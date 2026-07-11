@@ -41,8 +41,8 @@ function player(id) {
   (isGk ? GK : TECH).forEach(k => attrs[k] = rand20());
   MENT.forEach(k => attrs[k] = rand20());
   PHYS.forEach(k => attrs[k] = rand20());
-  // waarde in GBP (zoals plugin), soms onbekend (null)
-  const value = Math.random() < 0.1 ? null : Math.round(Math.pow(ca / 30, 4) * (age < 24 ? 2.2 : age > 30 ? 0.5 : 1) * 1000);
+  // waarde: net als de echte plugin bijna altijd null (FM berekent 'm live)
+  const value = Math.random() < 0.9 ? null : Math.round(Math.pow(ca / 30, 4) * 1000);
   return {
     id, name: pick(FIRST) + ' ' + pick(LAST),
     age, dob: String(2026 - age),

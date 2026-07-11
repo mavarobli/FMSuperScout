@@ -1,9 +1,16 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace FMSuperScout;
 
 internal static class Dumper
 {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int MessageBox(nint hWnd, string text, string caption, uint type);
+    // Systeemvenster als betrouwbare F9-feedback (IMGUI-overlay werkt niet in IL2CPP).
+    // Draait op de achtergrond-thread → blokkeert de game niet.
+    private static void Notify(string text) { try { MessageBox(0, text, "FMSuperScout", 0x40 | 0x40000 | 0x1000); } catch { } }
+
     private static readonly string OutDir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FMSuperScout");
 
@@ -211,6 +218,9 @@ internal static class Dumper
         Plugin.SetStatus($"FMSuperScout klaar ✓  {players.Count:N0} spelers, {staff.Count:N0} staf — " +
                          "open de web-app en klik Verversen", 20);
         WriteStatus("done", players.Count, staff.Count);
+        Notify($"Klaar!\n\n{players.Count:N0} spelers en {staff.Count:N0} staf ingelezen" +
+               $"{(MyClub != null ? $"\nManager: {ManagerName} · {MyClub}" : "")}\n\n" +
+               $"Open de FMSuperScout web-app en klik op Verversen.\n(Duur: {sw.ElapsedMilliseconds / 1000.0:0.0}s)");
     }
 
     // ---------- speler ----------
@@ -279,14 +289,15 @@ internal static class Dumper
 
         foreach (var (key, off) in Fields.StaffAttrs)
             e.StaffAttrs[key] = Attr(m, st + (ulong)Fields.NPLO_ATTRS + (ulong)off);
-        e.Job = GuessStaffRole(e.StaffAttrs);
 
         ulong con = m.Ptr(person + Fields.PERO_FULL_CONTRACT);
         if (con != 0)
         {
             e.Wage = Money(m.U32(con + Fields.CON_WEEKLY_WAGE));
             e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
+            e.Job = JobName(m.U8(con + 0x26));   // pero.Pcjo — echte functie uit contract
         }
+        if (string.IsNullOrEmpty(e.Job)) e.Job = "Staflid";
         e.Club = ResolveClubName(m, person);
         return e;
     }
@@ -377,23 +388,23 @@ internal static class Dumper
         return latin >= 2 && weird == 0;
     }
 
-    private static string GuessStaffRole(Dictionary<string, int> a)
+    // Echte functie uit personJobTypes-enum (byte op contract+0x26).
+    private static readonly Dictionary<int, string> Jobs = new()
     {
-        int G(string k) => a.GetValueOrDefault(k);
-        int gk = (G("KV_distributie") + G("KV_vangen") + G("KV_reflexen")) / 3;
-        int scout = (G("Oordeel_vermogen") + G("Oordeel_potentie")) / 2;
-        int coach = (G("Aanvallen") + G("Verdedigen") + G("Technisch") + G("Tactisch")) / 4;
-        int med = (G("Fysiotherapie") + G("Sportwetenschap")) / 2;
-        int fit = G("Fitheid");
-        int data = G("Data_analyse");
-        var opts = new (string role, int score)[]
-        {
-            ("Keeperstrainer", gk), ("Scout", scout), ("Coach", coach),
-            ("Fysiotherapeut", med), ("Fitnesscoach", fit), ("Data-analist", data),
-        };
-        var best = opts.OrderByDescending(o => o.score).First();
-        return best.score >= 8 ? best.role : "Staflid";
-    }
+        [1] = "Speler", [2] = "Coach", [3] = "Speler/Coach", [4] = "Voorzitter",
+        [6] = "Directeur", [8] = "Algemeen directeur", [10] = "Technisch directeur",
+        [12] = "Fysiotherapeut", [14] = "Scout", [16] = "Manager", [17] = "Speler/Manager",
+        [20] = "Assistent-manager", [21] = "Speler/Assistent-manager", [22] = "Media-analist",
+        [24] = "Algemeen manager", [26] = "Fitnesscoach", [27] = "Speler/Fitnesscoach",
+        [34] = "Keeperstrainer", [35] = "Speler/Keeperstrainer", [36] = "Hoofd data-analyse",
+        [38] = "Clubarts", [40] = "Hoofd sportwetenschap", [42] = "Data-analist",
+        [44] = "Hoofdscout", [45] = "Speler/Hoofdscout", [46] = "Arts", [48] = "Sportwetenschapper",
+        [49] = "Speler/Jeugdtrainer", [50] = "Hoofd fysiotherapie", [52] = "U19-manager",
+        [54] = "Trainer eerste elftal", [64] = "Hoofd jeugdopleiding", [65] = "Speler/Hoofd jeugd",
+        [66] = "Eigenaar", [70] = "President", [86] = "Loanmanager", [88] = "Technisch directeur",
+        [144] = "Interim-manager",
+    };
+    private static string JobName(int v) => Jobs.TryGetValue(v, out var s) ? s : null;
 
     // FM-datum: u32, jaar = raw>>16, dag-van-jaar = raw & 0x1ff
     private static (int year, int doy) DecodeFmDate(uint raw)

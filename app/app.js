@@ -43,7 +43,7 @@ const fmtDate = v => v ? String(v).slice(0, 10) : '–';
 // ---------- kolommen ----------
 const PLAYER_COLS = [
   { key: 'sl', label: '★', star: true },
-  { key: 'name', label: 'Naam', get: p => p.name },
+  { key: 'name', label: 'Naam', get: p => p.name, name: true },
   { key: 'age', label: 'Lft', num: true, get: p => p.age },
   { key: 'pos', label: 'Positie', get: p => p.pos || '–' },
   { key: 'club', label: 'Club', get: p => p.club, dimNull: true },
@@ -51,7 +51,7 @@ const PLAYER_COLS = [
   { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? '<span class="eu-yes">✓</span>' : '<span class="dim">–</span>' },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
-  { key: 'value', label: 'Waarde', num: true, get: p => p.value, fmt: fmtMoney },
+  { key: 'value', label: 'Waarde', num: true, get: p => estValue(p).v, render: p => estHtml(p) },
   { key: 'wage', label: 'Salaris p/w', num: true, get: p => p.wage, fmt: fmtMoney },
   { key: 'expires', label: 'Contract tot', get: p => p.expires, fmt: fmtDate },
   { key: 'interest', label: 'Interesse', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p) },
@@ -59,6 +59,50 @@ const PLAYER_COLS = [
 ];
 const qClass = v => v == null ? '' : v >= 150 ? 'q5' : v >= 120 ? 'q4' : v >= 90 ? 'q3' : v >= 60 ? 'q2' : 'q1';
 const qHtml = v => v == null ? '–' : `<span class="${qClass(v)}">${v}</span>`;
+
+// Geschatte marktwaarde (GBP): FM slaat de waarde meestal niet op maar berekent 'm live.
+// Model: exponentieel in CA, met leeftijds- en contractcorrectie. Grove richtwaarde.
+function estValue(p) {
+  if (p.value != null && p.value > 0) return { v: p.value, est: false };
+  if (!p.ca || p.ca < 1) return { v: null, est: false };
+  if (!p.club) return { v: 0, est: true };                 // transfervrij → geen som
+  const base = Math.pow(Math.max(0, p.ca - 40), 2.4) * 700;
+  const a = p.age || 25;
+  const af = a <= 20 ? 1.35 : a <= 24 ? 1.15 : a <= 28 ? 1.0 : a <= 31 ? 0.6 : a <= 34 ? 0.3 : 0.12;
+  const m = monthsUntil(p.expires);
+  const cf = (m != null && m <= 6) ? 0.4 : (m != null && m <= 12) ? 0.7 : 1.0;
+  return { v: Math.round(base * af * cf), est: true };
+}
+function estHtml(p) {
+  const e = estValue(p);
+  if (e.v == null) return '<span class="dim">–</span>';
+  return (e.est ? '<span class="dim">~</span>' : '') + fmtMoney(e.v);
+}
+
+// ---------- klembord / toast ----------
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'show';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.className = 'hidden', 1600);
+}
+function copyName(name) {
+  const ok = () => showToast('📋 Gekopieerd: ' + name);
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(name).then(ok, () => fallbackCopy(name, ok));
+  } else {
+    fallbackCopy(name, ok);
+  }
+}
+function fallbackCopy(text, ok) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); ok();
+  } catch { showToast('Kopiëren niet ondersteund'); }
+}
 
 // Interesse-inschatting (HEURISTIEK, geen exacte FM-waarde): reputatie jouw club vs
 // hun club is de hoofdfactor, plus beschikbaarheid, contract en leeftijd.
@@ -96,7 +140,7 @@ function intHtml(p) {
 }
 const STAFF_COLS = [
   { key: 'sl', label: '★', star: true },
-  { key: 'name', label: 'Naam', get: p => p.name },
+  { key: 'name', label: 'Naam', get: p => p.name, name: true },
   { key: 'age', label: 'Lft', num: true, get: p => p.age },
   { key: 'job', label: 'Rol', get: p => p.job || '–' },
   { key: 'club', label: 'Club', get: p => p.club, dimNull: true },
@@ -324,6 +368,7 @@ function renderVisible() {
       }
       if (c.render) return `<td class="${c.num ? 'num' : ''}">${c.render(p)}</td>`;
       let v = c.get(p);
+      if (c.name) return `<td class="pname" title="Klik om naam te kopiëren voor FM-zoekscherm">${v || '?'}</td>`;
       if (c.dimNull && !v) return `<td class="dim">–</td>`;
       if (c.fmt) v = c.fmt(v);
       if (v == null || v === '') v = '–';
@@ -335,7 +380,9 @@ function renderVisible() {
     tr.onclick = e => {
       const star = e.target.closest('[data-star]');
       if (star) { toggleShortlist(+star.dataset.star); e.stopPropagation(); return; }
-      showDetail(state.filtered[+tr.dataset.i]);
+      const p = state.filtered[+tr.dataset.i];
+      if (e.target.closest('.pname')) copyName(p.name);
+      showDetail(p);
     };
   });
 }
@@ -369,17 +416,21 @@ function showDetail(p) {
   const isPlayer = !!p.attrs;
   const on = state.shortlist.has(p.id);
 
-  let html = `<h2>${p.name} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span></h2>
+  const ev = estValue(p);
+  const valTxt = ev.v == null ? '–' : (ev.est ? '~' : '') + fmtMoney(ev.v);
+  let html = `<h2>${p.name} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span>
+    <button class="copybtn" data-copy="${p.name}" title="Kopieer naam voor FM-zoekscherm">📋</button></h2>
   <div class="sub">${p.age} jr · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${p.club || 'clubloos'}</div>
   <div class="kv">
     <div><b>CA</b> <span class="ca-bar">${p.ca ?? '–'}</span></div>
     <div><b>PA</b> <span class="pa-bar">${p.pa ?? '–'}</span></div>
     ${isPlayer ? `<div><b>Positie</b> ${p.pos || '–'}</div><div><b>Voet</b> ${p.foot || '–'}</div>` : `<div><b>Rol</b> ${p.job || '–'}</div>`}
-    <div><b>Waarde</b> ${fmtMoney(p.value)}</div>
+    <div><b>Gesch. waarde</b> ${valTxt}</div>
     <div><b>Salaris</b> ${fmtMoney(p.wage)} p/w</div>
     <div><b>Contract tot</b> ${fmtDate(p.expires)}</div>
     ${p.height ? `<div><b>Lengte</b> ${p.height} cm</div>` : ''}
-  </div>`;
+  </div>
+  ${isPlayer && ev.est && ev.v > 0 ? '<div class="dim" style="font-size:11px;margin:-4px 0 6px">Waarde is een schatting (CA/leeftijd/contract); FM bepaalt de echte transfersom in onderhandeling.</div>' : ''}`;
 
   const flags = [];
   if (isFree(p)) flags.push('<span class="pill">Clubloos</span>');
@@ -415,6 +466,8 @@ function showDetail(p) {
   }
   $('detail-body').innerHTML = html;
   document.querySelector('.detail-star').onclick = () => toggleShortlist(p.id);
+  const cb = document.querySelector('.copybtn');
+  if (cb) cb.onclick = () => copyName(p.name);
 }
 $('detail-close').onclick = () => { $('detail').classList.add('hidden'); state.selected = null; renderVisible(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-close').onclick(); });

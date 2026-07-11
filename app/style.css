@@ -130,6 +130,13 @@ input:focus, select:focus { outline: none; border-color: var(--accent2); }
 #grid td { padding: 5px 10px; border-bottom: 1px solid #1a212b; white-space: nowrap; color: var(--text); }
 #grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 #grid td.dim { color: var(--muted); }
+#grid td.pname { font-weight: 600; }
+#grid td.pname:hover { color: var(--accent2); text-decoration: underline; text-underline-offset: 2px; }
+.copybtn { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; font-size: 13px; padding: 2px 7px; margin-left: 4px; }
+.copybtn:hover { border-color: var(--accent2); }
+#toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: #06220f; padding: 9px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.4); opacity: 0; transition: opacity .15s, transform .15s; pointer-events: none; z-index: 100; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.hidden { opacity: 0; }
 #grid tbody tr { cursor: pointer; }
 #grid tbody tr:hover { background: var(--bg3); }
 #grid tbody tr.sel { background: #21314a; }
