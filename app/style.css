@@ -136,7 +136,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 /* ---------- tabel ---------- */
 #content { flex: 1 1 auto; min-width: 0; position: relative; display: flex; flex-direction: column; }
 #table-wrap { flex: 1 1 auto; overflow: auto; position: relative; }
-#grid { border-collapse: collapse; width: max-content; min-width: 100%; }
+#grid { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
 #grid th {
   position: sticky; top: 0; background: var(--bg3); color: var(--muted);
   font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
@@ -160,7 +160,9 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #colmenu .cm-row input { accent-color: var(--accent); }
 #colmenu .cm-reset { width: 100%; margin-top: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--muted); padding: 6px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 #colmenu .cm-reset:hover { color: var(--text); }
-#grid td { padding: 5px 10px; border-bottom: 1px solid #1a212b; white-space: nowrap; color: var(--text); }
+#grid td { padding: 0 10px; height: 28px; line-height: 28px; border-bottom: 1px solid #1a212b; white-space: nowrap; color: var(--text); box-sizing: border-box; overflow: hidden; }
+#grid td * { vertical-align: middle; line-height: normal; }
+#grid tbody tr { height: 28px; }
 #grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 #grid td.dim { color: var(--muted); }
 #grid td.pname { font-weight: 600; }

@@ -441,8 +441,20 @@ function sortRows() {
 }
 
 // ---------- gevirtualiseerde tabel ----------
-const ROW_H = 28;
+let ROW_H = 28;              // wordt na de eerste render gemeten (zoom/DPI-onafhankelijk)
 let renderQueued = false;
+// Meet de echte rijhoogte zodat spacer + translateY exact kloppen (voorkomt drift/verdwijnende lijnen).
+function measureRowH() {
+  const tr = $('grid-body').querySelector('tr');
+  if (!tr) return false;
+  const h = tr.getBoundingClientRect().height;
+  if (h > 12 && Math.abs(h - ROW_H) > 0.02) {
+    ROW_H = h;
+    $('grid-spacer').style.height = (state.filtered.length * ROW_H) + 'px';
+    return true;
+  }
+  return false;
+}
 function colLabel(c) { return c.star ? '★' : (c.label.startsWith('c_') || I18N.nl[c.label] ? t(c.label) : c.label); }
 function renderTable() {
   const cols = activeCols();
@@ -466,6 +478,7 @@ function renderTable() {
   });
   $('grid-spacer').style.height = (state.filtered.length * ROW_H) + 'px';
   renderVisible();
+  if (measureRowH()) renderVisible();   // hermeet en herpositioneer met echte hoogte
 }
 
 // rechtsklik op de koppen → kolommen tonen/verbergen
