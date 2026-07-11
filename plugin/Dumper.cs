@@ -10,6 +10,8 @@ internal static class Dumper
     // Diagnose-data (histogram van alle voorkomende class-offsets, gezet tijdens de scan).
     internal static Dictionary<int, long> AllOffHist = new();
     internal static long VtGp;
+    internal static int LinkedViaSquad;
+    internal static int ClubCount;
     // Person-adressen van de eerste spelers, voor club-offset-discovery in de diagnose.
     internal static readonly List<(ulong person, string name, string club)> DiagPersons = new();
     internal static string MyClub;       // club van de human-manager
@@ -57,6 +59,8 @@ internal static class Dumper
         var offsetHist = new Dictionary<int, int>();     // matches (speler/staf)
         var allOffHist = new Dictionary<int, long>();     // ALLE class-offsets (diagnose)
         var managers = new List<(ulong person, string name, string club, int rep)>(); // human-managers
+        var personToUid = new Dictionary<ulong, uint>(1 << 17); // person/objectstart-adres → uid
+        var clubObjs = new List<ulong>();                        // gedetecteerde club-objecten
         long candidates = 0, vtGp = 0;
 
         const int ChunkSize = 32 * 1024 * 1024; // 32 MB blokken
@@ -93,7 +97,15 @@ internal static class Dumper
 
                     bool isPlayer = off == Fields.PLAYER_OFFSET || off == Fields.PLAYER_STAFF_OFFSET;
                     bool isStaff = off == Fields.STAFF_OFFSET || off == Fields.HUMAN_MANAGER_OFFSET;
-                    if (!isPlayer && !isStaff) continue;
+                    if (!isPlayer && !isStaff)
+                    {
+                        // Club-detectie: object met teams-vector op +0x18/+0x20 en naam op +0xC0.
+                        ulong tb = mem.Ptr(p + 0x18), te = mem.Ptr(p + 0x20);
+                        if (tb != 0 && te > tb && (te - tb) % 8 == 0 && (te - tb) / 8 is >= 1 and <= 64
+                            && ClubNameOf(mem, p) != null)
+                            clubObjs.Add(p);
+                        continue;
+                    }
 
                     ulong basePtr = p - (ulong)off;
                     if (isPlayer)
@@ -103,7 +115,11 @@ internal static class Dumper
                         if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
                         offsetHist[off] = offsetHist.GetValueOrDefault(off) + 1;
                         if (!players.ContainsKey(uid))
+                        {
                             players[uid] = ReadPlayer(mem, p, basePtr, uid, ca, pa);
+                            personToUid[p] = uid;
+                            personToUid[basePtr] = uid;
+                        }
                     }
                     else
                     {
@@ -130,13 +146,59 @@ internal static class Dumper
         Dumper.AllOffHist = allOffHist;
         Dumper.VtGp = vtGp;
 
-        // Human-manager → jouw club. Kies de manager met een resolvebare club.
+        // ---- Squad-gebaseerde clubkoppeling (authoritatief) ----
+        // Loop clubs → teams → spelerslijst. Elke speler krijgt de club van zijn selectie;
+        // bij meerdere selecties wint het eerste elftal (laagste teamtype). Ook: welke club
+        // heeft de human-manager als teammanager → jouw club.
+        var mgrAddrs = new HashSet<ulong>(managers.Select(x => x.person));
+        var squadClub = new Dictionary<uint, (string club, int tt, int rep)>();
+        foreach (ulong club in clubObjs)
+        {
+            string cname = ClubNameOf(mem, club);
+            if (cname == null) continue;
+            ulong tb = mem.Ptr(club + 0x18), te = mem.Ptr(club + 0x20);
+            if (tb == 0 || te <= tb) continue;
+            ulong teamCount = (te - tb) / 8;
+            if (teamCount > 64) continue;
+            for (ulong ti = 0; ti < teamCount; ti++)
+            {
+                ulong team = mem.Ptr(tb + ti * 8);
+                if (team == 0) continue;
+                int tt = mem.U8(team + 0x28);            // teamtype (0 = eerste elftal)
+                int trep = mem.U16(team + 0xA8);
+                if (trep is < 0 or > 12000) trep = 0;
+                // manager van dit team → is het jouw human-manager?
+                ulong mgr = mem.Ptr(team + 0x80);
+                if (mgr != 0 && mgrAddrs.Contains(mgr) && (MyClub == null || tt == 0))
+                { MyClub = cname; MyClubRep = trep; }
+                // spelerslijst
+                ulong pb = mem.Ptr(team + 0x38), pe = mem.Ptr(team + 0x40);
+                if (pb == 0 || pe <= pb) continue;
+                ulong pcount = (pe - pb) / 8;
+                if (pcount > 200) continue;
+                for (ulong pi = 0; pi < pcount; pi++)
+                {
+                    ulong pp = mem.Ptr(pb + pi * 8);
+                    if (pp == 0 || !personToUid.TryGetValue(pp, out uint puid)) continue;
+                    if (!squadClub.TryGetValue(puid, out var cur) || tt < cur.tt)
+                        squadClub[puid] = (cname, tt, trep);
+                }
+            }
+        }
+        // Koppel clubs aan spelers (squad wint; anders blijft contract-keten-fallback staan).
+        foreach (var p in players.Values)
+            if (squadClub.TryGetValue(p.Uid, out var sc)) { p.Club = sc.club; if (sc.rep > 0) p.ClubRep = sc.rep; }
+
+        Dumper.LinkedViaSquad = squadClub.Count;
+        Dumper.ClubCount = clubObjs.Count;
+
+        // Human-manager fallback als geen team-match gevonden is.
         var me = managers.FirstOrDefault(x => !string.IsNullOrEmpty(x.club));
         if (me.person == 0 && managers.Count > 0) me = managers[0];
-        MyClub = me.club;
         ManagerName = me.name;
-        MyClubRep = me.rep;
-        Plugin.Log.LogInfo($"Manager: {ManagerName ?? "?"} · club: {MyClub ?? "?"} (rep {MyClubRep}) ({managers.Count} human-managers)");
+        if (MyClub == null) { MyClub = me.club; MyClubRep = me.rep; }
+        Plugin.Log.LogInfo($"Manager: {ManagerName ?? "?"} · club: {MyClub ?? "?"} (rep {MyClubRep}) · " +
+                           $"{clubObjs.Count} clubs, {squadClub.Count} spelers via selectie gekoppeld");
 
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
@@ -262,28 +324,20 @@ internal static class Dumper
     //   naam     = indirecte string op club + 0xC0 (cluo.Cnam) / +0xC8 (Csnm)
     private const int CLUB_NAME = 0xC0;
     private const int CLUB_SHORT_NAME = 0xC8;
-    private const int CLUB_ON_PERSON = 0x80;   // person→huidige club (60/60 gevuld, nationaliteit-passend)
-    private const int CLUB_TEAMS = 0x18;       // cluo→teams-vector (begin-pointer)
-    private const int TEAM_REP = 0xA8;         // teao.Trep — reputatie (2 bytes, ~0..10000)
 
-    // Huidige club via person+0x80. Geeft clubnaam + reputatie (via eerste team van de club).
+    // Fallback-club via contract-keten: contract(0xA8)→team(0x10)→club(0x30). Voor spelers
+    // buiten geladen competities (die niet in een selectie-object staan). De squad-walk
+    // overschrijft dit met de authoritatieve club. Ook gebruikt voor staf/manager.
     private static (string name, int rep) ResolveClub(MemScan m, ulong person)
     {
-        ulong club = m.Ptr(person + CLUB_ON_PERSON);
-        if (club == 0) return (null, 0);
-        string name = ClubNameOf(m, club);
-        return (name, name == null ? 0 : ClubRep(m, club));
-    }
-
-    // Reputatie: club→eerste team→teao.Trep.
-    private static int ClubRep(MemScan m, ulong club)
-    {
-        ulong teamsBegin = m.Ptr(club + CLUB_TEAMS);
-        if (teamsBegin == 0) return 0;
-        ulong firstTeam = m.Ptr(teamsBegin);
-        if (firstTeam == 0) return 0;
-        int rep = m.U16(firstTeam + TEAM_REP);
-        return rep is > 0 and <= 12000 ? rep : 0;
+        ulong con = m.Ptr(person + (ulong)Fields.PERO_FULL_CONTRACT);
+        if (con == 0) return (null, 0);
+        ulong team = m.Ptr(con + 0x10);
+        if (team == 0) return (null, 0);
+        int rep = m.U16(team + 0xA8);
+        if (rep is < 0 or > 12000) rep = 0;
+        ulong club = m.Ptr(team + 0x30);
+        return (club == 0 ? null : ClubNameOf(m, club), rep);
     }
 
     private static string ResolveClubName(MemScan m, ulong person) => ResolveClub(m, person).name;
@@ -487,15 +541,15 @@ internal static class Dumper
                 w.WriteLine($"  person+0x{kv.Key:X} : {kv.Value}/{DiagPersons.Count} hits  bv. [{string.Join(", ", clubSamples[kv.Key])}]");
             w.WriteLine();
             w.WriteLine($"Mijn club: {ManagerName} · {MyClub} · reputatie={MyClubRep}");
+            w.WriteLine($"Clubs gedetecteerd: {ClubCount} · spelers via selectie gekoppeld: {LinkedViaSquad}");
             w.WriteLine();
-            w.WriteLine("=== TOP-20 CA — welke offset geeft de JUISTE huidige club? ===");
-            w.WriteLine("(vergelijk met wat je in-game ziet: 0x80 is nu live gebruikt)");
+            w.WriteLine("=== TOP-20 CA — huidige club (via selectie) vs alternatieven ===");
+            w.WriteLine("(FINAL = wat de app toont; vergelijk met in-game. 0x80=geboorteplaats, 0x108/keten=oude bron)");
             foreach (var p in players.Values.OrderByDescending(x => x.Ca).Take(20))
             {
-                string c80 = ClubNameAt(m, p.PersonAddr + 0x80);
                 string c108 = ClubNameAt(m, p.PersonAddr + 0x108);
                 string cChain = ChainClubName(m, p.PersonAddr);
-                w.WriteLine($"  {p.Name,-22} CA{p.Ca} clubRep={p.ClubRep,-5} | 0x80={c80} | 0x108={c108} | keten={cChain}");
+                w.WriteLine($"  {p.Name,-22} CA{p.Ca} rep={p.ClubRep,-5} | FINAL={p.Club ?? "-"} | 0x108={c108} | keten={cChain}");
             }
             w.WriteLine();
             w.WriteLine("Sample spelers (eerste 12) — let op reputatie-schaal (clubRep/worldRep):");
