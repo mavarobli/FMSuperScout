@@ -24,6 +24,7 @@ internal static class Dumper
     {
         var sw = Stopwatch.StartNew();
         Plugin.Log.LogInfo("FMSuperScout: geheugen scannen…");
+        Plugin.SetStatus("FMSuperScout: database scannen… (±20 sec)", 3600);
         Directory.CreateDirectory(OutDir);
 
         var mem = new MemScan();
@@ -127,6 +128,8 @@ internal static class Dumper
 
         Plugin.Log.LogInfo($"Klaar in {sw.ElapsedMilliseconds} ms. Bestand in {OutDir}. " +
                            "Open de FMSuperScout web-app en klik Verversen.");
+        Plugin.SetStatus($"FMSuperScout klaar ✓  {players.Count:N0} spelers, {staff.Count:N0} staf — " +
+                         "open de web-app en klik Verversen", 20);
     }
 
     // ---------- speler ----------
@@ -227,35 +230,44 @@ internal static class Dumper
         return s == null ? new List<string>() : new List<string> { s };
     }
 
-    // Clubnaam: een club-object heeft een INDIRECTE naam-string op +0xC0 (kort op +0xC8).
-    // (Spelernamen zijn genest, club/natie indirect — verschil verklaarde lege clubs.)
-    // De persoon→club-pointer staat op een nog vast te pinnen offset; we proberen
-    // kandidaten en valideren op een plausibele naam. Discovery-diag pint het exact.
+    // Huidige club via de brondata-keten (authoritatief, uit gedecompileerde CE-tabel):
+    //   contract = [person + 0xA8]   (pero.Pflc, volledig contract)
+    //   team     = [contract + 0x10] (pero.Pcti)
+    //   club     = [team + 0x30]     (teao.Tclu)
+    //   naam     = indirecte string op club + 0xC0 (cluo.Cnam) / +0xC8 (Csnm)
     private const int CLUB_NAME = 0xC0;
     private const int CLUB_SHORT_NAME = 0xC8;
-    private static readonly int[] ClubCandidateOffsets =
-    {
-        0xA0, 0x98, 0x90, 0xA8, 0xB0, 0xB8, 0xC0, 0xC8, 0xD0, 0xD8, 0xE0, 0xE8, 0xF0, 0xF8,
-        0x100, 0x108, 0x110, 0x118, 0x120, 0x128, 0x130,
-    };
+    private const int CON_TEAM = 0x10;
+    private const int TEAM_CLUB = 0x30;
 
     private static string ResolveClubName(MemScan m, ulong person)
     {
-        foreach (int off in ClubCandidateOffsets)
-        {
-            ulong club = m.Ptr(person + (ulong)off);
-            if (club == 0) continue;
-            string name = m.IndirectString(club + CLUB_NAME) ?? m.IndirectString(club + CLUB_SHORT_NAME);
-            if (PlausibleClub(name)) return name;
-        }
-        return null;
+        ulong con = m.Ptr(person + (ulong)Fields.PERO_FULL_CONTRACT);
+        if (con == 0) return null;
+        ulong team = m.Ptr(con + CON_TEAM);
+        if (team == 0) return null;
+        ulong club = m.Ptr(team + (ulong)TEAM_CLUB);
+        if (club == 0) return null;
+        return ClubNameOf(m, club);
     }
 
+    private static string ClubNameOf(MemScan m, ulong club)
+    {
+        string name = m.IndirectString(club + CLUB_NAME) ?? m.IndirectString(club + CLUB_SHORT_NAME);
+        return PlausibleClub(name) ? name : null;
+    }
+
+    // Alleen echte namen: overwegend Latijnse letters, geen Cyrillische/rare bytes.
     private static bool PlausibleClub(string s)
     {
-        if (string.IsNullOrEmpty(s) || s.Length is < 2 or > 40) return false;
-        int letters = s.Count(char.IsLetter);
-        return letters >= 2 && letters >= s.Length / 2;
+        if (string.IsNullOrEmpty(s) || s.Length is < 2 or > 48) return false;
+        int latin = 0, weird = 0;
+        foreach (char c in s)
+        {
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) latin++;
+            else if (c > 0x7F && !"àáâäãåèéêëìíîïòóôöõùúûüñçøæœšžčćđ".Contains(char.ToLower(c))) weird++;
+        }
+        return latin >= 2 && weird == 0;
     }
 
     private static string GuessStaffRole(Dictionary<string, int> a)
