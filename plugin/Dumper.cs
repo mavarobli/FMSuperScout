@@ -1,15 +1,9 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace FMSuperScout;
 
 internal static class Dumper
 {
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int MessageBox(nint hWnd, string text, string caption, uint type);
-    // Systeemvenster als betrouwbare F9-feedback (IMGUI-overlay werkt niet in IL2CPP).
-    // Draait op de achtergrond-thread → blokkeert de game niet.
-    private static void Notify(string text) { try { MessageBox(0, text, "FMSuperScout", 0x40 | 0x40000 | 0x1000); } catch { } }
 
     private static readonly string OutDir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FMSuperScout");
@@ -47,7 +41,6 @@ internal static class Dumper
     {
         var sw = Stopwatch.StartNew();
         Plugin.Log.LogInfo("FMSuperScout: geheugen scannen…");
-        Plugin.SetStatus("FMSuperScout: database scannen… (±20 sec)", 3600);
         Directory.CreateDirectory(OutDir);
         WriteStatus("scanning", 0, 0);
 
@@ -227,10 +220,7 @@ internal static class Dumper
 
         Plugin.Log.LogInfo($"Klaar in {sw.ElapsedMilliseconds} ms. Bestand in {OutDir}. " +
                            "Open de FMSuperScout web-app en klik Verversen.");
-        Plugin.SetStatus($"FMSuperScout klaar ✓  {players.Count:N0} spelers, {staff.Count:N0} staf — " +
-                         "open de web-app en klik Verversen", 20);
-        WriteStatus("done", players.Count, staff.Count);
-        // Geen MessageBox meer: de web-app-banner toont de status.
+        WriteStatus("done", players.Count, staff.Count);   // web-app-banner leest dit
     }
 
     // ---------- speler ----------
@@ -627,7 +617,6 @@ internal sealed class Person
     public long Wage;
     public string Expires;
     public bool Listed;
-    public bool LoanListed;
     public bool NotForSale;
     public bool SetForRelease;
     public int CurRep;

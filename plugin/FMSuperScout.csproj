@@ -37,7 +37,6 @@
     <Reference Include="$(InteropDir)\SI.UI.dll" Private="false" />
     <Reference Include="$(InteropDir)\Assembly-CSharp.dll" Private="false" />
     <Reference Include="$(InteropDir)\UnityEngine.CoreModule.dll" Private="false" />
-    <Reference Include="$(InteropDir)\UnityEngine.IMGUIModule.dll" Private="false" />
     <Reference Include="$(InteropDir)\Unity.InputSystem.dll" Private="false" />
   </ItemGroup>
 

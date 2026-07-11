@@ -16,15 +16,6 @@ public class Plugin : BasePlugin
 
     internal static new ManualLogSource Log;
 
-    // On-screen status (zichtbaar in de game, ook zonder console).
-    internal static string Status = "";
-    internal static DateTime StatusExpiry = DateTime.MinValue;
-    internal static void SetStatus(string msg, double seconds)
-    {
-        Status = msg;
-        StatusExpiry = DateTime.Now.AddSeconds(seconds);
-    }
-
     public override void Load()
     {
         Log = base.Log;
@@ -45,33 +36,6 @@ public class HotkeyBehaviour : MonoBehaviour
     public HotkeyBehaviour(System.IntPtr ptr) : base(ptr) { }
 
     private bool _busy;
-
-    // Tekstvlak linksboven in de game met de dump-status (werkt zonder console).
-    private GUIStyle _style;
-    private void OnGUI()
-    {
-      try
-      {
-        if (DateTime.Now > Plugin.StatusExpiry || string.IsNullOrEmpty(Plugin.Status)) return;
-        if (_style == null)
-        {
-            _style = new GUIStyle();
-            _style.fontSize = 16;
-            _style.normal.textColor = Color.white;
-        }
-        string txt = "⚽ FMSuperScout — " + Plugin.Status;
-        float w = 10f * txt.Length + 28f;
-        if (w > 900f) w = 900f;
-        var box = new Rect(12f, 12f, w, 38f);
-        GUI.color = new Color(0.06f, 0.12f, 0.08f, 0.95f);
-        GUI.DrawTexture(box, Texture2D.whiteTexture);        // gevulde achtergrond (altijd zichtbaar)
-        GUI.color = Color.white;
-        GUI.Label(new Rect(26f, 20f, w, 26f), txt, _style);  // tekst erover
-      }
-      catch { /* IMGUI niet beschikbaar — web-app toont de status ook */ }
-
-    }
-
     private int _frame;
     private static readonly string RequestFile = System.IO.Path.Combine(
         System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
