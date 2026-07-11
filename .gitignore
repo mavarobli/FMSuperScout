@@ -1,0 +1,13 @@
+# Gekloonde referentierepos (1,6 GB, niet van ons)
+refs/
+
+# Build-output
+plugin/bin/
+plugin/obj/
+
+# Node
+node_modules/
+
+# OS
+Thumbs.db
+desktop.ini

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>FMSuperScout</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+</head>
+<body>
+<header id="topbar">
+  <h1>FM<span>Super</span>Scout</h1>
+  <nav>
+    <button id="tab-players" class="tab active">Spelers</button>
+    <button id="tab-staff" class="tab">Staf</button>
+  </nav>
+  <div id="dump-info">geen data</div>
+  <button id="btn-reload" title="Herlaad de nieuwste dump">⟳ Verversen</button>
+</header>
+
+<div id="main">
+  <aside id="filters">
+    <div class="fgroup">
+      <label>Zoek naam</label>
+      <input type="text" id="f-name" placeholder="bijv. Timber">
+    </div>
+    <div class="fgroup" id="fg-pos">
+      <label>Positie</label>
+      <div id="f-pos" class="poschips"></div>
+    </div>
+    <div class="fgroup">
+      <label>Leeftijd <span id="f-age-lbl"></span></label>
+      <div class="range2"><input type="number" id="f-age-min" placeholder="min" min="14" max="50">–<input type="number" id="f-age-max" placeholder="max" min="14" max="50"></div>
+    </div>
+    <div class="fgroup">
+      <label>Huidig niveau (CA)</label>
+      <div class="range2"><input type="number" id="f-ca-min" placeholder="min" min="0" max="200">–<input type="number" id="f-ca-max" placeholder="max" min="0" max="200"></div>
+    </div>
+    <div class="fgroup">
+      <label>Potentieel (PA)</label>
+      <div class="range2"><input type="number" id="f-pa-min" placeholder="min" min="0" max="200">–<input type="number" id="f-pa-max" placeholder="max" min="0" max="200"></div>
+    </div>
+    <div class="fgroup">
+      <label>Max. vraagprijs (€)</label>
+      <input type="text" id="f-price" placeholder="bijv. 10M of 500K">
+    </div>
+    <div class="fgroup">
+      <label>Max. salariseis (€ p/w)</label>
+      <input type="text" id="f-wage" placeholder="bijv. 50K">
+    </div>
+    <div class="fgroup">
+      <label>Nationaliteit</label>
+      <input type="text" id="f-nat" placeholder="bijv. NED">
+    </div>
+    <div class="fgroup">
+      <label>Club / competitie</label>
+      <input type="text" id="f-club" placeholder="bijv. Ajax of Eredivisie">
+    </div>
+    <div class="fgroup checks">
+      <label><input type="checkbox" id="f-interest"> Wil naar mijn club</label>
+      <label><input type="checkbox" id="f-listed"> Op transferlijst</label>
+      <label><input type="checkbox" id="f-loan"> Te huur</label>
+      <label><input type="checkbox" id="f-expiring"> Contract &lt; 1 jaar</label>
+      <label><input type="checkbox" id="f-free"> Transfervrij</label>
+    </div>
+    <div class="fgroup" id="fg-staffrole" style="display:none">
+      <label>Staf-rol</label>
+      <select id="f-staffrole"><option value="">Alle rollen</option></select>
+    </div>
+    <button id="btn-clear">Filters wissen</button>
+    <div id="result-count"></div>
+  </aside>
+
+  <section id="content">
+    <div id="table-wrap">
+      <table id="grid">
+        <thead><tr id="grid-head"></tr></thead>
+        <tbody id="grid-body"></tbody>
+      </table>
+      <div id="grid-spacer"></div>
+    </div>
+    <div id="empty-state">
+      <h2>Nog geen data geladen</h2>
+      <p id="empty-msg">Start FM26, laad je save en druk op <b>F9</b> om de database te dumpen.<br>Klik daarna hierboven op <b>⟳ Verversen</b>.</p>
+    </div>
+  </section>
+
+  <aside id="detail" class="hidden">
+    <button id="detail-close">✕</button>
+    <div id="detail-body"></div>
+  </aside>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
