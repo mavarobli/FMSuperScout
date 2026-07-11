@@ -38,6 +38,13 @@ internal static class Fields
     public const int PERO_DOB = 0x88;         // u32 FM-datum
     public const int PERO_FULL_CONTRACT = 0xA8; // ptr → contract-object
 
+    // Verborgen persoonlijkheid (pero.Pada), bytes 1..20:
+    public const int PERO_ADAPTABILITY = 0x70;
+    public const int PERO_AMBITION = 0x71;
+    public const int PERO_LOYALTY = 0x72;
+    public const int PERO_PRESSURE = 0x73;
+    public const int PERO_PROFESSIONALISM = 0x74;
+
     // --- In het contract-object (via [person+PERO_FULL_CONTRACT]) ---
     public const int CON_WEEKLY_WAGE = 0x20;  // u32 GBP p/w
     public const int CON_EXPIRY = 0x48;       // u32 FM-datum

@@ -60,18 +60,35 @@ const PLAYER_COLS = [
 const qClass = v => v == null ? '' : v >= 150 ? 'q5' : v >= 120 ? 'q4' : v >= 90 ? 'q3' : v >= 60 ? 'q2' : 'q1';
 const qHtml = v => v == null ? '–' : `<span class="${qClass(v)}">${v}</span>`;
 
-// Geschatte marktwaarde (GBP): FM slaat de waarde meestal niet op maar berekent 'm live.
-// Model: exponentieel in CA, met leeftijds- en contractcorrectie. Grove richtwaarde.
+// Geschatte marktwaarde (GBP). FM slaat de waarde meestal niet op maar berekent 'm live
+// uit vooral REPUTATIE + CA + leeftijd + contract (onderbouwd door SI-forum/community-
+// onderzoek). Model: reputatie-anker (exponentieel) × CA × leeftijd × contract.
+// Reputatie is 0..10000; waarde ~verdubbelt per ~1660 rep-punten.
 function estValue(p) {
-  if (p.value != null && p.value > 0) return { v: p.value, est: false };
+  if (p.value != null && p.value > 0) return { v: p.value, est: false, lo: Math.round(p.value * 0.8), hi: Math.round(p.value * 1.2) };
   if (!p.ca || p.ca < 1) return { v: null, est: false };
-  if (!p.club) return { v: 0, est: true };                 // transfervrij → geen som
-  const base = Math.pow(Math.max(0, p.ca - 40), 2.4) * 700;
+  if (!p.club) return { v: 0, est: true };                 // transfervrij → geen transfersom
+  // Effectieve reputatie: wereld-reputatie, met een CA-vloer zodat jonge talenten
+  // (nog onbekend, lage rep) niet ondergewaardeerd worden.
+  const effRep = Math.max(p.worldRep || 0, p.ca * 38, (p.clubRep || 0) * 0.5);
+  const base = 860000 * Math.exp(effRep / 2400);
+  const fCA = Math.pow(p.ca / 100, 2.2);
+  // leeftijd + potentie-premie voor jonge spelers met veel groei
   const a = p.age || 25;
-  const af = a <= 20 ? 1.35 : a <= 24 ? 1.15 : a <= 28 ? 1.0 : a <= 31 ? 0.6 : a <= 34 ? 0.3 : 0.12;
+  const paHead = Math.max(0, (p.pa || p.ca) - p.ca);
+  let fage;
+  if (a <= 21) fage = 1.0 + Math.min(1.0, paHead / 45);
+  else if (a <= 26) fage = 1.0;
+  else if (a <= 30) fage = 0.7;
+  else if (a <= 33) fage = 0.4;
+  else fage = 0.18;
+  // contract: min(1, 0.4 + 0.2·jaren); laatste maanden hard omlaag
   const m = monthsUntil(p.expires);
-  const cf = (m != null && m <= 6) ? 0.4 : (m != null && m <= 12) ? 0.7 : 1.0;
-  return { v: Math.round(base * af * cf), est: true };
+  const yrs = m != null ? m / 12 : 3;
+  let fcon = Math.min(1.0, 0.4 + 0.2 * yrs);
+  if (m != null && m <= 4) fcon = 0.28;
+  const v = Math.round(base * fCA * fage * fcon / 1e5) * 1e5; // afronden op 100K
+  return { v, est: true, lo: Math.round(v * 0.78), hi: Math.round(v * 1.22) };
 }
 function estHtml(p) {
   const e = estValue(p);
@@ -110,25 +127,45 @@ function interestEstimate(p) {
   const myRep = state.meta.myClubRep || 0;
   if (!myRep) return null;              // onbekend zonder jouw clubreputatie
   const their = p.clubRep || 0;
+  const bigger = myRep - their;         // >0 = jouw club groter dan de zijne
   let score = 50; const why = [];
-  if (isFree(p)) { score = 78; why.push('clubloos'); }
-  else {
-    const d = myRep - their;
-    if (d >= 500) { score = 82; why.push('stap omhoog'); }
-    else if (d >= -500) { score = 66; why.push('gelijkwaardig'); }
-    else if (d >= -2000) { score = 45; why.push('kleinere club'); }
-    else if (d >= -4000) { score = 26; why.push('veel kleiner'); }
-    else { score = 10; why.push('jouw club te klein'); }
+
+  // 1) Reputatievergelijking — FM's dominante factor.
+  if (isFree(p)) { score = 76; why.push('clubloos'); }
+  else if (bigger >= 500) { score = 80; why.push('stap omhoog'); }
+  else if (bigger >= -500) { score = 62; why.push('gelijkwaardig'); }
+  else if (bigger >= -2000) { score = 42; why.push('kleinere club'); }
+  else if (bigger >= -4000) { score = 24; why.push('veel kleiner'); }
+  else { score = 10; why.push('jouw club te klein'); }
+
+  // 2) Ambitie (echt attribuut): ambitieuze spelers willen omhoog; bij een stap
+  //    omlaag remt ambitie juist. Loyaliteit houdt ze bij hun club.
+  if (p.ambition) {
+    const amb = p.ambition - 10;
+    score += (bigger >= 0 ? 1.6 : -1.6) * amb;
+    if (p.ambition >= 16 && bigger < -500) why.push('ambitieus (wil niet zakken)');
+    else if (p.ambition >= 16 && bigger >= 0) why.push('ambitieus');
+    else if (p.ambition <= 6) why.push('weinig ambitie');
   }
+  // 3) Beschikbaarheid & contract.
   if (p.listed || p.setForRelease) { score += 18; why.push('beschikbaar'); }
   const m = monthsUntil(p.expires);
-  if (m != null && m <= 6) { score += 12; why.push('aflopend contract'); }
-  if (p.notForSale) { score -= 28; why.push('niet te koop'); }
-  if (p.worldRep && p.worldRep > myRep + 1500 && !isFree(p)) { score -= 18; why.push('grotere naam dan club'); }
+  if (m != null && m <= 6) { score += 14; why.push('aflopend contract'); }
+  if (p.notForSale) { score -= 26; why.push('niet te koop'); }
+  if (p.worldRep && p.worldRep > myRep + 1500 && !isFree(p)) { score -= 16; why.push('grotere naam dan club'); }
+
+  // 4) Leeftijd.
   if (p.age <= 15) { score = Math.min(score, 8); why.push('te jong (<16)'); }
   else if (p.age <= 17 && !isFree(p)) { score -= 8; why.push('jong, wacht vaak'); }
-  if (p.pa >= 155 && their >= myRep && p.age < 24 && !isFree(p)) { score -= 12; why.push('talent, zit goed'); }
-  score = Math.max(0, Math.min(100, score));
+
+  // 5) Loyaliteit als dempingsfactor (onderzoek-onderbouwd): hoge loyaliteit schaaft
+  //    tot ~40% af, vooral als het geen duidelijke stap omhoog is.
+  if (p.loyalty && !isFree(p)) {
+    score *= (1 - 0.40 * (p.loyalty / 20));
+    if (p.loyalty >= 16) why.push('zeer loyaal');
+  }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
   const label = score >= 70 ? 'Groot' : score >= 45 ? 'Redelijk' : score >= 25 ? 'Klein' : 'Nee';
   const cls = score >= 70 ? 'int-g' : score >= 45 ? 'int-r' : score >= 25 ? 'int-k' : 'int-n';
   return { score, label, cls, why };
@@ -417,7 +454,10 @@ function showDetail(p) {
   const on = state.shortlist.has(p.id);
 
   const ev = estValue(p);
-  const valTxt = ev.v == null ? '–' : (ev.est ? '~' : '') + fmtMoney(ev.v);
+  const valTxt = ev.v == null ? '–'
+    : ev.v === 0 ? 'transfervrij'
+    : ev.est ? `${fmtMoney(ev.lo)} – ${fmtMoney(ev.hi)}`
+    : fmtMoney(ev.v);
   let html = `<h2>${p.name} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span>
     <button class="copybtn" data-copy="${p.name}" title="Kopieer naam voor FM-zoekscherm">📋</button></h2>
   <div class="sub">${p.age} jr · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${p.club || 'clubloos'}</div>
@@ -427,6 +467,7 @@ function showDetail(p) {
     ${isPlayer ? `<div><b>Positie</b> ${p.pos || '–'}</div><div><b>Voet</b> ${p.foot || '–'}</div>` : `<div><b>Rol</b> ${p.job || '–'}</div>`}
     <div><b>Gesch. waarde</b> ${valTxt}</div>
     <div><b>Salaris</b> ${fmtMoney(p.wage)} p/w</div>
+    ${p.worldRep ? `<div><b>Reputatie</b> ${p.worldRep} / 10000</div>` : ''}
     <div><b>Contract tot</b> ${fmtDate(p.expires)}</div>
     ${p.height ? `<div><b>Lengte</b> ${p.height} cm</div>` : ''}
   </div>
@@ -445,7 +486,9 @@ function showDetail(p) {
 
   if (isPlayer) {
     const i = interestEstimate(p);
-    if (i) html += `<div class="interest-box"><b>Interesse-inschatting:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100 — ${i.why.join(', ')})</span><br><span class="dim">schatting o.b.v. reputatie, contract &amp; leeftijd — geen exacte FM-waarde</span></div>`;
+    if (i) html += `<div class="interest-box"><b>Interesse-inschatting:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100 — ${i.why.join(', ')})</span><br><span class="dim">schatting o.b.v. reputatie, persoonlijkheid, contract &amp; leeftijd — geen exacte FM-waarde</span></div>`;
+    const pers = [['Ambitie', p.ambition], ['Loyaliteit', p.loyalty], ['Professionaliteit', p.professionalism], ['Aanpassing', p.adaptability]].filter(x => x[1] > 0);
+    if (pers.length) html += '<div class="kv" style="margin-top:6px">' + pers.map(([k, v]) => `<div><b>${k}</b> <span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>';
   }
 
   if (isPlayer) {

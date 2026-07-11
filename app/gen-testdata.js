@@ -59,6 +59,7 @@ function player(id) {
     notForSale: Math.random() < 0.15,
     clubRep: club ? CLUB_REP[club] : 0,
     worldRep: Math.round(ca * 45 + ri(-500, 500)),
+    ambition: ri(5, 20), loyalty: ri(1, 20), professionalism: ri(3, 20), adaptability: ri(5, 20),
     attrs,
   };
 }

@@ -218,9 +218,7 @@ internal static class Dumper
         Plugin.SetStatus($"FMSuperScout klaar ✓  {players.Count:N0} spelers, {staff.Count:N0} staf — " +
                          "open de web-app en klik Verversen", 20);
         WriteStatus("done", players.Count, staff.Count);
-        Notify($"Klaar!\n\n{players.Count:N0} spelers en {staff.Count:N0} staf ingelezen" +
-               $"{(MyClub != null ? $"\nManager: {ManagerName} · {MyClub}" : "")}\n\n" +
-               $"Open de FMSuperScout web-app en klik op Verversen.\n(Duur: {sw.ElapsedMilliseconds / 1000.0:0.0}s)");
+        // Geen MessageBox meer: de web-app-banner toont de status.
     }
 
     // ---------- speler ----------
@@ -271,6 +269,11 @@ internal static class Dumper
         }
         e.CurRep = m.U16(pl + Fields.PLAO_CUR_REP);
         e.WorldRep = m.U16(pl + Fields.PLAO_WORLD_REP);
+        e.Ambition = ClampAttr(m.U8(person + Fields.PERO_AMBITION));
+        e.Loyalty = ClampAttr(m.U8(person + Fields.PERO_LOYALTY));
+        e.Professionalism = ClampAttr(m.U8(person + Fields.PERO_PROFESSIONALISM));
+        e.Adaptability = ClampAttr(m.U8(person + Fields.PERO_ADAPTABILITY));
+        e.Pressure = ClampAttr(m.U8(person + Fields.PERO_PRESSURE));
         e.PersonAddr = person;
         var (cname, crep) = ResolveClub(m, person);
         e.Club = cname; e.ClubRep = crep;
@@ -308,6 +311,9 @@ internal static class Dumper
         int v = (int)System.Math.Floor(raw / 5.0 + 0.5);
         return System.Math.Clamp(v, 0, 20);
     }
+
+    // Persoonlijkheid is als rauwe byte 1..20 opgeslagen (geen ×5).
+    private static int ClampAttr(int raw) => raw is >= 1 and <= 20 ? raw : 0;
 
     private static string ReadName(MemScan m, ulong person)
     {
@@ -488,6 +494,10 @@ internal static class Dumper
             j.Prop("setForRelease", p.SetForRelease);
             j.Prop("clubRep", p.ClubRep);
             j.Prop("worldRep", p.WorldRep);
+            j.Prop("ambition", p.Ambition);
+            j.Prop("loyalty", p.Loyalty);
+            j.Prop("professionalism", p.Professionalism);
+            j.Prop("adaptability", p.Adaptability);
             j.Key("attrs"); j.BeginObj();
             foreach (var kv in p.Attrs) { j.Key(kv.Key); j.Val((long)kv.Value); }
             j.EndObj();
@@ -601,6 +611,11 @@ internal sealed class Person
     public int CurRep;
     public int WorldRep;
     public int ClubRep;
+    public int Ambition;
+    public int Loyalty;
+    public int Professionalism;
+    public int Adaptability;
+    public int Pressure;
     public ulong PersonAddr;
     public string Job;
     public Dictionary<string, int> Attrs = new();
