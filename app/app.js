@@ -636,11 +636,10 @@ function showDetail(p) {
     html += `<label class="potswitch${canPot ? '' : ' off'}"><input type="checkbox" id="pot-toggle" ${state.showPot ? 'checked' : ''} ${canPot ? '' : 'disabled'}> ${t('showPot')}${state.showPot ? ` <span class="dim">(${t('potNote')})</span>` : ''}</label>`;
     const isGk = (p.posArr || []).includes('GK');
     const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
-    html += '<div class="attr-cols">';
+    const col = {};
     for (const [gk, keys] of groups) {
       const rows = keys.filter(k => p.attrs[k] != null);
-      if (!rows.length) continue;
-      html += `<div class="attr-col"><h3>${t(gk)}</h3>` + rows.map((k, idx) => {
+      col[gk] = !rows.length ? '' : `<div class="attr-col"><h3>${t(gk)}</h3>` + rows.map((k, idx) => {
         const raw = p.attrs[k];
         const shown = state.showPot ? potAttr(p, raw) : raw;
         const grew = state.showPot && shown > raw;
@@ -648,14 +647,17 @@ function showDetail(p) {
       }).join('') + '</div>';
     }
     // Persoonlijkheid (verborgen kenmerken) — net als een normale eigenschappengroep.
-    const pers = [['ambition', p.ambition], ['professionalism', p.professionalism], ['loyalty', p.loyalty],
+    const pd = [['ambition', p.ambition], ['professionalism', p.professionalism], ['loyalty', p.loyalty],
       ['pressure', p.pressure], ['temperament', p.temperament], ['sportsmanship', p.sportsmanship],
       ['adaptability', p.adaptability], ['controversy', p.controversy]].filter(x => x[1] > 0);
-    if (pers.length) {
-      html += `<div class="attr-col"><h3>${t('personaTitle')}</h3>` + pers.map(([k, v], idx) =>
-        `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>';
-    }
-    html += '</div>';
+    const persHtml = pd.length ? `<div class="attr-col"><h3>${t('personaTitle')}</h3>` + pd.map(([k, v], idx) =>
+      `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
+    // Links: Technisch/Keepen → Standaardsituaties → Fysiek · Rechts: Mentaal → Persoonlijkheid
+    const techKey = isGk ? 'g_goalkeeping' : 'g_technical';
+    html += `<div class="attr-flex">
+      <div class="attr-side">${col[techKey] || ''}${col['g_setpieces'] || ''}${col['g_physical'] || ''}</div>
+      <div class="attr-side">${col['g_mental'] || ''}${persHtml}</div>
+    </div>`;
   } else if (p.staffAttrs) {
     html += `<div class="attr-cols"><div class="attr-col"><h3>${t('staffAttrs')}</h3>` +
       Object.entries(p.staffAttrs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v], idx) =>
