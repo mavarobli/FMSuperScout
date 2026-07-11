@@ -14,6 +14,7 @@ const state = {
   refYear: new Date().getFullYear(),
   refDoy: 183,
   shortlist: new Set(JSON.parse(localStorage.getItem('fmss_shortlist') || '[]')),
+  colCfg: JSON.parse(localStorage.getItem('fmss_cols') || '{}'),  // per modus: {order:[], hidden:[]}
 };
 const GBP_TO_EUR = 1.16;
 
@@ -41,6 +42,7 @@ const I18N = {
     dumping: '⏳ FM is de database aan het ophalen…', dumpReady: '✓ Nieuwe data klaar — klik om te laden',
     started: 'Start FM26, laad je save en druk op F9 (of gebruik de knop "Nieuwe data").',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
+    colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
     staffAttrs: 'Staf-attributen',
   },
@@ -66,6 +68,7 @@ const I18N = {
     dumping: '⏳ FM is dumping the database…', dumpReady: '✓ New data ready — click to load',
     started: 'Start FM26, load your save and press F9 (or use the "New data" button).',
     tag_free: 'free', tag_listed: 'listed', tag_rel: 'released', tag_nfs: 'not for sale',
+    colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
     staffAttrs: 'Staff attributes',
   },
@@ -392,7 +395,38 @@ function applyFilters() {
   $('result-count').textContent = state.filtered.length.toLocaleString() + ' ' + t('results');
   renderTable();
 }
-function activeCols() { return state.mode === 'staff' ? STAFF_COLS : PLAYER_COLS; }
+// ---------- kolomconfiguratie (volgorde + verbergen, per modus) ----------
+const modeKey = () => state.mode === 'staff' ? 'staff' : 'players';
+function baseCols() { return modeKey() === 'staff' ? STAFF_COLS : PLAYER_COLS; }
+function colCfg() {
+  const k = modeKey();
+  const keys = baseCols().filter(c => !c.star).map(c => c.key);
+  let saved = state.colCfg[k];
+  if (!saved || !Array.isArray(saved.order)) { saved = { order: [...keys], hidden: [] }; state.colCfg[k] = saved; }
+  for (const kk of keys) if (!saved.order.includes(kk)) saved.order.push(kk);  // nieuwe kolommen erbij
+  saved.order = saved.order.filter(kk => keys.includes(kk));                    // verdwenen eruit
+  return saved;
+}
+function saveColCfg() { localStorage.setItem('fmss_cols', JSON.stringify(state.colCfg)); }
+function activeCols() {
+  const base = baseCols();
+  const byKey = Object.fromEntries(base.map(c => [c.key, c]));
+  const cf = colCfg();
+  const hidden = new Set(cf.hidden);
+  const sl = base.find(c => c.star);                     // ster-kolom altijd vooraan
+  const rest = cf.order.filter(k => !hidden.has(k) && byKey[k]).map(k => byKey[k]);
+  return sl ? [sl, ...rest] : rest;
+}
+function reorderCol(fromKey, toKey) {
+  if (fromKey === toKey) return;
+  const cf = colCfg();
+  const arr = cf.order;
+  const fi = arr.indexOf(fromKey), ti = arr.indexOf(toKey);
+  if (fi < 0 || ti < 0) return;
+  arr.splice(fi, 1);
+  arr.splice(arr.indexOf(toKey), 0, fromKey);            // vóór de doelkolom plaatsen
+  saveColCfg(); renderTable();
+}
 function sortRows() {
   const col = activeCols().find(c => c.key === state.sortKey) || activeCols()[1];
   if (col.star) return;
@@ -413,16 +447,58 @@ function colLabel(c) { return c.star ? '★' : (c.label.startsWith('c_') || I18N
 function renderTable() {
   const cols = activeCols();
   $('grid-head').innerHTML = cols.map(c =>
-    `<th data-key="${c.key}" class="${c.key === state.sortKey ? 'sorted' : ''}">${colLabel(c)}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('');
-  $('grid-head').querySelectorAll('th').forEach(th => th.onclick = () => {
+    `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}" class="${c.key === state.sortKey ? 'sorted' : ''}" title="${c.star ? '' : t('colHint')}">${colLabel(c)}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('');
+  $('grid-head').querySelectorAll('th').forEach(th => {
     const k = th.dataset.key;
-    if (activeCols().find(c => c.key === k)?.star) return;
-    if (state.sortKey === k) state.sortDir *= -1; else { state.sortKey = k; state.sortDir = -1; }
-    sortRows(); renderTable();
+    const col = cols.find(c => c.key === k);
+    th.onclick = () => {
+      if (col?.star) return;
+      if (state.sortKey === k) state.sortDir *= -1; else { state.sortKey = k; state.sortDir = -1; }
+      sortRows(); renderTable();
+    };
+    if (col?.star) return;
+    // slepen om te herordenen
+    th.ondragstart = e => { e.dataTransfer.setData('text/plain', k); e.dataTransfer.effectAllowed = 'move'; th.classList.add('dragging'); };
+    th.ondragover = e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; th.classList.add('drop-target'); };
+    th.ondragleave = () => th.classList.remove('drop-target');
+    th.ondragend = () => $('grid-head').querySelectorAll('th').forEach(x => x.classList.remove('dragging', 'drop-target'));
+    th.ondrop = e => { e.preventDefault(); th.classList.remove('drop-target'); reorderCol(e.dataTransfer.getData('text/plain'), k); };
   });
   $('grid-spacer').style.height = (state.filtered.length * ROW_H) + 'px';
   renderVisible();
 }
+
+// rechtsklik op de koppen → kolommen tonen/verbergen
+$('grid-head').addEventListener('contextmenu', e => { e.preventDefault(); openColMenu(e.clientX, e.clientY); });
+
+function openColMenu(x, y) {
+  closeColMenu();
+  const cf = colCfg();
+  const hidden = new Set(cf.hidden);
+  const base = baseCols().filter(c => !c.star);
+  const menu = document.createElement('div');
+  menu.id = 'colmenu';
+  menu.innerHTML = `<div class="cm-head">${t('colsTitle')}</div>` +
+    base.map(c => `<label class="cm-row"><input type="checkbox" data-k="${c.key}" ${hidden.has(c.key) ? '' : 'checked'}> ${colLabel(c)}</label>`).join('') +
+    `<button class="cm-reset">${t('colsReset')}</button>`;
+  menu.style.left = Math.min(x, window.innerWidth - 220) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - 340) + 'px';
+  document.body.appendChild(menu);
+  menu.querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = () => {
+    const k = cb.dataset.k;
+    const h = new Set(colCfg().hidden);
+    if (cb.checked) h.delete(k); else h.add(k);
+    colCfg().hidden = [...h];
+    saveColCfg(); renderTable();
+  });
+  menu.querySelector('.cm-reset').onclick = () => {
+    state.colCfg[modeKey()] = { order: baseCols().filter(c => !c.star).map(c => c.key), hidden: [] };
+    saveColCfg(); renderTable(); closeColMenu();
+  };
+}
+function closeColMenu() { const m = $('colmenu'); if (m) m.remove(); }
+document.addEventListener('click', e => { if (!e.target.closest('#colmenu')) closeColMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeColMenu(); });
 function renderVisible() {
   const wrap = $('table-wrap'), cols = activeCols();
   const first = Math.max(0, Math.floor(wrap.scrollTop / ROW_H) - 10);

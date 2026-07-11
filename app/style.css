@@ -145,6 +145,21 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 }
 #grid th:hover { color: var(--text); }
 #grid th.sorted { color: var(--accent); }
+#grid th.dragging { opacity: .45; }
+#grid th.drop-target { box-shadow: inset 3px 0 0 var(--accent); color: var(--accent); }
+
+/* kolommenu (rechtsklik) */
+#colmenu {
+  position: fixed; z-index: 200; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px; min-width: 190px; max-height: 60vh; overflow-y: auto;
+  box-shadow: 0 8px 28px rgba(0,0,0,.5);
+}
+#colmenu .cm-head { font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); padding: 4px 8px 6px; }
+#colmenu .cm-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: pointer; }
+#colmenu .cm-row:hover { background: var(--bg3); }
+#colmenu .cm-row input { accent-color: var(--accent); }
+#colmenu .cm-reset { width: 100%; margin-top: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--muted); padding: 6px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+#colmenu .cm-reset:hover { color: var(--text); }
 #grid td { padding: 5px 10px; border-bottom: 1px solid #1a212b; white-space: nowrap; color: var(--text); }
 #grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 #grid td.dim { color: var(--muted); }
