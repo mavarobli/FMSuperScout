@@ -652,11 +652,15 @@ function showDetail(p) {
       ['adaptability', p.adaptability], ['controversy', p.controversy]].filter(x => x[1] > 0);
     const persHtml = pd.length ? `<div class="attr-col"><h3>${t('personaTitle')}</h3>` + pd.map(([k, v], idx) =>
       `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
-    // Links: Technisch/Keepen → Standaardsituaties → Fysiek · Rechts: Mentaal → Persoonlijkheid
+    // Grid: links Technisch/Keepen + Standaardsituaties (Mentaal loopt ernaast over 2 rijen),
+    // onderste rij Fysiek | Persoonlijkheid op gelijke hoogte.
     const techKey = isGk ? 'g_goalkeeping' : 'g_technical';
-    html += `<div class="attr-flex">
-      <div class="attr-side">${col[techKey] || ''}${col['g_setpieces'] || ''}${col['g_physical'] || ''}</div>
-      <div class="attr-side">${col['g_mental'] || ''}${persHtml}</div>
+    html += `<div class="attr-grid">
+      <div style="grid-area:tech">${col[techKey] || ''}</div>
+      <div style="grid-area:sp">${col['g_setpieces'] || ''}</div>
+      <div style="grid-area:ment">${col['g_mental'] || ''}</div>
+      <div style="grid-area:phys">${col['g_physical'] || ''}</div>
+      <div style="grid-area:pers">${persHtml}</div>
     </div>`;
   } else if (p.staffAttrs) {
     html += `<div class="attr-cols"><div class="attr-col"><h3>${t('staffAttrs')}</h3>` +
