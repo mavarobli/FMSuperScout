@@ -163,6 +163,20 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .int-k { background: #2a3441; color: #9fb0c2; }
 .int-n { background: #3a1c1c; color: #e08a8a; }
 .interest-box { margin: 10px 0; padding: 8px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; }
+
+/* persoonlijkheid */
+.persona { margin: 10px 0; padding: 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; }
+.persona-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.persona-badge { font-weight: 700; font-size: 14px; color: var(--accent); }
+.persona-head .dim { font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px; }
+.hidden-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; }
+.hrow { display: grid; grid-template-columns: 90px 1fr 20px; align-items: center; gap: 6px; font-size: 12px; }
+.hlbl { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hbar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.hbar i { display: block; height: 100%; border-radius: 3px; }
+.hbar i.g1 { background: #7f8ea0; } .hbar i.g2 { background: #c9d4df; } .hbar i.g3 { background: var(--warn); } .hbar i.g4 { background: #7ddc9e; } .hbar i.g5 { background: var(--accent); }
+.hval { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 1100px) { .hidden-grid { grid-template-columns: 1fr; } }
 .star-cell { cursor: pointer; color: #3a4658; font-size: 15px; text-align: center; }
 .star-cell.on { color: var(--star); }
 

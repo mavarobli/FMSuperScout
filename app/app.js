@@ -34,6 +34,8 @@ const I18N = {
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
     int_big: 'Groot', int_ok: 'Redelijk', int_small: 'Klein', int_no: 'Nee', interestTitle: 'Interesse-inschatting',
     ambition: 'Ambitie', loyalty: 'Loyaliteit', professionalism: 'Professionaliteit', adaptability: 'Aanpassing',
+    pressure: 'Druk', sportsmanship: 'Sportiviteit', temperament: 'Temperament', controversy: 'Controverse', determination: 'Vastberadenheid',
+    personaTitle: 'Persoonlijkheid', hiddenTitle: 'Verborgen kenmerken', derived: 'afgeleid',
     showPot: 'Toon geschatte potentie', potNote: 'geschatte waarden op potentieel (PA)',
     clubless: 'clubloos', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd — FM haalt de data op…',
     dumping: '⏳ FM is de database aan het ophalen…', dumpReady: '✓ Nieuwe data klaar — klik om te laden',
@@ -57,6 +59,8 @@ const I18N = {
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
     int_big: 'High', int_ok: 'Fair', int_small: 'Low', int_no: 'No', interestTitle: 'Interest estimate',
     ambition: 'Ambition', loyalty: 'Loyalty', professionalism: 'Professionalism', adaptability: 'Adaptability',
+    pressure: 'Pressure', sportsmanship: 'Sportsmanship', temperament: 'Temperament', controversy: 'Controversy', determination: 'Determination',
+    personaTitle: 'Personality', hiddenTitle: 'Hidden attributes', derived: 'derived',
     showPot: 'Show estimated potential', potNote: 'estimated values at potential (PA)',
     clubless: 'free agent', copied: 'Copied', reqSent: '⏳ Request sent — FM is fetching the data…',
     dumping: '⏳ FM is dumping the database…', dumpReady: '✓ New data ready — click to load',
@@ -503,8 +507,53 @@ function exportShortlist() {
   showToast('✓ ' + all.length + ' → CSV');
 }
 
+// ---------- persoonlijkheid (afgeleid uit verborgen attributen, FM-achtig) ----------
+const PERSONA = {
+  model_citizen: { nl: 'Modelburger', en: 'Model Citizen' }, model_pro: { nl: 'Modelprof', en: 'Model Professional' },
+  perfectionist: { nl: 'Perfectionist', en: 'Perfectionist' }, professional: { nl: 'Professioneel', en: 'Professional' },
+  fairly_pro: { nl: 'Redelijk professioneel', en: 'Fairly Professional' }, resolute: { nl: 'Resoluut', en: 'Resolute' },
+  determined: { nl: 'Vastberaden', en: 'Determined' }, iron: { nl: 'IJzeren wil', en: 'Iron Willed' },
+  very_ambitious: { nl: 'Zeer ambitieus', en: 'Very Ambitious' }, ambitious: { nl: 'Ambitieus', en: 'Ambitious' },
+  very_loyal: { nl: 'Zeer loyaal', en: 'Very Loyal' }, loyal: { nl: 'Loyaal', en: 'Loyal' },
+  mercenary: { nl: 'Huurling', en: 'Mercenary' }, temperamental: { nl: 'Temperamentvol', en: 'Temperamental' },
+  spineless: { nl: 'Ruggengraatloos', en: 'Spineless' }, low_det: { nl: 'Weinig vastberaden', en: 'Low Determination' },
+  unambitious: { nl: 'Weinig ambitieus', en: 'Unambitious' }, balanced: { nl: 'Evenwichtig', en: 'Balanced' },
+};
+function personaKey(p) {
+  const det = p.attrs?.Determination ?? 0;
+  const amb = p.ambition || 0, loy = p.loyalty || 0, pro = p.professionalism || 0,
+    pre = p.pressure || 0, spo = p.sportsmanship || 0, tem = p.temperament || 0;
+  if (!amb && !loy && !pro) return null;                  // geen persoonlijkheidsdata
+  if (pro >= 18 && det >= 18 && spo >= 15 && loy >= 13) return 'model_citizen';
+  if (pro >= 18 && det >= 15 && amb >= 13) return 'model_pro';
+  if (pro >= 18 && amb >= 18) return 'perfectionist';
+  if (det <= 6 && pre <= 6) return 'spineless';
+  if (tem <= 6 || pre <= 6) return 'temperamental';
+  if (loy <= 6 && amb >= 13 && pro < 15) return 'mercenary';
+  if (pro >= 15) return 'professional';
+  if (det >= 18 && pre >= 15) return 'resolute';
+  if (det >= 18) return 'determined';
+  if (pre >= 18 && det >= 13) return 'iron';
+  if (amb >= 18) return 'very_ambitious';
+  if (loy >= 18) return 'very_loyal';
+  if (amb >= 15) return 'ambitious';
+  if (loy >= 15) return 'loyal';
+  if (pro >= 12) return 'fairly_pro';
+  if (det <= 6) return 'low_det';
+  if (amb <= 6) return 'unambitious';
+  return 'balanced';
+}
+const personaName = k => k ? (PERSONA[k]?.[state.lang] ?? PERSONA[k]?.nl ?? k) : null;
+
 // ---------- detailpaneel ----------
 const attrClass = v => v >= 17 ? 'g5' : v >= 14 ? 'g4' : v >= 10 ? 'g3' : v >= 6 ? 'g2' : 'g1';
+// Compacte verborgen-kenmerk rij met mini-balk.
+function hiddenRow(labelKey, v) {
+  if (!v) return '';
+  return `<div class="hrow"><span class="hlbl">${t(labelKey)}</span>
+    <span class="hbar"><i class="${attrClass(v)}" style="width:${v * 5}%"></i></span>
+    <span class="hval ${attrClass(v)}">${v}</span></div>`;
+}
 // Geschatte potentie-waarde van een attribuut o.b.v. PA/CA-verhouding (ruwe projectie).
 function potAttr(p, v) {
   if (!p.pa || !p.ca || p.pa <= p.ca) return v;
@@ -544,8 +593,25 @@ function showDetail(p) {
   if (isPlayer) {
     const i = interestEstimate(p);
     if (i) html += `<div class="interest-box"><b>${t('interestTitle')}:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100)</span></div>`;
-    const pers = [['ambition', p.ambition], ['loyalty', p.loyalty], ['professionalism', p.professionalism], ['adaptability', p.adaptability]].filter(x => x[1] > 0);
-    if (pers.length) html += '<div class="kv" style="margin-top:6px">' + pers.map(([k, v]) => `<div><b>${t(k)}</b> <span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>';
+
+    // Persoonlijkheid: afgeleide badge + verborgen kenmerken als mini-balken.
+    const pk = personaKey(p);
+    if (pk) {
+      html += `<div class="persona">
+        <div class="persona-head"><span class="persona-badge">🧠 ${personaName(pk)}</span>
+          <span class="dim">${t('personaTitle')} · ${t('derived')}</span></div>
+        <div class="hidden-grid">
+          ${hiddenRow('determination', p.attrs?.Determination)}
+          ${hiddenRow('ambition', p.ambition)}
+          ${hiddenRow('professionalism', p.professionalism)}
+          ${hiddenRow('loyalty', p.loyalty)}
+          ${hiddenRow('pressure', p.pressure)}
+          ${hiddenRow('temperament', p.temperament)}
+          ${hiddenRow('sportsmanship', p.sportsmanship)}
+          ${hiddenRow('adaptability', p.adaptability)}
+          ${hiddenRow('controversy', p.controversy)}
+        </div></div>`;
+    }
   }
 
   if (isPlayer && p.attrs) {

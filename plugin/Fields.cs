@@ -44,6 +44,9 @@ internal static class Fields
     public const int PERO_LOYALTY = 0x72;
     public const int PERO_PRESSURE = 0x73;
     public const int PERO_PROFESSIONALISM = 0x74;
+    public const int PERO_SPORTSMANSHIP = 0x75;
+    public const int PERO_TEMPERAMENT = 0x76;
+    public const int PERO_CONTROVERSY = 0x77;
 
     // --- In het contract-object (via [person+PERO_FULL_CONTRACT]) ---
     public const int CON_WEEKLY_WAGE = 0x20;  // u32 GBP p/w

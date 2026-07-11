@@ -60,6 +60,7 @@ function player(id) {
     clubRep: club ? CLUB_REP[club] : 0,
     worldRep: Math.round(ca * 45 + ri(-500, 500)),
     ambition: ri(5, 20), loyalty: ri(1, 20), professionalism: ri(3, 20), adaptability: ri(5, 20),
+    pressure: ri(3, 20), sportsmanship: ri(3, 20), temperament: ri(3, 20), controversy: ri(1, 18),
     attrs,
   };
 }

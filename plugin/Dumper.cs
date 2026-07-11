@@ -274,6 +274,9 @@ internal static class Dumper
         e.Professionalism = ClampAttr(m.U8(person + Fields.PERO_PROFESSIONALISM));
         e.Adaptability = ClampAttr(m.U8(person + Fields.PERO_ADAPTABILITY));
         e.Pressure = ClampAttr(m.U8(person + Fields.PERO_PRESSURE));
+        e.Sportsmanship = ClampAttr(m.U8(person + Fields.PERO_SPORTSMANSHIP));
+        e.Temperament = ClampAttr(m.U8(person + Fields.PERO_TEMPERAMENT));
+        e.Controversy = ClampAttr(m.U8(person + Fields.PERO_CONTROVERSY));
         e.PersonAddr = person;
         var (cname, crep) = ResolveClub(m, person);
         e.Club = cname; e.ClubRep = crep;
@@ -498,6 +501,10 @@ internal static class Dumper
             j.Prop("loyalty", p.Loyalty);
             j.Prop("professionalism", p.Professionalism);
             j.Prop("adaptability", p.Adaptability);
+            j.Prop("pressure", p.Pressure);
+            j.Prop("sportsmanship", p.Sportsmanship);
+            j.Prop("temperament", p.Temperament);
+            j.Prop("controversy", p.Controversy);
             j.Key("attrs"); j.BeginObj();
             foreach (var kv in p.Attrs) { j.Key(kv.Key); j.Val((long)kv.Value); }
             j.EndObj();
@@ -616,6 +623,9 @@ internal sealed class Person
     public int Professionalism;
     public int Adaptability;
     public int Pressure;
+    public int Sportsmanship;
+    public int Temperament;
+    public int Controversy;
     public ulong PersonAddr;
     public string Job;
     public Dictionary<string, int> Attrs = new();
