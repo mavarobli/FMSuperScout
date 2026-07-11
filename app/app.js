@@ -298,11 +298,14 @@ async function loadDump() {
     state.players = data.players || [];
     state.staff = data.staff || [];
     state.meta = data.meta || {};
-    // peiljaar uit game-datum
+    // peiljaar: automatisch uit het afgeleide seizoensjaar (of game-datum)
     if (state.meta.gameDate) {
       const g = new Date(state.meta.gameDate);
-      state.refYear = g.getFullYear();
+      state.refYear = state.meta.gameYear || g.getFullYear();
       state.refDoy = Math.floor((g - new Date(g.getFullYear(), 0, 0)) / 864e5);
+      $('f-refyear').value = state.refYear;
+    } else if (state.meta.gameYear) {
+      state.refYear = state.meta.gameYear;
       $('f-refyear').value = state.refYear;
     }
     const when = new Date(st.dumpTime).toLocaleString();

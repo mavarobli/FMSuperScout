@@ -78,7 +78,7 @@ function staff(id) {
 }
 
 const data = {
-  meta: { generated: new Date().toISOString(), gameDate: '2026-07-11', manager: 'mavarobli', myClub: 'Feyenoord', myClubRep: 7200, currency: 'GBP', source: 'TESTDATA' },
+  meta: { generated: new Date().toISOString(), gameDate: '2028-07-11', gameYear: 2028, manager: 'mavarobli', myClub: 'Feyenoord', myClubRep: 7200, currency: 'GBP', source: 'TESTDATA' },
   players: Array.from({ length: 45000 }, (_, i) => player(i + 1)),
   staff: Array.from({ length: 8000 }, (_, i) => staff(100000 + i)),
 };

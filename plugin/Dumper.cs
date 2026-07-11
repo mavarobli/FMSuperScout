@@ -24,6 +24,7 @@ internal static class Dumper
     internal static string MyClub;       // club van de human-manager
     internal static string ManagerName;  // naam van de human-manager
     internal static int MyClubRep;       // reputatie van jouw club (~0..10000)
+    internal static int GameYear;        // afgeleid huidig seizoensjaar
 
     // Statusbestand dat de web-app pollt (betrouwbare F9-feedback, ook zonder console).
     private static void WriteStatus(string state, int players, int staff)
@@ -206,6 +207,17 @@ internal static class Dumper
         if (MyClub == null) { MyClub = me.club; MyClubRep = me.rep; }
         Plugin.Log.LogInfo($"Manager: {ManagerName ?? "?"} · club: {MyClub ?? "?"} (rep {MyClubRep}) · " +
                            $"{clubObjs.Count} clubs, {squadClub.Count} spelers via selectie gekoppeld");
+
+        // Huidig seizoensjaar afleiden uit de data: de jeugdinstroom genereert elk jaar
+        // een groot cohort ~16-jarigen. Het hoogste geboortejaar met een fors cohort +16
+        // ≈ het huidige in-game jaar. Robuust en patch-bestendig (geen offsets nodig).
+        var byHist = new Dictionary<int, int>();
+        foreach (var pl in players.Values)
+            if (pl.BirthYear is >= 1990 and <= 2100)
+                byHist[pl.BirthYear] = byHist.GetValueOrDefault(pl.BirthYear) + 1;
+        int youngestCohort = byHist.Where(kv => kv.Value >= 30).Select(kv => kv.Key).DefaultIfEmpty(0).Max();
+        GameYear = youngestCohort > 0 ? youngestCohort + 16 : DateTime.Now.Year;
+        Plugin.Log.LogInfo($"Afgeleid seizoensjaar: {GameYear} (jongste cohort {youngestCohort})");
 
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
@@ -449,7 +461,10 @@ internal static class Dumper
         j.BeginObj();
         j.Key("meta"); j.BeginObj();
         j.Prop("generated", DateTime.Now.ToString("s"));
-        j.Prop("gameDate", DateTime.Now.ToString("yyyy-MM-dd"));
+        // Afgeleid seizoensjaar met de systeemmaand/-dag (jaar is het betrouwbare deel).
+        int gy = GameYear > 0 ? GameYear : DateTime.Now.Year;
+        j.Prop("gameDate", $"{gy:D4}-{DateTime.Now:MM-dd}");
+        j.Prop("gameYear", gy);
         j.Prop("manager", ManagerName);
         j.Prop("myClub", MyClub);
         j.Prop("myClubRep", MyClubRep);
