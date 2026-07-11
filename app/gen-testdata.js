@@ -53,8 +53,8 @@ function player(id) {
     value, wage: club ? ri(500, 400000) : null,
     expires: club ? isoPlus(pick([2, 4, 8, 12, 24, 36])) : null,
     listed: Math.random() < 0.08,
-    loanListed: Math.random() < 0.06,
-    interested: false,
+    setForRelease: Math.random() < 0.04,
+    notForSale: Math.random() < 0.15,
     attrs,
   };
 }

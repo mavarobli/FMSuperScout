@@ -49,13 +49,15 @@ const PLAYER_COLS = [
   { key: 'club', label: 'Club', get: p => p.club, dimNull: true },
   { key: 'nat', label: 'Nat', get: p => (p.nat || []).join(', ') },
   { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? '<span class="eu-yes">✓</span>' : '<span class="dim">–</span>' },
-  { key: 'ca', label: 'CA', num: true, cls: 'ca-bar', get: p => p.ca },
-  { key: 'pa', label: 'PA', num: true, cls: 'pa-bar', get: p => p.pa },
+  { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
+  { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
   { key: 'value', label: 'Waarde', num: true, get: p => p.value, fmt: fmtMoney },
   { key: 'wage', label: 'Salaris p/w', num: true, get: p => p.wage, fmt: fmtMoney },
   { key: 'expires', label: 'Contract tot', get: p => p.expires, fmt: fmtDate },
   { key: 'status', label: 'Status', get: p => statusText(p), render: p => statusHtml(p) },
 ];
+const qClass = v => v == null ? '' : v >= 150 ? 'q5' : v >= 120 ? 'q4' : v >= 90 ? 'q3' : v >= 60 ? 'q2' : 'q1';
+const qHtml = v => v == null ? '–' : `<span class="${qClass(v)}">${v}</span>`;
 const STAFF_COLS = [
   { key: 'sl', label: '★', star: true },
   { key: 'name', label: 'Naam', get: p => p.name },
@@ -63,19 +65,28 @@ const STAFF_COLS = [
   { key: 'job', label: 'Rol', get: p => p.job || '–' },
   { key: 'club', label: 'Club', get: p => p.club, dimNull: true },
   { key: 'nat', label: 'Nat', get: p => (p.nat || []).join(', ') },
-  { key: 'ca', label: 'CA', num: true, cls: 'ca-bar', get: p => p.ca },
-  { key: 'pa', label: 'PA', num: true, cls: 'pa-bar', get: p => p.pa },
+  { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
+  { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
   { key: 'wage', label: 'Salaris p/w', num: true, get: p => p.wage, fmt: fmtMoney },
   { key: 'expires', label: 'Contract tot', get: p => p.expires, fmt: fmtDate },
 ];
 
-function statusText(p) { return (p.listed ? 'lijst ' : '') + (isFree(p) ? 'clubloos' : ''); }
+function statusText(p) { return (p.listed ? 'lijst ' : '') + (p.setForRelease ? 'vrij ' : '') + (isFree(p) ? 'clubloos' : ''); }
 function statusHtml(p) {
   let h = '';
+  if (isFree(p)) h += '<span class="tag free">clubloos</span>';
   if (p.listed) h += '<span class="tag listed">transferlijst</span>';
-  return h;
+  if (p.setForRelease) h += '<span class="tag rel">vrijgegeven</span>';
+  if (p.notForSale) h += '<span class="tag nfs">niet te koop</span>';
+  return h || '<span class="dim">–</span>';
 }
 const isFree = p => !p.club;
+// Haalbaar = op de lijst, vrijgegeven, clubloos of aflopend contract (<12 mnd), en niet 'niet te koop'.
+function isAttainable(p) {
+  if (p.notForSale) return false;
+  const m = monthsUntil(p.expires);
+  return p.listed || p.setForRelease || isFree(p) || (m != null && m <= 12);
+}
 
 // ---------- posities & veld ----------
 const PITCH = [
@@ -188,6 +199,7 @@ function applyFilters() {
   const wage = parseMoney($('f-wage').value);
   const nat = $('f-nat').value.trim().toLowerCase();
   const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
+  const wantAttain = $('f-attain').checked;
   const wantListed = $('f-listed').checked, wantExp6 = $('f-exp6').checked, wantExp12 = $('f-exp12').checked;
   const wantFree = $('f-free').checked, onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
   const staffRole = $('f-staffrole').value;
@@ -207,6 +219,7 @@ function applyFilters() {
     if (onlyEu && !isEu(p)) return false;
     if (onlyMyClub && (!p.club || p.club.toLowerCase() !== myClub)) return false;
     if (wantFree && !isFree(p)) return false;
+    if (wantAttain && !isAttainable(p)) return false;
     if (wantListed && !p.listed) return false;
     if (wantExp6) { const m = monthsUntil(p.expires); if (m == null || m > 6) return false; }
     if (wantExp12) { const m = monthsUntil(p.expires); if (m == null || m > 12) return false; }
@@ -331,10 +344,13 @@ function showDetail(p) {
   </div>`;
 
   const flags = [];
-  if (p.listed) flags.push('<span class="pill warn">Op transferlijst</span>');
   if (isFree(p)) flags.push('<span class="pill">Clubloos</span>');
+  if (p.listed) flags.push('<span class="pill warn">Op transferlijst</span>');
+  if (p.setForRelease) flags.push('<span class="pill warn">Vrijgegeven</span>');
+  if (p.notForSale) flags.push('<span class="pill">Niet te koop</span>');
   const m = monthsUntil(p.expires);
   if (m != null && m <= 6) flags.push('<span class="pill warn">Contract &lt; 6 mnd</span>');
+  if (isAttainable(p)) flags.push('<span class="pill good">Haalbaar</span>');
   if (isEu(p)) flags.push('<span class="pill good">EU/EEA</span>');
   if (flags.length) html += '<div>' + flags.join('') + '</div>';
 
@@ -364,7 +380,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-cl
 ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-price', 'f-wage', 'f-nat'].forEach(id => {
   let t; $(id).addEventListener('input', () => { clearTimeout(t); t = setTimeout(applyFilters, 150); });
 });
-['f-eu', 'f-myclub', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
+['f-eu', 'f-myclub', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
 $('f-staffrole').addEventListener('change', applyFilters);
 $('pos-clear').onclick = () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); applyFilters(); };
 

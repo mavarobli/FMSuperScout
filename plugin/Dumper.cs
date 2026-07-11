@@ -174,7 +174,9 @@ internal static class Dumper
             e.Wage = Money(m.U32(con + Fields.CON_WEEKLY_WAGE));
             e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
             byte flags = m.U8(con + Fields.CON_STATUS_FLAGS);
-            e.Listed = (flags & (1 << 0)) != 0 || (flags & (1 << 3)) != 0;
+            e.Listed = (flags & (1 << 0)) != 0 || (flags & (1 << 3)) != 0; // Listed / by request
+            e.NotForSale = (flags & (1 << 4)) != 0;
+            e.SetForRelease = (flags & (1 << 5)) != 0;
         }
         e.Club = ResolveClubName(m, person);
         if (DiagPersons.Count < 60) DiagPersons.Add((person, e.Name, e.Club));
@@ -365,8 +367,8 @@ internal static class Dumper
             Money(j, "askingPrice", p.Value); // v1: transferwaarde; echte vraagprijs in v2
             j.Null4("wageDemand");
             j.Prop("listed", p.Listed);
-            j.Prop("loanListed", p.LoanListed);
-            j.Prop("interested", p.Interested);
+            j.Prop("notForSale", p.NotForSale);
+            j.Prop("setForRelease", p.SetForRelease);
             j.Key("attrs"); j.BeginObj();
             foreach (var kv in p.Attrs) { j.Key(kv.Key); j.Val((long)kv.Value); }
             j.EndObj();
@@ -463,7 +465,8 @@ internal sealed class Person
     public string Expires;
     public bool Listed;
     public bool LoanListed;
-    public bool Interested;
+    public bool NotForSale;
+    public bool SetForRelease;
     public string Job;
     public Dictionary<string, int> Attrs = new();
     public Dictionary<string, int> StaffAttrs = new();

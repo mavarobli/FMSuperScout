@@ -25,12 +25,11 @@
 <div id="main">
   <aside id="filters">
     <div class="fgroup">
-      <label>Zoek naam of club</label>
-      <input type="text" id="f-name" placeholder="bijv. Timber of Feyenoord">
+      <input type="text" id="f-name" placeholder="🔍 Zoek naam of club">
     </div>
 
-    <div class="fgroup" id="fg-pitch">
-      <label>Posities <button id="pos-clear" class="mini">wis</button></label>
+    <div class="fsection" id="fg-pitch">
+      <div class="fsec-head">Positie <button id="pos-clear" class="mini">wis</button></div>
       <div id="pitch-wrap"></div>
     </div>
 
@@ -39,39 +38,34 @@
       <select id="f-staffrole"><option value="">Alle rollen</option></select>
     </div>
 
-    <div class="fgroup">
-      <label>Leeftijd</label>
-      <div class="range2"><input type="number" id="f-age-min" placeholder="min" min="14" max="50">–<input type="number" id="f-age-max" placeholder="max" min="14" max="50"></div>
-    </div>
-    <div class="fgroup">
-      <label>Huidig niveau (CA)</label>
-      <div class="range2"><input type="number" id="f-ca-min" placeholder="min" min="0" max="200">–<input type="number" id="f-ca-max" placeholder="max" min="0" max="200"></div>
-    </div>
-    <div class="fgroup">
-      <label>Potentieel (PA)</label>
-      <div class="range2"><input type="number" id="f-pa-min" placeholder="min" min="0" max="200">–<input type="number" id="f-pa-max" placeholder="max" min="0" max="200"></div>
-    </div>
-    <div class="fgroup">
-      <label>Max. waarde</label>
-      <input type="text" id="f-price" placeholder="bijv. 10M of 500K">
-    </div>
-    <div class="fgroup">
-      <label>Max. salaris p/w</label>
-      <input type="text" id="f-wage" placeholder="bijv. 50K">
-    </div>
-    <div class="fgroup">
-      <label>Nationaliteit</label>
-      <input type="text" id="f-nat" placeholder="bijv. Nederland">
+    <div class="fsection">
+      <div class="fsec-head">Kwaliteit &amp; leeftijd</div>
+      <div class="frow"><span>Leeftijd</span><div class="range2"><input type="number" id="f-age-min" placeholder="min">–<input type="number" id="f-age-max" placeholder="max"></div></div>
+      <div class="frow"><span>CA</span><div class="range2"><input type="number" id="f-ca-min" placeholder="min">–<input type="number" id="f-ca-max" placeholder="max"></div></div>
+      <div class="frow"><span>PA</span><div class="range2"><input type="number" id="f-pa-min" placeholder="min">–<input type="number" id="f-pa-max" placeholder="max"></div></div>
     </div>
 
-    <div class="fgroup checks">
-      <label><input type="checkbox" id="f-eu"> Alleen EU/EEA-spelers</label>
-      <label><input type="checkbox" id="f-myclub"> Bij mijn club</label>
-      <label><input type="checkbox" id="f-listed"> Op transferlijst</label>
-      <label><input type="checkbox" id="f-exp6"> Contract &lt; 6 maanden</label>
-      <label><input type="checkbox" id="f-exp12"> Contract &lt; 1 jaar</label>
-      <label><input type="checkbox" id="f-free"> Clubloos</label>
-      <label><input type="checkbox" id="f-shortlist"> Alleen shortlist</label>
+    <div class="fsection">
+      <div class="fsec-head">Financieel</div>
+      <div class="frow"><span>Max. waarde</span><input type="text" id="f-price" placeholder="10M"></div>
+      <div class="frow"><span>Max. loon p/w</span><input type="text" id="f-wage" placeholder="50K"></div>
+    </div>
+
+    <div class="fsection">
+      <div class="fsec-head">Herkomst</div>
+      <div class="frow"><span>Nationaliteit</span><input type="text" id="f-nat" placeholder="Nederland"></div>
+      <label class="chk"><input type="checkbox" id="f-eu"> Alleen EU/EEA</label>
+    </div>
+
+    <div class="fsection">
+      <div class="fsec-head">Beschikbaarheid</div>
+      <label class="chk"><input type="checkbox" id="f-attain"> Haalbaar (lijst/vrij/aflopend)</label>
+      <label class="chk"><input type="checkbox" id="f-listed"> Op transferlijst</label>
+      <label class="chk"><input type="checkbox" id="f-exp6"> Contract &lt; 6 maanden</label>
+      <label class="chk"><input type="checkbox" id="f-exp12"> Contract &lt; 1 jaar</label>
+      <label class="chk"><input type="checkbox" id="f-free"> Clubloos</label>
+      <label class="chk"><input type="checkbox" id="f-myclub"> Bij mijn club</label>
+      <label class="chk"><input type="checkbox" id="f-shortlist"> Alleen shortlist</label>
     </div>
 
     <button id="btn-clear">Filters wissen</button>
