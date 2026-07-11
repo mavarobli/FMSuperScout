@@ -8,6 +8,9 @@ plugin/obj/
 # Node
 node_modules/
 
+# Lokale build-tooling (niet committen)
+scratchpad/
+
 # OS
 Thumbs.db
 desktop.ini

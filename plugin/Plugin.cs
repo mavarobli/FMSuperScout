@@ -14,7 +14,7 @@ public class Plugin : BasePlugin
     public const string Name = "FMSuperScout";
     public const string Version = "0.1.0";
 
-    internal static ManualLogSource Log;
+    internal static new ManualLogSource Log;
 
     public override void Load()
     {
@@ -22,7 +22,7 @@ public class Plugin : BasePlugin
         ClassInjector.RegisterTypeInIl2Cpp<HotkeyBehaviour>();
 
         var go = new GameObject("FMSuperScout");
-        Object.DontDestroyOnLoad(go);
+        UnityEngine.Object.DontDestroyOnLoad(go);
         go.hideFlags = HideFlags.HideAndDontSave;
         go.AddComponent<HotkeyBehaviour>();
 
@@ -32,6 +32,9 @@ public class Plugin : BasePlugin
 
 public class HotkeyBehaviour : MonoBehaviour
 {
+    // Verplichte ctor voor via Il2CppInterop geïnjecteerde MonoBehaviours.
+    public HotkeyBehaviour(System.IntPtr ptr) : base(ptr) { }
+
     private bool _busy;
 
     private void Update()

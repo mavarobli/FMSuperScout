@@ -66,9 +66,10 @@ public sealed class JsonWriter
     public void Null() { Sep(); _sb.Append("null"); _needComma = true; }
 
     // gemaksmethoden
-    public void Prop(string k, string v) { Key(k); Val(v); }
+    public void Prop(string k, string v) { Key(k); Val(v); }   // v == null → JSON null
     public void Prop(string k, long v) { Key(k); Val(v); }
     public void Prop(string k, bool v) { Key(k); Val(v); }
+    public void Null4(string k) { Key(k); Null(); }
     public void PropOpt(string k, long? v) { if (v.HasValue) { Key(k); Val(v.Value); } }
 
     public void Close()
