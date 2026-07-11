@@ -19,25 +19,33 @@ internal static class Dumper
             Plugin.Log.LogError("GameAssembly.dll niet gevonden — kan niet dumpen.");
             return;
         }
-        Plugin.Log.LogInfo($"Regio's: {mem.Regions.Count}, GameAssembly {mem.GaBase:X}-{mem.GaEnd:X}");
+        Plugin.Log.LogInfo($"Scanregio's: {mem.ScanRegions.Count}, GameAssembly {mem.GaBase:X}-{mem.GaEnd:X}");
 
         var players = new Dictionary<uint, Person>();
         var staff = new Dictionary<uint, Person>();
         var offsetHist = new Dictionary<int, int>();
         long candidates = 0;
 
-        foreach (var (start, end) in mem.Regions)
+        const int ChunkSize = 32 * 1024 * 1024; // 32 MB blokken
+        var buf = new byte[ChunkSize];
+
+        foreach (var (start, size) in mem.ScanRegions)
         {
-            // Sla enorme of niet-heap regio's niet over: person-objecten staan in de GC-heap.
-            ulong size = end - start;
             if (size < 0x40) continue;
-            unsafe
+            ulong scanned = 0;
+            while (scanned < size)
             {
-                for (ulong p = start; p + 0x10 <= end; p += 8)
+                int want = (int)System.Math.Min((ulong)ChunkSize, size - scanned);
+                ulong chunkBase = start + scanned;
+                if (!mem.ReadBlock(chunkBase, buf, want)) { scanned += (ulong)want; continue; }
+
+                for (int i = 0; i + 0x10 <= want; i += 8)
                 {
-                    ulong vt = *(ulong*)p;
+                    ulong vt = BitConverter.ToUInt64(buf, i);
                     if (vt < mem.GaBase || vt >= mem.GaEnd) continue; // snelle prune: vtable in GameAssembly
                     candidates++;
+
+                    ulong p = chunkBase + (ulong)i; // kandidaat person-object
                     int off = mem.DynamicOffset(p);
                     if (off == 0) continue;
 
@@ -68,6 +76,7 @@ internal static class Dumper
                             staff[uid] = ReadStaff(mem, p, basePtr, uid, ca, pa);
                     }
                 }
+                scanned += (ulong)want;
             }
         }
 
@@ -118,7 +127,7 @@ internal static class Dumper
         e.Value = m.U32(pl + Fields.PLAO_TRANSFER_VALUE);
         e.GuideValue = m.U32(pl + Fields.PLAO_GUIDE_VALUE);
         ulong con = m.Ptr(person + Fields.PERO_FULL_CONTRACT);
-        if (con != 0 && m.Valid(con, 0x60))
+        if (con != 0)
         {
             e.Wage = m.U32(con + Fields.CON_WEEKLY_WAGE);
             e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
@@ -143,7 +152,7 @@ internal static class Dumper
         e.Job = GuessStaffRole(e.StaffAttrs);
 
         ulong con = m.Ptr(person + Fields.PERO_FULL_CONTRACT);
-        if (con != 0 && m.Valid(con, 0x60))
+        if (con != 0)
         {
             e.Wage = m.U32(con + Fields.CON_WEEKLY_WAGE);
             e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
@@ -188,7 +197,7 @@ internal static class Dumper
         foreach (int off in ClubCandidateOffsets)
         {
             ulong club = m.Ptr(person + (ulong)off);
-            if (club == 0 || !m.Valid(club, CLUB_NAME + 8)) continue;
+            if (club == 0) continue;
             string name = m.NestedString(club + CLUB_NAME);
             if (!string.IsNullOrEmpty(name) && name.Length is >= 2 and <= 48 && LooksLikeName(name))
                 return name;
@@ -318,7 +327,7 @@ internal static class Dumper
             string path = Path.Combine(OutDir, "diagnostics.txt");
             using var w = new StreamWriter(path, false);
             w.WriteLine($"FMSuperScout diagnostics — {DateTime.Now}");
-            w.WriteLine($"Regio's: {m.Regions.Count}  GameAssembly: {m.GaBase:X}-{m.GaEnd:X}");
+            w.WriteLine($"Scanregio's: {m.ScanRegions.Count}  GameAssembly: {m.GaBase:X}-{m.GaEnd:X}");
             w.WriteLine($"Kandidaten: {candidates:N0}  Spelers: {players.Count}  Staf: {staff.Count}  Tijd: {ms} ms");
             w.WriteLine("Dynamic-offset histogram:");
             foreach (var kv in hist.OrderByDescending(x => x.Value))

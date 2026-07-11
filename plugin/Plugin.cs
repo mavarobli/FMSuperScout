@@ -45,18 +45,15 @@ public class HotkeyBehaviour : MonoBehaviour
         if (kb[Key.F9].wasPressedThisFrame)
         {
             _busy = true;
-            try
+            Plugin.Log.LogInfo("F9 → dump gestart op achtergrond-thread (game blijft speelbaar)…");
+            // Scan draait op een achtergrond-thread: ReadProcessMemory is thread-safe en de
+            // IL2CPP-GC verplaatst objecten niet, dus de game bevriest niet tijdens het dumpen.
+            System.Threading.Tasks.Task.Run(() =>
             {
-                Dumper.DumpAll();
-            }
-            catch (System.Exception e)
-            {
-                Plugin.Log.LogError($"Dump mislukt: {e}");
-            }
-            finally
-            {
-                _busy = false;
-            }
+                try { Dumper.DumpAll(); }
+                catch (System.Exception e) { Plugin.Log.LogError($"Dump mislukt: {e}"); }
+                finally { _busy = false; }
+            });
         }
     }
 }
