@@ -7,6 +7,10 @@ internal static class Dumper
     private static readonly string OutDir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FMSuperScout");
 
+    // Diagnose-data (histogram van alle voorkomende class-offsets, gezet tijdens de scan).
+    internal static Dictionary<int, long> AllOffHist = new();
+    internal static long VtGp;
+
     public static void DumpAll()
     {
         var sw = Stopwatch.StartNew();
@@ -19,12 +23,16 @@ internal static class Dumper
             Plugin.Log.LogError("GameAssembly.dll niet gevonden — kan niet dumpen.");
             return;
         }
-        Plugin.Log.LogInfo($"Scanregio's: {mem.ScanRegions.Count}, GameAssembly {mem.GaBase:X}-{mem.GaEnd:X}");
+        Plugin.Log.LogInfo($"Scanregio's: {mem.ScanRegions.Count}, GameAssembly {mem.GaBase:X}-{mem.GaEnd:X}, " +
+                           $"game_plugin {mem.GpBase:X}-{mem.GpEnd:X}");
+        if (mem.GpBase == 0)
+            Plugin.Log.LogWarning("game_plugin.dll niet gevonden! Person-objecten leven daar — dump zal leeg zijn.");
 
         var players = new Dictionary<uint, Person>();
         var staff = new Dictionary<uint, Person>();
-        var offsetHist = new Dictionary<int, int>();
-        long candidates = 0;
+        var offsetHist = new Dictionary<int, int>();     // matches (speler/staf)
+        var allOffHist = new Dictionary<int, long>();     // ALLE class-offsets (diagnose)
+        long candidates = 0, vtGp = 0;
 
         const int ChunkSize = 32 * 1024 * 1024; // 32 MB blokken
         var buf = new byte[ChunkSize];
@@ -42,19 +50,25 @@ internal static class Dumper
                 for (int i = 0; i + 0x10 <= want; i += 8)
                 {
                     ulong vt = BitConverter.ToUInt64(buf, i);
-                    if (vt < mem.GaBase || vt >= mem.GaEnd) continue; // snelle prune: vtable in GameAssembly
+                    // vtable moet in game_plugin.dll (native DB) of GameAssembly liggen
+                    if (!mem.IsVtable(vt)) continue;
                     candidates++;
+                    if (mem.InGp(vt)) vtGp++;
 
                     ulong p = chunkBase + (ulong)i; // kandidaat person-object
-                    int off = mem.DynamicOffset(p);
+                    int off = mem.DynamicOffsetFromVtable(vt);
                     if (off == 0) continue;
+
+                    // Diagnose: registreer élk class-offset dat een plausibele UID heeft,
+                    // zodat we de echte speler/staf-offsets kunnen zien als er 0 matchen.
+                    uint uid = mem.U32(p + Fields.OBJ_DUNI);
+                    if (uid == 0 || uid == 0xFFFFFFFF) continue;
+                    if (off is > 0 and < 0x2000)
+                        allOffHist[off] = allOffHist.GetValueOrDefault(off) + 1;
 
                     bool isPlayer = off == Fields.PLAYER_OFFSET || off == Fields.PLAYER_STAFF_OFFSET;
                     bool isStaff = off == Fields.STAFF_OFFSET || off == Fields.HUMAN_MANAGER_OFFSET;
                     if (!isPlayer && !isStaff) continue;
-
-                    uint uid = mem.U32(p + Fields.OBJ_DUNI);
-                    if (uid == 0 || uid == 0xFFFFFFFF) continue;
 
                     ulong basePtr = p - (ulong)off;
                     if (isPlayer)
@@ -79,6 +93,9 @@ internal static class Dumper
                 scanned += (ulong)want;
             }
         }
+        Plugin.Log.LogInfo($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten");
+        Dumper.AllOffHist = allOffHist;
+        Dumper.VtGp = vtGp;
 
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
@@ -327,9 +344,18 @@ internal static class Dumper
             string path = Path.Combine(OutDir, "diagnostics.txt");
             using var w = new StreamWriter(path, false);
             w.WriteLine($"FMSuperScout diagnostics — {DateTime.Now}");
-            w.WriteLine($"Scanregio's: {m.ScanRegions.Count}  GameAssembly: {m.GaBase:X}-{m.GaEnd:X}");
-            w.WriteLine($"Kandidaten: {candidates:N0}  Spelers: {players.Count}  Staf: {staff.Count}  Tijd: {ms} ms");
-            w.WriteLine("Dynamic-offset histogram:");
+            w.WriteLine($"Scanregio's: {m.ScanRegions.Count}");
+            w.WriteLine($"GameAssembly.dll: {m.GaBase:X}-{m.GaEnd:X}");
+            w.WriteLine($"game_plugin.dll:  {m.GpBase:X}-{m.GpEnd:X}");
+            w.WriteLine($"Kandidaten: {candidates:N0}  (vtable in game_plugin: {VtGp:N0})");
+            w.WriteLine($"Spelers: {players.Count}  Staf: {staff.Count}  Tijd: {ms} ms");
+            w.WriteLine();
+            w.WriteLine("=== DIAGNOSE: alle class-offsets (meta+4) met plausibele UID, top 50 ===");
+            w.WriteLine("(De echte speler/staf-classes zijn de grote pieken; vergelijk met verwacht speler=0x288)");
+            foreach (var kv in AllOffHist.OrderByDescending(x => x.Value).Take(50))
+                w.WriteLine($"  0x{kv.Key:X} ({kv.Key,5}) : {kv.Value:N0}");
+            w.WriteLine();
+            w.WriteLine("Matches per offset (speler/staf-filter geslaagd):");
             foreach (var kv in hist.OrderByDescending(x => x.Value))
                 w.WriteLine($"  0x{kv.Key:X} ({kv.Key}) : {kv.Value}");
             w.WriteLine();

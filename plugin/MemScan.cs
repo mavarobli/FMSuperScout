@@ -53,16 +53,57 @@ internal sealed class MemScan
     // Regio's om te scannen naar person-objecten: private + committed + read-write (de GC-heap).
     public readonly List<(ulong start, ulong size)> ScanRegions = new();
 
-    public ulong GaBase { get; private set; }
+    public ulong GaBase { get; private set; }   // GameAssembly.dll (Unity/C#-laag)
     public ulong GaEnd { get; private set; }
+    public ulong GpBase { get; private set; }   // game_plugin.dll (native C++ database — hier leven person-objecten)
+    public ulong GpEnd { get; private set; }
 
     [ThreadStatic] private static byte[] _tls;
     private static byte[] Tls => _tls ??= new byte[16];
 
+    // Gecachte module-images voor snelle vtable/meta-resolutie zonder syscall per kandidaat.
+    private byte[] _gp;   // game_plugin.dll
+    private byte[] _ga;   // GameAssembly.dll
+
     public MemScan()
     {
         BuildRegions();
-        FindGameAssembly();
+        FindModules();
+        _gp = ReadImage(GpBase, GpEnd);
+        _ga = ReadImage(GaBase, GaEnd);
+    }
+
+    private byte[] ReadImage(ulong start, ulong end)
+    {
+        if (start == 0 || end <= start) return null;
+        int len = (int)(end - start);
+        var img = new byte[len];
+        const int chunk = 8 * 1024 * 1024;
+        var tmp = new byte[chunk];
+        int done = 0;
+        while (done < len)
+        {
+            int want = System.Math.Min(chunk, len - done);
+            if (ReadBlock(start + (ulong)done, tmp, want))
+                System.Array.Copy(tmp, 0, img, done, want);
+            // bij een gat blijft die sectie 0 — prima voor onze read-checks
+            done += want;
+        }
+        return img;
+    }
+
+    // Snelle image-reads (buiten bereik → 0).
+    private ulong ImgPtr(ulong addr)
+    {
+        if (_gp != null && addr >= GpBase && addr + 8 <= GpEnd) return BitConverter.ToUInt64(_gp, (int)(addr - GpBase));
+        if (_ga != null && addr >= GaBase && addr + 8 <= GaEnd) return BitConverter.ToUInt64(_ga, (int)(addr - GaBase));
+        return Ptr(addr); // fallback via RPM
+    }
+    private int ImgI32(ulong addr)
+    {
+        if (_gp != null && addr >= GpBase && addr + 4 <= GpEnd) return BitConverter.ToInt32(_gp, (int)(addr - GpBase));
+        if (_ga != null && addr >= GaBase && addr + 4 <= GaEnd) return BitConverter.ToInt32(_ga, (int)(addr - GaBase));
+        return I32(addr);
     }
 
     private static bool IsReadable(uint protect)
@@ -99,20 +140,42 @@ internal sealed class MemScan
         }
     }
 
-    private void FindGameAssembly()
+    // Alle geladen module-ranges (voor de vtable-check), gesorteerd op start.
+    private (ulong start, ulong end)[] _mods = System.Array.Empty<(ulong, ulong)>();
+
+    private void FindModules()
     {
+        var list = new List<(ulong, ulong)>();
         foreach (ProcessModule m in Process.GetCurrentProcess().Modules)
         {
+            ulong b = (ulong)m.BaseAddress.ToInt64();
+            ulong e = b + (ulong)m.ModuleMemorySize;
+            list.Add((b, e));
             if (string.Equals(m.ModuleName, "GameAssembly.dll", StringComparison.OrdinalIgnoreCase))
-            {
-                GaBase = (ulong)m.BaseAddress.ToInt64();
-                GaEnd = GaBase + (ulong)m.ModuleMemorySize;
-                return;
-            }
+            { GaBase = b; GaEnd = e; }
+            else if (string.Equals(m.ModuleName, "game_plugin.dll", StringComparison.OrdinalIgnoreCase))
+            { GpBase = b; GpEnd = e; }
         }
+        list.Sort((a, b) => a.Item1.CompareTo(b.Item1));
+        _mods = list.ToArray();
     }
 
     public bool InGa(ulong addr) => addr >= GaBase && addr < GaEnd;
+    public bool InGp(ulong addr) => GpBase != 0 && addr >= GpBase && addr < GpEnd;
+
+    /// <summary>Ligt dit adres in een geladen module (mogelijke vtable)?</summary>
+    public bool IsVtable(ulong addr)
+    {
+        int lo = 0, hi = _mods.Length - 1;
+        while (lo <= hi)
+        {
+            int mid = (lo + hi) >> 1;
+            if (addr < _mods[mid].start) hi = mid - 1;
+            else if (addr >= _mods[mid].end) lo = mid + 1;
+            else return true;
+        }
+        return false;
+    }
 
     /// <summary>Leest een heel blok. Geeft false bij ongeldig adres (crasht nooit).</summary>
     public bool ReadBlock(ulong addr, byte[] buf, int len)
@@ -184,13 +247,15 @@ internal sealed class MemScan
         return s.Length == 0 ? null : s;
     }
 
-    /// <summary>Meta-offset-truc: vtable=[person]; meta=[vtable-8]; return int32 op meta+4.</summary>
-    public int DynamicOffset(ulong person)
+    /// <summary>
+    /// Meta-offset-truc: meta=[vtable-8]; return int32 op meta+4. Vtable is al bekend
+    /// (uit de scanbuffer), dus we hoeven [person] niet opnieuw te lezen. Volledig uit
+    /// de gecachte module-images → geen syscall.
+    /// </summary>
+    public int DynamicOffsetFromVtable(ulong vtable)
     {
-        ulong vtable = Ptr(person);
-        if (vtable == 0 || !InGa(vtable)) return 0;
-        ulong meta = Ptr(vtable - 8);
+        ulong meta = ImgPtr(vtable - 8);
         if (meta == 0) return 0;
-        return I32(meta + 4);
+        return ImgI32(meta + 4);
     }
 }
