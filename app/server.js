@@ -61,6 +61,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/refresh' && req.method === 'POST') {
+    // Schrijf een trigger-bestand; de plugin pollt hierop en start een dump.
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(path.join(DATA_DIR, 'request.flag'), String(Date.now()));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String(e) }));
+    }
+    return;
+  }
+
   if (url.pathname === '/api/dump') {
     const dump = latestDump();
     if (!dump) {

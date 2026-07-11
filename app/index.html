@@ -9,78 +9,90 @@
 </head>
 <body>
 <header id="topbar">
-  <button id="btn-sidebar" title="Filters tonen/verbergen">☰</button>
+  <button id="btn-sidebar" title="Filters">☰</button>
   <h1>FM<span>Super</span>Scout</h1>
   <nav>
-    <button id="tab-players" class="tab active">Spelers</button>
-    <button id="tab-staff" class="tab">Staf</button>
-    <button id="tab-shortlist" class="tab">★ Shortlist <span id="sl-count">0</span></button>
+    <button id="tab-players" class="tab active" data-i18n="players">Spelers</button>
+    <button id="tab-staff" class="tab" data-i18n="staff">Staf</button>
+    <button id="tab-shortlist" class="tab">★ <span data-i18n="shortlist">Shortlist</span> <span id="sl-count">0</span></button>
   </nav>
-  <div id="club-badge" title="Deze data komt uit je draaiende game"></div>
-  <div id="dump-info">geen data</div>
-  <button id="btn-cur" title="Wissel valuta">£ / €</button>
-  <button id="btn-reload" title="Herlaad de nieuwste dump">⟳ Verversen</button>
+  <div id="club-badge" title="Klik = filter op jouw club"></div>
+  <div id="dump-info"></div>
+  <select id="sel-lang" title="Taal / Language">
+    <option value="nl">NL</option>
+    <option value="en">EN</option>
+  </select>
+  <select id="sel-cur" title="Valuta / Currency">
+    <option value="£">£ GBP</option>
+    <option value="€">€ EUR</option>
+  </select>
+  <button id="btn-fetch" data-i18n="fetch" title="Vraag FM om een nieuwe dump">⬇ Nieuwe data</button>
+  <button id="btn-reload" data-i18n="reload" title="Herlaad de laatste dump">⟳</button>
 </header>
 
 <div id="banner" class="hidden"></div>
 <div id="main">
   <aside id="filters">
     <div class="fgroup">
-      <input type="text" id="f-name" placeholder="🔍 Zoek naam of club">
+      <input type="text" id="f-name" data-i18n-ph="searchph" placeholder="🔍 Zoek naam of club">
     </div>
 
     <div class="fsection" id="fg-pitch">
-      <div class="fsec-head">Positie <button id="pos-clear" class="mini">wis</button></div>
+      <div class="fsec-head"><span data-i18n="position">Positie</span> <button id="pos-clear" class="mini" data-i18n="clear">wis</button></div>
       <div id="pitch-wrap"></div>
     </div>
 
     <div class="fgroup" id="fg-staffrole" style="display:none">
-      <label>Staf-rol</label>
-      <select id="f-staffrole"><option value="">Alle rollen</option></select>
+      <label data-i18n="staffrole">Staf-rol</label>
+      <select id="f-staffrole"><option value="">–</option></select>
     </div>
 
     <div class="fsection">
-      <div class="fsec-head">Kwaliteit &amp; leeftijd</div>
-      <div class="frow"><span>Leeftijd</span><div class="range2"><input type="number" id="f-age-min" placeholder="min">–<input type="number" id="f-age-max" placeholder="max"></div></div>
-      <div class="frow"><span>CA</span><div class="range2"><input type="number" id="f-ca-min" placeholder="min">–<input type="number" id="f-ca-max" placeholder="max"></div></div>
-      <div class="frow"><span>PA</span><div class="range2"><input type="number" id="f-pa-min" placeholder="min">–<input type="number" id="f-pa-max" placeholder="max"></div></div>
+      <div class="fsec-head" data-i18n="quality">Kwaliteit &amp; leeftijd</div>
+      <div class="frow"><span data-i18n="age">Leeftijd</span><div class="range2"><input type="number" id="f-age-min" placeholder="–">–<input type="number" id="f-age-max" placeholder="–"></div></div>
+      <div class="frow"><span>CA</span><div class="range2"><input type="number" id="f-ca-min" placeholder="–">–<input type="number" id="f-ca-max" placeholder="–"></div></div>
+      <div class="frow"><span>PA</span><div class="range2"><input type="number" id="f-pa-min" placeholder="–">–<input type="number" id="f-pa-max" placeholder="–"></div></div>
+      <div class="frow"><span data-i18n="refyear" title="Huidig in-game jaar — bepaalt de leeftijd">Peiljaar</span><input type="number" id="f-refyear" class="yr"></div>
     </div>
 
     <div class="fsection">
-      <div class="fsec-head">Financieel</div>
-      <div class="frow"><span>Max. waarde</span><input type="text" id="f-price" placeholder="10M"></div>
-      <div class="frow"><span>Max. loon p/w</span><input type="text" id="f-wage" placeholder="50K"></div>
+      <div class="fsec-head" data-i18n="financial">Financieel</div>
+      <div class="frow"><span data-i18n="maxvalue">Max. waarde</span><input type="text" id="f-price" placeholder="10M"></div>
+      <div class="frow"><span data-i18n="maxwage">Max. loon p/w</span><input type="text" id="f-wage" placeholder="50K"></div>
     </div>
 
     <div class="fsection">
-      <div class="fsec-head">Herkomst</div>
-      <div class="frow"><span>Nationaliteit</span><input type="text" id="f-nat" placeholder="Nederland"></div>
-      <label class="chk"><input type="checkbox" id="f-eu"> Alleen EU/EEA</label>
+      <div class="fsec-head" data-i18n="origin">Herkomst</div>
+      <div class="frow"><span data-i18n="nat">Nationaliteit</span><input type="text" id="f-nat" placeholder="Nederland"></div>
+      <label class="chk"><input type="checkbox" id="f-eu"> <span data-i18n="euonly">Alleen EU/EEA</span></label>
     </div>
 
     <div class="fsection">
-      <div class="fsec-head">Beschikbaarheid</div>
-      <div class="frow"><span>Interesse ≥</span>
+      <div class="fsec-head" data-i18n="availability">Beschikbaarheid</div>
+      <div class="frow"><span data-i18n="interestmin">Interesse ≥</span>
         <select id="f-interest">
-          <option value="0">Alle</option>
-          <option value="25">Klein</option>
-          <option value="45">Redelijk</option>
-          <option value="70">Groot</option>
+          <option value="0" data-i18n="all">Alle</option>
+          <option value="25" data-i18n="int_small">Klein</option>
+          <option value="45" data-i18n="int_ok">Redelijk</option>
+          <option value="70" data-i18n="int_big">Groot</option>
         </select></div>
-      <label class="chk"><input type="checkbox" id="f-attain"> Haalbaar (lijst/vrij/aflopend)</label>
-      <label class="chk"><input type="checkbox" id="f-listed"> Op transferlijst</label>
-      <label class="chk"><input type="checkbox" id="f-exp6"> Contract &lt; 6 maanden</label>
-      <label class="chk"><input type="checkbox" id="f-exp12"> Contract &lt; 1 jaar</label>
-      <label class="chk"><input type="checkbox" id="f-free"> Clubloos</label>
-      <label class="chk"><input type="checkbox" id="f-myclub"> Bij mijn club</label>
-      <label class="chk"><input type="checkbox" id="f-shortlist"> Alleen shortlist</label>
+      <label class="chk"><input type="checkbox" id="f-attain"> <span data-i18n="attainable">Haalbaar</span></label>
+      <label class="chk"><input type="checkbox" id="f-listed"> <span data-i18n="listed">Op transferlijst</span></label>
+      <label class="chk"><input type="checkbox" id="f-exp6"> <span data-i18n="exp6">Contract &lt; 6 mnd</span></label>
+      <label class="chk"><input type="checkbox" id="f-exp12"> <span data-i18n="exp12">Contract &lt; 1 jaar</span></label>
+      <label class="chk"><input type="checkbox" id="f-free"> <span data-i18n="free">Clubloos</span></label>
+      <label class="chk"><input type="checkbox" id="f-myclub"> <span data-i18n="myclub">Mijn club</span></label>
+      <label class="chk"><input type="checkbox" id="f-shortlist"> <span data-i18n="onlyshortlist">Alleen shortlist</span></label>
     </div>
 
-    <button id="btn-clear">Filters wissen</button>
+    <button id="btn-clear" data-i18n="clearfilters">Filters wissen</button>
     <div id="result-count"></div>
   </aside>
 
   <section id="content">
+    <div id="sl-bar" class="hidden">
+      <button id="btn-export" data-i18n="exportcsv">⬇ Shortlist exporteren (CSV)</button>
+    </div>
     <div id="table-wrap">
       <table id="grid">
         <thead><tr id="grid-head"></tr></thead>
@@ -89,8 +101,8 @@
       <div id="grid-spacer"></div>
     </div>
     <div id="empty-state">
-      <h2>Nog geen data geladen</h2>
-      <p id="empty-msg">Start FM26, laad je save en druk op <b>F9</b> om de database te dumpen.<br>Klik daarna op <b>⟳ Verversen</b>.</p>
+      <h2 data-i18n="nodata">Nog geen data geladen</h2>
+      <p id="empty-msg"></p>
     </div>
   </section>
 

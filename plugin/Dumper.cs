@@ -472,7 +472,7 @@ internal static class Dumper
         j.Prop("name", p.Name ?? "?");
         j.Prop("searchName", p.Name ?? "");
         j.Prop("age", p.Age);
-        if (p.BirthYear > 0) j.Prop("dob", $"{p.BirthYear:D4}");
+        if (p.BirthYear > 0) { j.Prop("dob", $"{p.BirthYear:D4}"); j.Prop("birthYear", p.BirthYear); j.Prop("birthDoy", p.BirthDoy); }
         j.Key("nat"); j.BeginArr(); foreach (var n in p.Nat) j.Val(n); j.EndArr();
         j.Prop("club", p.Club);
         j.Null4("div");

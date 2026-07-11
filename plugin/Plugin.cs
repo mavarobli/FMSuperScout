@@ -72,15 +72,29 @@ public class HotkeyBehaviour : MonoBehaviour
 
     }
 
+    private int _frame;
+    private static readonly string RequestFile = System.IO.Path.Combine(
+        System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+        "FMSuperScout", "request.flag");
+
     private void Update()
     {
         var kb = Keyboard.current;
-        if (kb == null || _busy) return;
+        if (_busy) return;
 
-        if (kb[Key.F9].wasPressedThisFrame)
+        bool f9 = kb != null && kb[Key.F9].wasPressedThisFrame;
+        bool requested = false;
+        // Trigger vanuit de web-app: check ~1x/sec op request.flag.
+        if (!f9 && (++_frame % 60 == 0))
+        {
+            try { if (System.IO.File.Exists(RequestFile)) { System.IO.File.Delete(RequestFile); requested = true; } }
+            catch { }
+        }
+
+        if (f9 || requested)
         {
             _busy = true;
-            Plugin.Log.LogInfo("F9 → dump gestart op achtergrond-thread (game blijft speelbaar)…");
+            Plugin.Log.LogInfo($"{(f9 ? "F9" : "web-app")} → dump gestart op achtergrond-thread…");
             // Scan draait op een achtergrond-thread: ReadProcessMemory is thread-safe en de
             // IL2CPP-GC verplaatst objecten niet, dus de game bevriest niet tijdens het dumpen.
             System.Threading.Tasks.Task.Run(() =>

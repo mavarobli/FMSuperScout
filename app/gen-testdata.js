@@ -45,7 +45,7 @@ function player(id) {
   const value = Math.random() < 0.9 ? null : Math.round(Math.pow(ca / 30, 4) * 1000);
   return {
     id, name: pick(FIRST) + ' ' + pick(LAST),
-    age, dob: String(2026 - age),
+    age, dob: String(2026 - age), birthYear: 2026 - age, birthDoy: ri(1, 365),
     nat: [pick(NATS)],
     club, div: null,
     pos: posArr.join(', '), posArr,
