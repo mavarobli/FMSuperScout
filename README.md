@@ -33,6 +33,22 @@ Snelle, accurate scout-tool voor **Football Manager 26** (Windows/Steam). Leest 
 
 Verwijder uit de FM26-map: `BepInEx/`, `dotnet/`, `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`, `changelog.txt`. De game is dan weer 100% origineel (Steam → verify files kan ook).
 
+## Status & nauwkeurigheid (v0.1)
+
+Rock-solid uit het geheugen (geverifieerde offsets, FM 26.3.x):
+- Naam, nationaliteit, leeftijd/geboortejaar, lengte, voorkeursvoet
+- **CA (huidige punten) en PA (potentiële punten)** — de échte waarden, niet de scout-schatting
+- Alle 47 zichtbare + 5 verborgen attributen, posities en geschiktheid
+- Transferwaarde, weeksalaris, contracteinddatum, transferlijst-status
+- Staf: CA/PA, staf-attributen, geschatte rol
+
+Nog te finetunen in v0.2 (na de eerste echte dump, met `diagnostics.txt`):
+- **Clubnaam** is nu best-effort (meerdere offset-kandidaten met naam-validatie). Als een club leeg/fout is, pin ik het exacte offset uit de diagnostics.
+- **"Wil naar mijn club"** en **exacte vraagprijs/salariseis** vereisen de manager-context; die haal ik in v0.2 uit dezelfde dump. Nu toont de kolom transferlijst-status; `askingPrice` = transferwaarde als benadering.
+- **Leeftijd** gebruikt nu de echte systeemdatum als in-game datum (klopt voor jouw save ~juli 2026); exacte in-game datum lees ik in v0.2 in.
+
+De plugin schrijft naast `dump.json` ook `diagnostics.txt` (aantallen, offset-histogram, voorbeeldspelers) — stuur die na je eerste F9 en ik pin de laatste velden exact.
+
 ## Disclaimer
 
 Alleen voor eigen singleplayer-gebruik. De plugin leest alleen data (schrijft niets in de game) en werkt volledig offline.
