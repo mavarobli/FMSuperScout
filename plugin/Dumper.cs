@@ -12,6 +12,8 @@ internal static class Dumper
     internal static long VtGp;
     // Person-adressen van de eerste spelers, voor club-offset-discovery in de diagnose.
     internal static readonly List<(ulong person, string name, string club)> DiagPersons = new();
+    internal static string MyClub;       // club van de human-manager
+    internal static string ManagerName;  // naam van de human-manager
 
     // 0xFFFFFFFF is FM's "niet ingesteld"-sentinel → onbekend (-1). Anders de waarde.
     private static long Money(uint v) => v == 0xFFFFFFFF ? -1 : v;
@@ -39,6 +41,7 @@ internal static class Dumper
         var staff = new Dictionary<uint, Person>();
         var offsetHist = new Dictionary<int, int>();     // matches (speler/staf)
         var allOffHist = new Dictionary<int, long>();     // ALLE class-offsets (diagnose)
+        var managers = new List<(ulong person, string name, string club)>(); // human-managers
         long candidates = 0, vtGp = 0;
 
         const int ChunkSize = 32 * 1024 * 1024; // 32 MB blokken
@@ -94,7 +97,12 @@ internal static class Dumper
                         if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
                         offsetHist[off] = offsetHist.GetValueOrDefault(off) + 1;
                         if (!staff.ContainsKey(uid))
-                            staff[uid] = ReadStaff(mem, p, basePtr, uid, ca, pa);
+                        {
+                            var st = ReadStaff(mem, p, basePtr, uid, ca, pa);
+                            staff[uid] = st;
+                            if (off == Fields.HUMAN_MANAGER_OFFSET)
+                                managers.Add((p, st.Name, st.Club));
+                        }
                     }
                 }
                 scanned += (ulong)want;
@@ -103,6 +111,13 @@ internal static class Dumper
         Plugin.Log.LogInfo($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten");
         Dumper.AllOffHist = allOffHist;
         Dumper.VtGp = vtGp;
+
+        // Human-manager → jouw club. Kies de manager met een resolvebare club.
+        var me = managers.FirstOrDefault(x => !string.IsNullOrEmpty(x.club));
+        if (me.person == 0 && managers.Count > 0) me = managers[0];
+        MyClub = me.club;
+        ManagerName = me.name;
+        Plugin.Log.LogInfo($"Manager: {ManagerName ?? "?"} · club: {MyClub ?? "?"} ({managers.Count} human-managers)");
 
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
@@ -296,6 +311,9 @@ internal static class Dumper
         j.Key("meta"); j.BeginObj();
         j.Prop("generated", DateTime.Now.ToString("s"));
         j.Prop("gameDate", DateTime.Now.ToString("yyyy-MM-dd"));
+        j.Prop("manager", ManagerName);
+        j.Prop("myClub", MyClub);
+        j.Prop("currency", "GBP");
         j.Prop("source", "FMSuperScout plugin v" + Plugin.Version);
         j.EndObj();
 

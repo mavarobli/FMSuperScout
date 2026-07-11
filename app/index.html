@@ -9,27 +9,38 @@
 </head>
 <body>
 <header id="topbar">
+  <button id="btn-sidebar" title="Filters tonen/verbergen">☰</button>
   <h1>FM<span>Super</span>Scout</h1>
   <nav>
     <button id="tab-players" class="tab active">Spelers</button>
     <button id="tab-staff" class="tab">Staf</button>
+    <button id="tab-shortlist" class="tab">★ Shortlist <span id="sl-count">0</span></button>
   </nav>
+  <div id="club-badge" title="Deze data komt uit je draaiende game"></div>
   <div id="dump-info">geen data</div>
+  <button id="btn-cur" title="Wissel valuta">£ / €</button>
   <button id="btn-reload" title="Herlaad de nieuwste dump">⟳ Verversen</button>
 </header>
 
 <div id="main">
   <aside id="filters">
     <div class="fgroup">
-      <label>Zoek naam</label>
-      <input type="text" id="f-name" placeholder="bijv. Timber">
+      <label>Zoek naam of club</label>
+      <input type="text" id="f-name" placeholder="bijv. Timber of Feyenoord">
     </div>
-    <div class="fgroup" id="fg-pos">
-      <label>Positie</label>
-      <div id="f-pos" class="poschips"></div>
+
+    <div class="fgroup" id="fg-pitch">
+      <label>Posities <button id="pos-clear" class="mini">wis</button></label>
+      <div id="pitch-wrap"></div>
     </div>
+
+    <div class="fgroup" id="fg-staffrole" style="display:none">
+      <label>Staf-rol</label>
+      <select id="f-staffrole"><option value="">Alle rollen</option></select>
+    </div>
+
     <div class="fgroup">
-      <label>Leeftijd <span id="f-age-lbl"></span></label>
+      <label>Leeftijd</label>
       <div class="range2"><input type="number" id="f-age-min" placeholder="min" min="14" max="50">–<input type="number" id="f-age-max" placeholder="max" min="14" max="50"></div>
     </div>
     <div class="fgroup">
@@ -41,32 +52,28 @@
       <div class="range2"><input type="number" id="f-pa-min" placeholder="min" min="0" max="200">–<input type="number" id="f-pa-max" placeholder="max" min="0" max="200"></div>
     </div>
     <div class="fgroup">
-      <label>Max. vraagprijs (€)</label>
+      <label>Max. waarde</label>
       <input type="text" id="f-price" placeholder="bijv. 10M of 500K">
     </div>
     <div class="fgroup">
-      <label>Max. salariseis (€ p/w)</label>
+      <label>Max. salaris p/w</label>
       <input type="text" id="f-wage" placeholder="bijv. 50K">
     </div>
     <div class="fgroup">
       <label>Nationaliteit</label>
-      <input type="text" id="f-nat" placeholder="bijv. NED">
+      <input type="text" id="f-nat" placeholder="bijv. Nederland">
     </div>
-    <div class="fgroup">
-      <label>Club / competitie</label>
-      <input type="text" id="f-club" placeholder="bijv. Ajax of Eredivisie">
-    </div>
+
     <div class="fgroup checks">
-      <label><input type="checkbox" id="f-interest"> Wil naar mijn club</label>
+      <label><input type="checkbox" id="f-eu"> Alleen EU/EEA-spelers</label>
+      <label><input type="checkbox" id="f-myclub"> Bij mijn club</label>
       <label><input type="checkbox" id="f-listed"> Op transferlijst</label>
-      <label><input type="checkbox" id="f-loan"> Te huur</label>
-      <label><input type="checkbox" id="f-expiring"> Contract &lt; 1 jaar</label>
-      <label><input type="checkbox" id="f-free"> Transfervrij</label>
+      <label><input type="checkbox" id="f-exp6"> Contract &lt; 6 maanden</label>
+      <label><input type="checkbox" id="f-exp12"> Contract &lt; 1 jaar</label>
+      <label><input type="checkbox" id="f-free"> Clubloos</label>
+      <label><input type="checkbox" id="f-shortlist"> Alleen shortlist</label>
     </div>
-    <div class="fgroup" id="fg-staffrole" style="display:none">
-      <label>Staf-rol</label>
-      <select id="f-staffrole"><option value="">Alle rollen</option></select>
-    </div>
+
     <button id="btn-clear">Filters wissen</button>
     <div id="result-count"></div>
   </aside>
@@ -81,7 +88,7 @@
     </div>
     <div id="empty-state">
       <h2>Nog geen data geladen</h2>
-      <p id="empty-msg">Start FM26, laad je save en druk op <b>F9</b> om de database te dumpen.<br>Klik daarna hierboven op <b>⟳ Verversen</b>.</p>
+      <p id="empty-msg">Start FM26, laad je save en druk op <b>F9</b> om de database te dumpen.<br>Klik daarna op <b>⟳ Verversen</b>.</p>
     </div>
   </section>
 

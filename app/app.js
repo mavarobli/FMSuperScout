@@ -1,52 +1,67 @@
 // FMSuperScout frontend — vanilla JS, gevirtualiseerde tabel voor 50k+ rijen.
 'use strict';
-
 const $ = id => document.getElementById(id);
 
 const state = {
-  mode: 'players',        // 'players' | 'staff'
-  players: [],
-  staff: [],
-  meta: null,
+  mode: 'players',
+  players: [], staff: [], meta: {},
   filtered: [],
-  sortKey: 'ca',
-  sortDir: -1,
+  sortKey: 'ca', sortDir: -1,
   selected: null,
+  cur: localStorage.getItem('fmss_cur') || '£',
+  shortlist: new Set(JSON.parse(localStorage.getItem('fmss_shortlist') || '[]')),
 };
 
-// ---------- kolomdefinities ----------
-const fmtMoney = v => {
+const GBP_TO_EUR = 1.16;
+
+// ---------- EU/EEA-landen (FM toont Nederlandse namen) ----------
+const EU_NATIONS = new Set([
+  'Nederland', 'België', 'Duitsland', 'Frankrijk', 'Italië', 'Spanje', 'Portugal', 'Ierland',
+  'Oostenrijk', 'Polen', 'Zweden', 'Denemarken', 'Finland', 'Tsjechië', 'Slowakije', 'Hongarije',
+  'Roemenië', 'Bulgarije', 'Griekenland', 'Kroatië', 'Slovenië', 'Luxemburg', 'Estland', 'Letland',
+  'Litouwen', 'Malta', 'Cyprus',
+  // EEA + Zwitserland (voor werkvergunning gelijkgesteld)
+  'Noorwegen', 'IJsland', 'Liechtenstein', 'Zwitserland',
+].map(s => s.toLowerCase()));
+
+const isEu = p => (p.nat || []).some(n => EU_NATIONS.has((n || '').toLowerCase()));
+
+// ---------- geld ----------
+function fmtMoney(v) {
   if (v == null) return '–';
-  if (v === 0) return '0';
-  const abs = Math.abs(v);
-  if (abs >= 1e9) return (v / 1e9).toFixed(2) + ' mld';
-  if (abs >= 1e6) return (v / 1e6).toFixed(1) + ' M';
-  if (abs >= 1e3) return Math.round(v / 1e3) + ' K';
-  return String(Math.round(v));
-};
+  let val = v, sym = '£';
+  if (state.cur === '€') { val = v * GBP_TO_EUR; sym = '€'; }
+  if (val === 0) return sym + '0';
+  const abs = Math.abs(val);
+  if (abs >= 1e9) return sym + (val / 1e9).toFixed(2) + ' mld';
+  if (abs >= 1e6) return sym + (val / 1e6).toFixed(1) + 'M';
+  if (abs >= 1e3) return sym + Math.round(val / 1e3) + 'K';
+  return sym + Math.round(val);
+}
 const fmtDate = v => v ? String(v).slice(0, 10) : '–';
 
+// ---------- kolommen ----------
 const PLAYER_COLS = [
+  { key: 'sl', label: '★', star: true },
   { key: 'name', label: 'Naam', get: p => p.name },
   { key: 'age', label: 'Lft', num: true, get: p => p.age },
   { key: 'pos', label: 'Positie', get: p => p.pos || '–' },
-  { key: 'club', label: 'Club', get: p => p.club || 'Clubloos' },
+  { key: 'club', label: 'Club', get: p => p.club, dimNull: true },
   { key: 'nat', label: 'Nat', get: p => (p.nat || []).join(', ') },
+  { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? '<span class="eu-yes">✓</span>' : '<span class="dim">–</span>' },
   { key: 'ca', label: 'CA', num: true, cls: 'ca-bar', get: p => p.ca },
   { key: 'pa', label: 'PA', num: true, cls: 'pa-bar', get: p => p.pa },
   { key: 'value', label: 'Waarde', num: true, get: p => p.value, fmt: fmtMoney },
-  { key: 'askingPrice', label: 'Vraagprijs', num: true, get: p => p.askingPrice, fmt: fmtMoney },
   { key: 'wage', label: 'Salaris p/w', num: true, get: p => p.wage, fmt: fmtMoney },
-  { key: 'wageDemand', label: 'Salariseis p/w', num: true, get: p => p.wageDemand, fmt: fmtMoney },
   { key: 'expires', label: 'Contract tot', get: p => p.expires, fmt: fmtDate },
-  { key: 'interest', label: 'Interesse', get: p => p.interest },
+  { key: 'status', label: 'Status', get: p => statusText(p), render: p => statusHtml(p) },
 ];
-
 const STAFF_COLS = [
+  { key: 'sl', label: '★', star: true },
   { key: 'name', label: 'Naam', get: p => p.name },
   { key: 'age', label: 'Lft', num: true, get: p => p.age },
   { key: 'job', label: 'Rol', get: p => p.job || '–' },
-  { key: 'club', label: 'Club', get: p => p.club || 'Clubloos' },
+  { key: 'club', label: 'Club', get: p => p.club, dimNull: true },
   { key: 'nat', label: 'Nat', get: p => (p.nat || []).join(', ') },
   { key: 'ca', label: 'CA', num: true, cls: 'ca-bar', get: p => p.ca },
   { key: 'pa', label: 'PA', num: true, cls: 'pa-bar', get: p => p.pa },
@@ -54,20 +69,62 @@ const STAFF_COLS = [
   { key: 'expires', label: 'Contract tot', get: p => p.expires, fmt: fmtDate },
 ];
 
-const POSITIONS = ['GK', 'DR', 'DC', 'DL', 'WBR', 'WBL', 'DM', 'MR', 'MC', 'ML', 'AMR', 'AMC', 'AML', 'ST'];
+function statusText(p) { return (p.listed ? 'lijst ' : '') + (isFree(p) ? 'clubloos' : ''); }
+function statusHtml(p) {
+  let h = '';
+  if (p.listed) h += '<span class="tag listed">transferlijst</span>';
+  return h;
+}
+const isFree = p => !p.club;
 
-// Attributen gegroepeerd voor het detailpaneel (sleutels zoals de plugin ze dumpt)
-const ATTR_GROUPS_PLAYER = {
-  'Techniek': ['Corners', 'Crossing', 'Dribbling', 'Finishing', 'FirstTouch', 'FreeKicks', 'Heading', 'LongShots', 'LongThrows', 'Marking', 'Passing', 'PenaltyTaking', 'Tackling', 'Technique'],
+// ---------- posities & veld ----------
+const PITCH = [
+  ['ST', 50, 9], ['AML', 17, 24], ['AMC', 50, 24], ['AMR', 83, 24],
+  ['ML', 11, 42], ['MC', 50, 42], ['MR', 89, 42], ['DM', 50, 57],
+  ['WBL', 11, 64], ['WBR', 89, 64], ['DL', 24, 78], ['DC', 50, 80],
+  ['DR', 76, 78], ['GK', 50, 93],
+];
+const activePos = new Set();
+
+function buildPitch() {
+  const nodes = PITCH.map(([pos, x, y]) =>
+    `<g class="pos-node" data-pos="${pos}" transform="translate(${x},${y})">
+       <circle r="8"></circle><text>${pos}</text></g>`).join('');
+  $('pitch-wrap').innerHTML =
+    `<svg viewBox="0 0 100 104" xmlns="http://www.w3.org/2000/svg">
+       <rect x="1" y="1" width="98" height="102" rx="3" fill="#12301c" stroke="#2a3441"/>
+       <line x1="1" y1="52" x2="99" y2="52" stroke="#2a4a34"/>
+       <circle cx="50" cy="52" r="10" fill="none" stroke="#2a4a34"/>
+       <rect x="30" y="1" width="40" height="14" fill="none" stroke="#2a4a34"/>
+       <rect x="30" y="89" width="40" height="14" fill="none" stroke="#2a4a34"/>
+       ${nodes}
+     </svg>`;
+  $('pitch-wrap').querySelectorAll('.pos-node').forEach(n => {
+    n.onclick = () => {
+      const pos = n.dataset.pos;
+      if (activePos.has(pos)) { activePos.delete(pos); n.classList.remove('on'); }
+      else { activePos.add(pos); n.classList.add('on'); }
+      applyFilters();
+    };
+  });
+}
+
+// ---------- attributen in FM-volgorde ----------
+const ATTR_OUTFIELD = {
+  'Technisch': ['Corners', 'Crossing', 'Dribbling', 'Finishing', 'FirstTouch', 'FreeKicks', 'Heading', 'LongShots', 'LongThrows', 'Marking', 'Passing', 'PenaltyTaking', 'Tackling', 'Technique'],
   'Mentaal': ['Aggression', 'Anticipation', 'Bravery', 'Composure', 'Concentration', 'Decisions', 'Determination', 'Flair', 'Leadership', 'OffTheBall', 'Positioning', 'Teamwork', 'Vision', 'WorkRate'],
   'Fysiek': ['Acceleration', 'Agility', 'Balance', 'JumpingReach', 'NaturalFitness', 'Pace', 'Stamina', 'Strength'],
-  'Keeper': ['AerialReach', 'CommandOfArea', 'Communication', 'Eccentricity', 'Handling', 'Kicking', 'OneOnOnes', 'Punching', 'Reflexes', 'RushingOut', 'Throwing'],
+};
+const ATTR_GK = {
+  'Keeper': ['AerialReach', 'CommandOfArea', 'Communication', 'Eccentricity', 'FirstTouch', 'Handling', 'Kicking', 'OneOnOnes', 'Passing', 'PenaltyTaking', 'Punching', 'Reflexes', 'RushingOut', 'Throwing', 'Technique'],
+  'Mentaal': ['Aggression', 'Anticipation', 'Bravery', 'Composure', 'Concentration', 'Decisions', 'Determination', 'Flair', 'Leadership', 'OffTheBall', 'Positioning', 'Teamwork', 'Vision', 'WorkRate'],
+  'Fysiek': ['Acceleration', 'Agility', 'Balance', 'JumpingReach', 'NaturalFitness', 'Pace', 'Stamina', 'Strength'],
 };
 const ATTR_NL = {
-  Corners: 'Corners', Crossing: 'Voorzetten', Dribbling: 'Dribbelen', Finishing: 'Afmaken', FirstTouch: 'Eerste balcontact', FreeKicks: 'Vrije trappen', Heading: 'Koppen', LongShots: 'Afstandsschoten', LongThrows: 'Verre inworpen', Marking: 'Mandekking', Passing: 'Passen', PenaltyTaking: 'Strafschoppen', Tackling: 'Tackelen', Technique: 'Techniek',
-  Aggression: 'Agressie', Anticipation: 'Anticiperen', Bravery: 'Moed', Composure: 'Kalmte', Concentration: 'Concentratie', Decisions: 'Beslissingen', Determination: 'Vastberadenheid', Flair: 'Flair', Leadership: 'Leiderschap', OffTheBall: 'Vrijlopen', Positioning: 'Positiespel', Teamwork: 'Teamwork', Vision: 'Inzicht', WorkRate: 'Arbeidsethos',
-  Acceleration: 'Acceleratie', Agility: 'Behendigheid', Balance: 'Evenwicht', JumpingReach: 'Sprongkracht', NaturalFitness: 'Natuurlijke fitheid', Pace: 'Snelheid', Stamina: 'Uithoudingsvermogen', Strength: 'Kracht',
-  AerialReach: 'Reikwijdte', CommandOfArea: 'Strafschopgebied', Communication: 'Communicatie', Eccentricity: 'Excentriciteit', Handling: 'Vangen', Kicking: 'Uittrappen', OneOnOnes: 'Één-op-één', Punching: 'Stompen', Reflexes: 'Reflexen', RushingOut: 'Uitkomen', Throwing: 'Uitwerpen',
+  Corners: 'Hoekschoppen', Crossing: 'Voorzetten', Dribbling: 'Dribbelen', Finishing: 'Afronden', FirstTouch: 'Balaanname', FreeKicks: 'Vrije trappen', Heading: 'Koppen', LongShots: 'Schoten van afstand', LongThrows: 'Verre ingooien', Marking: 'Dekken', Passing: 'Passen', PenaltyTaking: 'Strafschoppen', Tackling: 'Tackelen', Technique: 'Techniek',
+  Aggression: 'Agressie', Anticipation: 'Anticipatie', Bravery: 'Moed', Composure: 'Kalmte', Concentration: 'Concentratie', Decisions: 'Beslissingen', Determination: 'Wilskracht', Flair: 'Flair', Leadership: 'Leiderschap', OffTheBall: 'Positiekeuze', Positioning: 'Positiespel', Teamwork: 'Teamwork', Vision: 'Passeeroverzicht', WorkRate: 'Inzet',
+  Acceleration: 'Acceleratie', Agility: 'Wendbaarheid', Balance: 'Balans', JumpingReach: 'Sprongkracht', NaturalFitness: 'Natuurlijke fitheid', Pace: 'Snelheid', Stamina: 'Uithoudingsvermogen', Strength: 'Kracht',
+  AerialReach: 'Uitreiken', CommandOfArea: 'Beheersing strafschopgebied', Communication: 'Communicatie', Eccentricity: 'Excentriciteit', Handling: 'Vangen', Kicking: 'Uittrappen', OneOnOnes: 'Één-op-één', Punching: 'Stompen', Reflexes: 'Reflexen', RushingOut: 'Uitkomen', Throwing: 'Uitwerpen',
 };
 
 // ---------- data laden ----------
@@ -85,21 +142,19 @@ async function loadDump() {
     state.staff = data.staff || [];
     state.meta = data.meta || {};
     const when = new Date(st.dumpTime).toLocaleString('nl-NL');
-    const gameDate = state.meta.gameDate ? ` · in-game: ${fmtDate(state.meta.gameDate)}` : '';
-    $('dump-info').textContent = `${state.players.length.toLocaleString('nl-NL')} spelers · ${state.staff.length.toLocaleString('nl-NL')} staf · dump: ${when}${gameDate}`;
+    $('dump-info').textContent = `${state.players.length.toLocaleString('nl-NL')} spelers · ${state.staff.length.toLocaleString('nl-NL')} staf · ${when}`;
+    const mgr = state.meta.manager, club = state.meta.myClub;
+    $('club-badge').innerHTML = (mgr || club)
+      ? `${mgr ? mgr + ' · ' : ''}<b>${club || '?'}</b>` : '';
     $('empty-state').classList.add('hidden');
     buildStaffRoles();
     applyFilters();
-  } catch (e) {
-    $('dump-info').textContent = 'fout bij laden';
-    console.error(e);
-  }
+  } catch (e) { $('dump-info').textContent = 'fout bij laden'; console.error(e); }
 }
 
 function buildStaffRoles() {
-  const sel = $('f-staffrole');
   const jobs = [...new Set(state.staff.map(s => s.job).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">Alle rollen</option>' + jobs.map(j => `<option>${j}</option>`).join('');
+  $('f-staffrole').innerHTML = '<option value="">Alle rollen</option>' + jobs.map(j => `<option>${j}</option>`).join('');
 }
 
 // ---------- filters ----------
@@ -109,16 +164,22 @@ const parseMoney = s => {
   const m = s.match(/^([\d.]+)\s*(K|M|MLD|B)?/);
   if (!m) return null;
   let v = parseFloat(m[1]);
-  if (m[2] === 'K') v *= 1e3;
-  else if (m[2] === 'M') v *= 1e6;
-  else if (m[2] === 'MLD' || m[2] === 'B') v *= 1e9;
+  if (m[2] === 'K') v *= 1e3; else if (m[2] === 'M') v *= 1e6; else if (m[2] === 'MLD' || m[2] === 'B') v *= 1e9;
+  // invoer is in weergavevaluta → terug naar GBP voor vergelijking
+  if (state.cur === '€') v /= GBP_TO_EUR;
   return isNaN(v) ? null : v;
 };
 
-const activePos = new Set();
+function monthsUntil(expires) {
+  if (!expires) return null;
+  const now = state.meta.gameDate ? new Date(state.meta.gameDate) : new Date();
+  const exp = new Date(expires);
+  if (isNaN(exp)) return null;
+  return (exp - now) / (1000 * 60 * 60 * 24 * 30.44);
+}
 
 function applyFilters() {
-  const rows = state.mode === 'players' ? state.players : state.staff;
+  let rows = state.mode === 'staff' ? state.staff : state.players;
   const name = $('f-name').value.trim().toLowerCase();
   const ageMin = +$('f-age-min').value || 0, ageMax = +$('f-age-max').value || 99;
   const caMin = +$('f-ca-min').value || 0, caMax = +$('f-ca-max').value || 999;
@@ -126,31 +187,30 @@ function applyFilters() {
   const price = parseMoney($('f-price').value);
   const wage = parseMoney($('f-wage').value);
   const nat = $('f-nat').value.trim().toLowerCase();
-  const club = $('f-club').value.trim().toLowerCase();
-  const wantInterest = $('f-interest').checked;
-  const wantListed = $('f-listed').checked;
-  const wantLoan = $('f-loan').checked;
-  const wantExpiring = $('f-expiring').checked;
-  const wantFree = $('f-free').checked;
+  const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
+  const wantListed = $('f-listed').checked, wantExp6 = $('f-exp6').checked, wantExp12 = $('f-exp12').checked;
+  const wantFree = $('f-free').checked, onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
   const staffRole = $('f-staffrole').value;
-  const now = state.meta && state.meta.gameDate ? new Date(state.meta.gameDate) : new Date();
-  const inOneYear = new Date(now); inOneYear.setFullYear(inOneYear.getFullYear() + 1);
+  const myClub = (state.meta.myClub || '').toLowerCase();
+
+  if (state.mode === 'shortlist') rows = [...state.players, ...state.staff];
 
   state.filtered = rows.filter(p => {
-    if (name && !(p.searchName || p.name || '').toLowerCase().includes(name)) return false;
+    if (onlySl && !state.shortlist.has(p.id)) return false;
+    if (name && !((p.name || '').toLowerCase().includes(name) || (p.club || '').toLowerCase().includes(name))) return false;
     if (p.age < ageMin || p.age > ageMax) return false;
     if ((p.ca ?? 0) < caMin || (p.ca ?? 0) > caMax) return false;
     if ((p.pa ?? 0) < paMin || (p.pa ?? 0) > paMax) return false;
-    if (price != null && (p.askingPrice ?? p.value ?? 0) > price) return false;
-    if (wage != null && (p.wageDemand ?? p.wage ?? 0) > wage) return false;
+    if (price != null && (p.value ?? Infinity) > price) return false;
+    if (wage != null && (p.wage ?? Infinity) > wage) return false;
     if (nat && !(p.nat || []).some(n => n.toLowerCase().includes(nat))) return false;
-    if (club && !((p.club || '').toLowerCase().includes(club) || (p.div || '').toLowerCase().includes(club))) return false;
-    if (activePos.size && !(p.posArr || []).some(x => activePos.has(x))) return false;
-    if (wantInterest && !p.interested) return false;
+    if (onlyEu && !isEu(p)) return false;
+    if (onlyMyClub && (!p.club || p.club.toLowerCase() !== myClub)) return false;
+    if (wantFree && !isFree(p)) return false;
     if (wantListed && !p.listed) return false;
-    if (wantLoan && !p.loanListed) return false;
-    if (wantExpiring && !(p.expires && new Date(p.expires) < inOneYear)) return false;
-    if (wantFree && p.club) return false;
+    if (wantExp6) { const m = monthsUntil(p.expires); if (m == null || m > 6) return false; }
+    if (wantExp12) { const m = monthsUntil(p.expires); if (m == null || m > 12) return false; }
+    if (activePos.size && !(p.posArr || []).some(x => activePos.has(x))) return false;
     if (state.mode === 'staff' && staffRole && p.job !== staffRole) return false;
     return true;
   });
@@ -160,9 +220,13 @@ function applyFilters() {
   renderTable();
 }
 
+function activeCols() {
+  return state.mode === 'staff' ? STAFF_COLS : PLAYER_COLS;
+}
+
 function sortRows() {
-  const cols = state.mode === 'players' ? PLAYER_COLS : STAFF_COLS;
-  const col = cols.find(c => c.key === state.sortKey) || cols[0];
+  const col = activeCols().find(c => c.key === state.sortKey) || activeCols()[1];
+  if (col.star) return;
   const dir = state.sortDir;
   state.filtered.sort((a, b) => {
     const va = col.get(a), vb = col.get(b);
@@ -179,15 +243,14 @@ const ROW_H = 28;
 let renderQueued = false;
 
 function renderTable() {
-  const cols = state.mode === 'players' ? PLAYER_COLS : STAFF_COLS;
+  const cols = activeCols();
   const head = $('grid-head');
   head.innerHTML = cols.map(c =>
-    `<th data-key="${c.key}" class="${c.key === state.sortKey ? 'sorted' : ''}">${c.label}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`
-  ).join('');
+    `<th data-key="${c.key}" class="${c.key === state.sortKey ? 'sorted' : ''}">${c.label}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('');
   head.querySelectorAll('th').forEach(th => th.onclick = () => {
     const k = th.dataset.key;
-    if (state.sortKey === k) state.sortDir *= -1;
-    else { state.sortKey = k; state.sortDir = -1; }
+    if (activeCols().find(c => c.key === k)?.star) return;
+    if (state.sortKey === k) state.sortDir *= -1; else { state.sortKey = k; state.sortDir = -1; }
     sortRows(); renderTable();
   });
   $('grid-spacer').style.height = (state.filtered.length * ROW_H) + 'px';
@@ -195,8 +258,7 @@ function renderTable() {
 }
 
 function renderVisible() {
-  const wrap = $('table-wrap');
-  const cols = state.mode === 'players' ? PLAYER_COLS : STAFF_COLS;
+  const wrap = $('table-wrap'), cols = activeCols();
   const first = Math.max(0, Math.floor(wrap.scrollTop / ROW_H) - 10);
   const count = Math.ceil(wrap.clientHeight / ROW_H) + 20;
   const slice = state.filtered.slice(first, first + count);
@@ -205,132 +267,143 @@ function renderVisible() {
   body.innerHTML = slice.map((p, i) => {
     const idx = first + i;
     const tds = cols.map(c => {
-      let v = c.get(p);
-      if (c.fmt) v = c.fmt(v);
-      if (v == null) v = '–';
-      if (c.key === 'interest') {
-        v = p.interested ? `<span class="tag yes">JA</span>` : '';
-        if (p.listed) v += `<span class="tag listed">lijst</span>`;
+      if (c.star) {
+        const on = state.shortlist.has(p.id);
+        return `<td class="star-cell ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</td>`;
       }
+      if (c.render) return `<td class="${c.num ? 'num' : ''}">${c.render(p)}</td>`;
+      let v = c.get(p);
+      if (c.dimNull && !v) return `<td class="dim">–</td>`;
+      if (c.fmt) v = c.fmt(v);
+      if (v == null || v === '') v = '–';
       return `<td class="${c.num ? 'num' : ''} ${c.cls || ''}">${v}</td>`;
     }).join('');
     return `<tr data-i="${idx}" class="${state.selected === p ? 'sel' : ''}" style="height:${ROW_H}px">${tds}</tr>`;
   }).join('');
-  body.querySelectorAll('tr').forEach(tr => tr.onclick = () => showDetail(state.filtered[+tr.dataset.i]));
+  body.querySelectorAll('tr').forEach(tr => {
+    tr.onclick = e => {
+      const star = e.target.closest('[data-star]');
+      if (star) { toggleShortlist(+star.dataset.star); e.stopPropagation(); return; }
+      showDetail(state.filtered[+tr.dataset.i]);
+    };
+  });
 }
-
 $('table-wrap').addEventListener('scroll', () => {
   if (renderQueued) return;
   renderQueued = true;
   requestAnimationFrame(() => { renderQueued = false; renderVisible(); });
 });
 
-// ---------- detailpaneel ----------
-function attrClass(v) {
-  if (v >= 17) return 'g5';
-  if (v >= 14) return 'g4';
-  if (v >= 10) return 'g3';
-  if (v >= 6) return 'g2';
-  return 'g1';
+// ---------- shortlist ----------
+function toggleShortlist(id) {
+  if (state.shortlist.has(id)) state.shortlist.delete(id); else state.shortlist.add(id);
+  localStorage.setItem('fmss_shortlist', JSON.stringify([...state.shortlist]));
+  $('sl-count').textContent = state.shortlist.size;
+  if (state.mode === 'shortlist' || $('f-shortlist').checked) applyFilters(); else renderVisible();
+  if (state.selected) refreshDetailStar();
 }
+function refreshDetailStar() {
+  const el = document.querySelector('.detail-star');
+  if (el && state.selected) el.classList.toggle('on', state.shortlist.has(state.selected.id));
+}
+
+// ---------- detailpaneel ----------
+const attrClass = v => v >= 17 ? 'g5' : v >= 14 ? 'g4' : v >= 10 ? 'g3' : v >= 6 ? 'g2' : 'g1';
 
 function showDetail(p) {
   state.selected = p;
   renderVisible();
   const d = $('detail');
   d.classList.remove('hidden');
-  const isPlayer = state.mode === 'players';
+  const isPlayer = !!p.attrs;
+  const on = state.shortlist.has(p.id);
 
-  let html = `<h2>${p.name}</h2>
-  <div class="sub">${p.age} jaar · ${(p.nat || []).join(', ')} · ${p.club || 'Clubloos'}${p.div ? ' (' + p.div + ')' : ''}</div>
+  let html = `<h2>${p.name} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span></h2>
+  <div class="sub">${p.age} jr · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${p.club || 'clubloos'}</div>
   <div class="kv">
     <div><b>CA</b> <span class="ca-bar">${p.ca ?? '–'}</span></div>
     <div><b>PA</b> <span class="pa-bar">${p.pa ?? '–'}</span></div>
     ${isPlayer ? `<div><b>Positie</b> ${p.pos || '–'}</div><div><b>Voet</b> ${p.foot || '–'}</div>` : `<div><b>Rol</b> ${p.job || '–'}</div>`}
     <div><b>Waarde</b> ${fmtMoney(p.value)}</div>
-    <div><b>Vraagprijs</b> ${fmtMoney(p.askingPrice)}</div>
     <div><b>Salaris</b> ${fmtMoney(p.wage)} p/w</div>
-    <div><b>Salariseis</b> ${fmtMoney(p.wageDemand)} p/w</div>
     <div><b>Contract tot</b> ${fmtDate(p.expires)}</div>
-    <div><b>Geboren</b> ${fmtDate(p.dob)}</div>
     ${p.height ? `<div><b>Lengte</b> ${p.height} cm</div>` : ''}
-    ${p.persona ? `<div><b>Persoonlijkheid</b> ${p.persona}</div>` : ''}
   </div>`;
 
   const flags = [];
-  if (p.interested) flags.push('Wil naar jouw club');
-  if (p.listed) flags.push('Op transferlijst');
-  if (p.loanListed) flags.push('Te huur');
-  if (!p.club) flags.push('Transfervrij');
-  if (flags.length) html += '<div>' + flags.map(f => `<span class="pill">${f}</span>`).join('') + '</div>';
+  if (p.listed) flags.push('<span class="pill warn">Op transferlijst</span>');
+  if (isFree(p)) flags.push('<span class="pill">Clubloos</span>');
+  const m = monthsUntil(p.expires);
+  if (m != null && m <= 6) flags.push('<span class="pill warn">Contract &lt; 6 mnd</span>');
+  if (isEu(p)) flags.push('<span class="pill good">EU/EEA</span>');
+  if (flags.length) html += '<div>' + flags.join('') + '</div>';
 
-  if (p.attrs) {
-    const groups = ATTR_GROUPS_PLAYER;
+  if (isPlayer) {
     const isGk = (p.posArr || []).includes('GK');
+    const groups = isGk ? ATTR_GK : ATTR_OUTFIELD;
     html += '<div class="attr-cols">';
     for (const [g, keys] of Object.entries(groups)) {
-      if (isPlayer && g === 'Keeper' && !isGk) continue;
-      if (isPlayer && g === 'Techniek' && isGk) continue;
       const rows = keys.filter(k => p.attrs[k] != null);
       if (!rows.length) continue;
       html += `<div class="attr-col"><h3>${g}</h3>` + rows.map(k =>
-        `<div class="attr-row"><span>${ATTR_NL[k] || k}</span><span class="v ${attrClass(p.attrs[k])}">${p.attrs[k]}</span></div>`
-      ).join('') + '</div>';
+        `<div class="attr-row"><span>${ATTR_NL[k] || k}</span><span class="v ${attrClass(p.attrs[k])}">${p.attrs[k]}</span></div>`).join('') + '</div>';
     }
     html += '</div>';
-  }
-  if (p.staffAttrs) {
+  } else if (p.staffAttrs) {
     html += '<div class="attr-cols"><div class="attr-col"><h3>Staf-attributen</h3>' +
-      Object.entries(p.staffAttrs).map(([k, v]) =>
-        `<div class="attr-row"><span>${k}</span><span class="v ${attrClass(v)}">${v}</span></div>`
-      ).join('') + '</div></div>';
+      Object.entries(p.staffAttrs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v]) =>
+        `<div class="attr-row"><span>${k.replace(/_/g, ' ')}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div></div>';
   }
   $('detail-body').innerHTML = html;
+  document.querySelector('.detail-star').onclick = () => toggleShortlist(p.id);
 }
-
 $('detail-close').onclick = () => { $('detail').classList.add('hidden'); state.selected = null; renderVisible(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-close').onclick(); });
 
-// ---------- UI wiring ----------
-POSITIONS.forEach(pos => {
-  const b = document.createElement('button');
-  b.textContent = pos;
-  b.onclick = () => {
-    if (activePos.has(pos)) { activePos.delete(pos); b.classList.remove('on'); }
-    else { activePos.add(pos); b.classList.add('on'); }
-    applyFilters();
-  };
-  $('f-pos').appendChild(b);
+// ---------- UI-bediening ----------
+['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-price', 'f-wage', 'f-nat'].forEach(id => {
+  let t; $(id).addEventListener('input', () => { clearTimeout(t); t = setTimeout(applyFilters, 150); });
 });
-
-['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-price', 'f-wage', 'f-nat', 'f-club'].forEach(id => {
-  let t;
-  $(id).addEventListener('input', () => { clearTimeout(t); t = setTimeout(applyFilters, 150); });
-});
-['f-interest', 'f-listed', 'f-loan', 'f-expiring', 'f-free'].forEach(id => $(id).addEventListener('change', applyFilters));
+['f-eu', 'f-myclub', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
 $('f-staffrole').addEventListener('change', applyFilters);
+$('pos-clear').onclick = () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); applyFilters(); };
 
 $('btn-clear').onclick = () => {
   document.querySelectorAll('#filters input[type=text], #filters input[type=number]').forEach(i => i.value = '');
   document.querySelectorAll('#filters input[type=checkbox]').forEach(i => i.checked = false);
   $('f-staffrole').value = '';
   activePos.clear();
-  document.querySelectorAll('.poschips button').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on'));
   applyFilters();
+};
+
+$('btn-sidebar').onclick = () => document.body.classList.toggle('sidebar-collapsed');
+$('btn-cur').onclick = () => {
+  state.cur = state.cur === '£' ? '€' : '£';
+  localStorage.setItem('fmss_cur', state.cur);
+  $('btn-cur').textContent = state.cur === '£' ? '£ → €' : '€ → £';
+  renderVisible();
+  if (state.selected) showDetail(state.selected);
 };
 
 function setMode(mode) {
   state.mode = mode;
   $('tab-players').classList.toggle('active', mode === 'players');
   $('tab-staff').classList.toggle('active', mode === 'staff');
-  $('fg-pos').style.display = mode === 'players' ? '' : 'none';
+  $('tab-shortlist').classList.toggle('active', mode === 'shortlist');
+  $('fg-pitch').style.display = mode === 'staff' ? 'none' : '';
   $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
   state.selected = null;
   $('detail').classList.add('hidden');
-  if (!['name', 'age', 'ca', 'pa', 'club', 'wage', 'expires'].includes(state.sortKey)) { state.sortKey = 'ca'; state.sortDir = -1; }
+  if (!activeCols().find(c => c.key === state.sortKey)) { state.sortKey = 'ca'; state.sortDir = -1; }
   applyFilters();
 }
 $('tab-players').onclick = () => setMode('players');
 $('tab-staff').onclick = () => setMode('staff');
+$('tab-shortlist').onclick = () => setMode('shortlist');
 $('btn-reload').onclick = loadDump;
 
+buildPitch();
+$('sl-count').textContent = state.shortlist.size;
+$('btn-cur').textContent = state.cur === '£' ? '£ → €' : '€ → £';
 loadDump();

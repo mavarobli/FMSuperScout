@@ -9,10 +9,16 @@ Snelle, accurate scout-tool voor **Football Manager 26** (Windows/Steam). Leest 
 
 ## Features
 
-- Zoeken op naam, filteren op positie, leeftijd, CA, PA, vraagprijs, salariseis, nationaliteit, club/competitie
-- Filters: *wil naar mijn club*, *op transferlijst*, *te huur*, *aflopend contract*, *transfervrij*
+- Zoeken op naam of club; filteren op leeftijd, CA, PA, waarde, salaris, nationaliteit
+- **Posities kies je op een klikbaar voetbalveld** (zoals in de game)
+- Filters: *EU/EEA-speler*, *bij mijn club*, *op transferlijst*, *contract < 6 mnd*, *contract < 1 jaar*, *clubloos*, *alleen shortlist*
+- **Shortlist** met één klik (★), met eigen tabblad — bewaard in je browser
+- **Valutawissel £ ↔ €** (FM bewaart bedragen intern in Britse ponden)
 - Sorteerbare kolommen, vloeiend met 50.000+ spelers (gevirtualiseerde tabel)
-- Detailpaneel met alle attributen (kleurgecodeerd), contract- en transferinfo
+- **Dichtklapbare filterbalk** (☰)
+- Detailpaneel met alle attributen **in exact dezelfde volgorde als in-game** — keepers tonen keeper-attributen
+- Clubloze spelers als `–` (vallen sneller op)
+- Kop toont je **manager + club** zodat je ziet dat de juiste (draaiende) save is ingelezen
 - Apart tabblad voor stafleden met staf-attributen en rollenfilter
 
 ## Structuur
@@ -42,12 +48,15 @@ Rock-solid uit het geheugen (geverifieerde offsets, FM 26.3.x):
 - Transferwaarde, weeksalaris, contracteinddatum, transferlijst-status
 - Staf: CA/PA, staf-attributen, geschatte rol
 
-Nog te finetunen in v0.2 (na de eerste echte dump, met `diagnostics.txt`):
-- **Clubnaam** is nu best-effort (meerdere offset-kandidaten met naam-validatie). Als een club leeg/fout is, pin ik het exacte offset uit de diagnostics.
-- **"Wil naar mijn club"** en **exacte vraagprijs/salariseis** vereisen de manager-context; die haal ik in v0.2 uit dezelfde dump. Nu toont de kolom transferlijst-status; `askingPrice` = transferwaarde als benadering.
-- **Leeftijd** gebruikt nu de echte systeemdatum als in-game datum (klopt voor jouw save ~juli 2026); exacte in-game datum lees ik in v0.2 in.
+Valuta: FM bewaart waardes/salarissen intern in **Britse ponden (£)**. De app toont £ standaard, met een knop om naar € om te rekenen.
 
-De plugin schrijft naast `dump.json` ook `diagnostics.txt` (aantallen, offset-histogram, voorbeeldspelers) — stuur die na je eerste F9 en ik pin de laatste velden exact.
+Nog te finetunen (elke ronde met `diagnostics.txt`):
+- **Clubnaam**: club-object heeft een indirecte naamstring; de persoon→club-offset wordt via de "CLUB-OFFSET DISCOVERY"-sectie in `diagnostics.txt` exact vastgepind.
+- **"Wil naar mijn club" (transferinteresse)**: dit vereist de interesse-clublijst per speler (welke clubs een speler wil). Die offset moet ik nog vinden — komt in een volgende ronde. *"Bij mijn club"* (spelers die nú bij jou spelen) werkt wél.
+- **Echte marktwaarde/vraagprijs**: FM slaat vaak `–` op en berekent de waarde live; ik zoek uit waar de berekende waarde staat.
+- **Leeftijd** gebruikt de systeemdatum als in-game datum (klopt voor jouw save ~juli 2026); exacte in-game datum lees ik later in.
+
+De plugin schrijft naast `dump.json` ook `diagnostics.txt` (aantallen, offset-histogram, club-discovery) — stuur die na je F9 en ik pin de resterende velden exact.
 
 ## Disclaimer
 
