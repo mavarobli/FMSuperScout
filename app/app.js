@@ -54,10 +54,46 @@ const PLAYER_COLS = [
   { key: 'value', label: 'Waarde', num: true, get: p => p.value, fmt: fmtMoney },
   { key: 'wage', label: 'Salaris p/w', num: true, get: p => p.wage, fmt: fmtMoney },
   { key: 'expires', label: 'Contract tot', get: p => p.expires, fmt: fmtDate },
+  { key: 'interest', label: 'Interesse', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p) },
   { key: 'status', label: 'Status', get: p => statusText(p), render: p => statusHtml(p) },
 ];
 const qClass = v => v == null ? '' : v >= 150 ? 'q5' : v >= 120 ? 'q4' : v >= 90 ? 'q3' : v >= 60 ? 'q2' : 'q1';
 const qHtml = v => v == null ? '–' : `<span class="${qClass(v)}">${v}</span>`;
+
+// Interesse-inschatting (HEURISTIEK, geen exacte FM-waarde): reputatie jouw club vs
+// hun club is de hoofdfactor, plus beschikbaarheid, contract en leeftijd.
+function interestEstimate(p) {
+  const myRep = state.meta.myClubRep || 0;
+  if (!myRep) return null;              // onbekend zonder jouw clubreputatie
+  const their = p.clubRep || 0;
+  let score = 50; const why = [];
+  if (isFree(p)) { score = 78; why.push('clubloos'); }
+  else {
+    const d = myRep - their;
+    if (d >= 500) { score = 82; why.push('stap omhoog'); }
+    else if (d >= -500) { score = 66; why.push('gelijkwaardig'); }
+    else if (d >= -2000) { score = 45; why.push('kleinere club'); }
+    else if (d >= -4000) { score = 26; why.push('veel kleiner'); }
+    else { score = 10; why.push('jouw club te klein'); }
+  }
+  if (p.listed || p.setForRelease) { score += 18; why.push('beschikbaar'); }
+  const m = monthsUntil(p.expires);
+  if (m != null && m <= 6) { score += 12; why.push('aflopend contract'); }
+  if (p.notForSale) { score -= 28; why.push('niet te koop'); }
+  if (p.worldRep && p.worldRep > myRep + 1500 && !isFree(p)) { score -= 18; why.push('grotere naam dan club'); }
+  if (p.age <= 15) { score = Math.min(score, 8); why.push('te jong (<16)'); }
+  else if (p.age <= 17 && !isFree(p)) { score -= 8; why.push('jong, wacht vaak'); }
+  if (p.pa >= 155 && their >= myRep && p.age < 24 && !isFree(p)) { score -= 12; why.push('talent, zit goed'); }
+  score = Math.max(0, Math.min(100, score));
+  const label = score >= 70 ? 'Groot' : score >= 45 ? 'Redelijk' : score >= 25 ? 'Klein' : 'Nee';
+  const cls = score >= 70 ? 'int-g' : score >= 45 ? 'int-r' : score >= 25 ? 'int-k' : 'int-n';
+  return { score, label, cls, why };
+}
+function intHtml(p) {
+  const i = interestEstimate(p);
+  if (!i) return '<span class="dim">?</span>';
+  return `<span class="int ${i.cls}" title="${i.why.join(', ')}">${i.label}</span>`;
+}
 const STAFF_COLS = [
   { key: 'sl', label: '★', star: true },
   { key: 'name', label: 'Naam', get: p => p.name },
@@ -154,9 +190,9 @@ async function loadDump() {
     state.meta = data.meta || {};
     const when = new Date(st.dumpTime).toLocaleString('nl-NL');
     $('dump-info').textContent = `${state.players.length.toLocaleString('nl-NL')} spelers · ${state.staff.length.toLocaleString('nl-NL')} staf · ${when}`;
-    const mgr = state.meta.manager, club = state.meta.myClub;
+    const mgr = state.meta.manager, club = state.meta.myClub, rep = state.meta.myClubRep;
     $('club-badge').innerHTML = (mgr || club)
-      ? `${mgr ? mgr + ' · ' : ''}<b>${club || '?'}</b>` : '';
+      ? `${mgr ? mgr + ' · ' : ''}<b>${club || '?'}</b>${rep ? ` <span class="dim">(rep ${rep})</span>` : ''}` : '';
     $('empty-state').classList.add('hidden');
     buildStaffRoles();
     applyFilters();
@@ -200,6 +236,7 @@ function applyFilters() {
   const nat = $('f-nat').value.trim().toLowerCase();
   const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
   const wantAttain = $('f-attain').checked;
+  const minInterest = +$('f-interest').value || 0;
   const wantListed = $('f-listed').checked, wantExp6 = $('f-exp6').checked, wantExp12 = $('f-exp12').checked;
   const wantFree = $('f-free').checked, onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
   const staffRole = $('f-staffrole').value;
@@ -220,6 +257,7 @@ function applyFilters() {
     if (onlyMyClub && (!p.club || p.club.toLowerCase() !== myClub)) return false;
     if (wantFree && !isFree(p)) return false;
     if (wantAttain && !isAttainable(p)) return false;
+    if (minInterest > 0) { const i = interestEstimate(p); if (!i || i.score < minInterest) return false; }
     if (wantListed && !p.listed) return false;
     if (wantExp6) { const m = monthsUntil(p.expires); if (m == null || m > 6) return false; }
     if (wantExp12) { const m = monthsUntil(p.expires); if (m == null || m > 12) return false; }
@@ -355,6 +393,11 @@ function showDetail(p) {
   if (flags.length) html += '<div>' + flags.join('') + '</div>';
 
   if (isPlayer) {
+    const i = interestEstimate(p);
+    if (i) html += `<div class="interest-box"><b>Interesse-inschatting:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100 — ${i.why.join(', ')})</span><br><span class="dim">schatting o.b.v. reputatie, contract &amp; leeftijd — geen exacte FM-waarde</span></div>`;
+  }
+
+  if (isPlayer) {
     const isGk = (p.posArr || []).includes('GK');
     const groups = isGk ? ATTR_GK : ATTR_OUTFIELD;
     html += '<div class="attr-cols">';
@@ -382,6 +425,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-cl
 });
 ['f-eu', 'f-myclub', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
 $('f-staffrole').addEventListener('change', applyFilters);
+$('f-interest').addEventListener('change', applyFilters);
 $('pos-clear').onclick = () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); applyFilters(); };
 
 $('btn-clear').onclick = () => {

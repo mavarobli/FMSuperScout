@@ -9,7 +9,9 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const FIRST = ['Jari', 'Sem', 'Luuk', 'Milan', 'Kees', 'Diego', 'Luca', 'Marco', 'Pedro', 'João', 'Kylian', 'Erling', 'Youri', 'Sven', 'Tijs', 'Bram', 'Nico', 'Rafa', 'Andri', 'Tom'];
 const LAST = ['Jansen', 'de Vries', 'van Dijk', 'Silva', 'Santos', 'Müller', 'García', 'Rossi', 'Kowalski', 'Eriksen', 'Berg', 'Timber', 'Botman', 'Nielsen', 'Costa', 'Moreno', 'Novak', 'Petrov', 'Yilmaz', 'Karlsson'];
-const CLUBS = ['Feyenoord', 'Ajax', 'PSV', 'AZ', 'FC Twente', 'Real Madrid', 'Barcelona', 'Bayern', 'Dortmund', 'Liverpool', 'Arsenal', 'Chelsea', 'Inter', 'Milan', 'PSG', 'Benfica', 'Porto', 'Club Brugge', 'Anderlecht', 'Celtic', null];
+// club → reputatie (~0..10000) voor het testen van de interesse-inschatting
+const CLUB_REP = { Feyenoord: 7200, Ajax: 7900, PSV: 7400, AZ: 6000, 'FC Twente': 5200, 'Real Madrid': 9700, Barcelona: 9500, Bayern: 9400, Dortmund: 8600, Liverpool: 9200, Arsenal: 8900, Chelsea: 9000, Inter: 8700, Milan: 8600, PSG: 8800, Benfica: 7600, Porto: 7500, 'Club Brugge': 6200, Anderlecht: 5800, Celtic: 6400 };
+const CLUBS = [...Object.keys(CLUB_REP), null];
 const NATS = ['Nederland', 'België', 'Duitsland', 'Spanje', 'Frankrijk', 'Engeland', 'Italië', 'Portugal', 'Brazilië', 'Argentinië', 'Denemarken', 'Zweden', 'Noorwegen', 'Turkije', 'Polen', 'Kroatië'];
 const POS_SETS = [['GK'], ['DC'], ['DC', 'DR'], ['DL', 'WBL'], ['DM', 'MC'], ['MC'], ['MC', 'AMC'], ['AMR', 'ST'], ['AML'], ['ST'], ['AMC', 'ST'], ['DR', 'WBR', 'MR']];
 const JOBS = ['Assistent-manager', 'Coach', 'Fitnesscoach', 'Keeperstrainer', 'Scout', 'Fysiotherapeut', 'Data-analist'];
@@ -55,6 +57,8 @@ function player(id) {
     listed: Math.random() < 0.08,
     setForRelease: Math.random() < 0.04,
     notForSale: Math.random() < 0.15,
+    clubRep: club ? CLUB_REP[club] : 0,
+    worldRep: Math.round(ca * 45 + ri(-500, 500)),
     attrs,
   };
 }
@@ -72,7 +76,7 @@ function staff(id) {
 }
 
 const data = {
-  meta: { generated: new Date().toISOString(), gameDate: '2026-07-11', manager: 'mavarobli', myClub: 'Feyenoord', currency: 'GBP', source: 'TESTDATA' },
+  meta: { generated: new Date().toISOString(), gameDate: '2026-07-11', manager: 'mavarobli', myClub: 'Feyenoord', myClubRep: 7200, currency: 'GBP', source: 'TESTDATA' },
   players: Array.from({ length: 45000 }, (_, i) => player(i + 1)),
   staff: Array.from({ length: 8000 }, (_, i) => staff(100000 + i)),
 };

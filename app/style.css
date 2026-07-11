@@ -138,6 +138,12 @@ input:focus, select:focus { outline: none; border-color: var(--accent2); }
 .tag.nfs { background: #3a1414; color: #e08080; }
 .tag.free { background: #1c2a3a; color: #7fb0e0; }
 .eu-yes { color: var(--accent); font-weight: 700; }
+.int { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 3px; }
+.int-g { background: #16412a; color: #6fe0a0; }
+.int-r { background: #443a14; color: #f0cf6a; }
+.int-k { background: #2a3441; color: #9fb0c2; }
+.int-n { background: #3a1c1c; color: #e08a8a; }
+.interest-box { margin: 10px 0; padding: 8px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; }
 .star-cell { cursor: pointer; color: #3a4658; font-size: 15px; text-align: center; }
 .star-cell.on { color: var(--star); }
 

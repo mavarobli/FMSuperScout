@@ -19,6 +19,7 @@ Snelle, accurate scout-tool voor **Football Manager 26** (Windows/Steam). Leest 
 - Detailpaneel met alle attributen **in exact dezelfde volgorde als in-game** — keepers tonen keeper-attributen
 - Clubloze spelers als `–` (vallen sneller op)
 - Kop toont je **manager + club** zodat je ziet dat de juiste (draaiende) save is ingelezen
+- **Interesse-inschatting** (Groot/Redelijk/Klein/Nee): heuristiek op basis van clubreputatie (jouw club vs hun club), beschikbaarheid, contractduur en leeftijd — geen exacte FM-waarde, maar reputatie is FM's dominante factor dus redelijk indicatief
 - Apart tabblad voor stafleden met staf-attributen en rollenfilter
 
 ## Structuur

@@ -14,6 +14,7 @@ internal static class Dumper
     internal static readonly List<(ulong person, string name, string club)> DiagPersons = new();
     internal static string MyClub;       // club van de human-manager
     internal static string ManagerName;  // naam van de human-manager
+    internal static int MyClubRep;       // reputatie van jouw club (~0..10000)
 
     // 0xFFFFFFFF is FM's "niet ingesteld"-sentinel → onbekend (-1). Anders de waarde.
     private static long Money(uint v) => v == 0xFFFFFFFF ? -1 : v;
@@ -42,7 +43,7 @@ internal static class Dumper
         var staff = new Dictionary<uint, Person>();
         var offsetHist = new Dictionary<int, int>();     // matches (speler/staf)
         var allOffHist = new Dictionary<int, long>();     // ALLE class-offsets (diagnose)
-        var managers = new List<(ulong person, string name, string club)>(); // human-managers
+        var managers = new List<(ulong person, string name, string club, int rep)>(); // human-managers
         long candidates = 0, vtGp = 0;
 
         const int ChunkSize = 32 * 1024 * 1024; // 32 MB blokken
@@ -102,7 +103,10 @@ internal static class Dumper
                             var st = ReadStaff(mem, p, basePtr, uid, ca, pa);
                             staff[uid] = st;
                             if (off == Fields.HUMAN_MANAGER_OFFSET)
-                                managers.Add((p, st.Name, st.Club));
+                            {
+                                var (mc, mrep) = ResolveClub(mem, p);
+                                managers.Add((p, st.Name, mc ?? st.Club, mrep));
+                            }
                         }
                     }
                 }
@@ -118,7 +122,8 @@ internal static class Dumper
         if (me.person == 0 && managers.Count > 0) me = managers[0];
         MyClub = me.club;
         ManagerName = me.name;
-        Plugin.Log.LogInfo($"Manager: {ManagerName ?? "?"} · club: {MyClub ?? "?"} ({managers.Count} human-managers)");
+        MyClubRep = me.rep;
+        Plugin.Log.LogInfo($"Manager: {ManagerName ?? "?"} · club: {MyClub ?? "?"} (rep {MyClubRep}) ({managers.Count} human-managers)");
 
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
@@ -178,7 +183,10 @@ internal static class Dumper
             e.NotForSale = (flags & (1 << 4)) != 0;
             e.SetForRelease = (flags & (1 << 5)) != 0;
         }
-        e.Club = ResolveClubName(m, person);
+        e.CurRep = m.U16(pl + Fields.PLAO_CUR_REP);
+        e.WorldRep = m.U16(pl + Fields.PLAO_WORLD_REP);
+        var (cname, crep) = ResolveClub(m, person);
+        e.Club = cname; e.ClubRep = crep;
         if (DiagPersons.Count < 60) DiagPersons.Add((person, e.Name, e.Club));
         return e;
     }
@@ -241,17 +249,22 @@ internal static class Dumper
     private const int CLUB_SHORT_NAME = 0xC8;
     private const int CON_TEAM = 0x10;
     private const int TEAM_CLUB = 0x30;
+    private const int TEAM_REP = 0xA8;   // teao.Trep — clubreputatie (2 bytes, ~0..10000)
 
-    private static string ResolveClubName(MemScan m, ulong person)
+    // Volgt contract→team→club. Geeft clubnaam + teamreputatie (rep=0 als onbekend).
+    private static (string name, int rep) ResolveClub(MemScan m, ulong person)
     {
         ulong con = m.Ptr(person + (ulong)Fields.PERO_FULL_CONTRACT);
-        if (con == 0) return null;
+        if (con == 0) return (null, 0);
         ulong team = m.Ptr(con + CON_TEAM);
-        if (team == 0) return null;
+        if (team == 0) return (null, 0);
+        int rep = m.U16(team + TEAM_REP);
+        if (rep is < 0 or > 12000) rep = 0;
         ulong club = m.Ptr(team + (ulong)TEAM_CLUB);
-        if (club == 0) return null;
-        return ClubNameOf(m, club);
+        return (club == 0 ? null : ClubNameOf(m, club), rep);
     }
+
+    private static string ResolveClubName(MemScan m, ulong person) => ResolveClub(m, person).name;
 
     private static string ClubNameOf(MemScan m, ulong club)
     {
@@ -327,6 +340,7 @@ internal static class Dumper
         j.Prop("gameDate", DateTime.Now.ToString("yyyy-MM-dd"));
         j.Prop("manager", ManagerName);
         j.Prop("myClub", MyClub);
+        j.Prop("myClubRep", MyClubRep);
         j.Prop("currency", "GBP");
         j.Prop("source", "FMSuperScout plugin v" + Plugin.Version);
         j.EndObj();
@@ -369,6 +383,8 @@ internal static class Dumper
             j.Prop("listed", p.Listed);
             j.Prop("notForSale", p.NotForSale);
             j.Prop("setForRelease", p.SetForRelease);
+            j.Prop("clubRep", p.ClubRep);
+            j.Prop("worldRep", p.WorldRep);
             j.Key("attrs"); j.BeginObj();
             foreach (var kv in p.Attrs) { j.Key(kv.Key); j.Val((long)kv.Value); }
             j.EndObj();
@@ -432,9 +448,10 @@ internal static class Dumper
             foreach (var kv in clubHits.OrderByDescending(x => x.Value).Take(20))
                 w.WriteLine($"  person+0x{kv.Key:X} : {kv.Value}/{DiagPersons.Count} hits  bv. [{string.Join(", ", clubSamples[kv.Key])}]");
             w.WriteLine();
-            w.WriteLine("Sample spelers (eerste 12):");
+            w.WriteLine($"Mijn club: {ManagerName} · {MyClub} · reputatie={MyClubRep}");
+            w.WriteLine("Sample spelers (eerste 12) — let op reputatie-schaal (clubRep/worldRep):");
             foreach (var p in players.Values.Take(12))
-                w.WriteLine($"  uid={p.Uid} {p.Name} lft={p.Age} CA={p.Ca} PA={p.Pa} pos={string.Join("/", p.PosArr)} club={p.Club} nat={string.Join(",", p.Nat)} val={p.Value} wage={p.Wage} exp={p.Expires}");
+                w.WriteLine($"  uid={p.Uid} {p.Name} lft={p.Age} CA={p.Ca} PA={p.Pa} pos={string.Join("/", p.PosArr)} club={p.Club} clubRep={p.ClubRep} worldRep={p.WorldRep} nat={string.Join(",", p.Nat)} val={p.Value} wage={p.Wage} exp={p.Expires}");
             w.WriteLine();
             w.WriteLine("Sample staf (eerste 8):");
             foreach (var p in staff.Values.Take(8))
@@ -467,6 +484,9 @@ internal sealed class Person
     public bool LoanListed;
     public bool NotForSale;
     public bool SetForRelease;
+    public int CurRep;
+    public int WorldRep;
+    public int ClubRep;
     public string Job;
     public Dictionary<string, int> Attrs = new();
     public Dictionary<string, int> StaffAttrs = new();
