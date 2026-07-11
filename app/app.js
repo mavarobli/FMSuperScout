@@ -463,7 +463,35 @@ $('tab-staff').onclick = () => setMode('staff');
 $('tab-shortlist').onclick = () => setMode('shortlist');
 $('btn-reload').onclick = loadDump;
 
+// ---------- statuspolling (F9-feedback) ----------
+let lastPluginState = null, lastDumpTime = null;
+async function poll() {
+  try {
+    const st = await (await fetch('/api/status')).json();
+    const b = $('banner');
+    const pl = st.plugin;
+    if (pl && pl.state === 'scanning') {
+      b.className = 'scanning';
+      b.textContent = '⏳ FM26 is de database aan het dumpen…';
+    } else if (pl && pl.state === 'done') {
+      // nieuwe dump beschikbaar?
+      if (st.dumpTime && st.dumpTime !== lastDumpTime && lastDumpTime !== null) {
+        b.className = 'done';
+        b.textContent = `✓ Nieuwe dump klaar: ${pl.players.toLocaleString('nl-NL')} spelers, ${pl.staff.toLocaleString('nl-NL')} staf — klik hier om te laden`;
+        b.onclick = () => { loadDump(); b.className = 'hidden'; };
+      } else if (lastPluginState === 'scanning') {
+        b.className = 'done';
+        b.textContent = `✓ Dump klaar: ${pl.players.toLocaleString('nl-NL')} spelers — klik hier om te laden`;
+        b.onclick = () => { loadDump(); b.className = 'hidden'; };
+      }
+    }
+    lastPluginState = pl ? pl.state : null;
+    if (st.dumpTime) lastDumpTime = st.dumpTime;
+  } catch { /* server weg */ }
+  setTimeout(poll, 2000);
+}
+
 buildPitch();
 $('sl-count').textContent = state.shortlist.size;
 $('btn-cur').textContent = state.cur === '£' ? '£ → €' : '€ → £';
-loadDump();
+loadDump().then(() => poll());

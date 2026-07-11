@@ -50,19 +50,25 @@ public class HotkeyBehaviour : MonoBehaviour
     private GUIStyle _style;
     private void OnGUI()
     {
+      try
+      {
         if (DateTime.Now > Plugin.StatusExpiry || string.IsNullOrEmpty(Plugin.Status)) return;
         if (_style == null)
         {
             _style = new GUIStyle();
-            _style.fontSize = 15;
+            _style.fontSize = 16;
             _style.normal.textColor = Color.white;
         }
         string txt = "⚽ FMSuperScout — " + Plugin.Status;
         float w = 10f * txt.Length + 28f;
         if (w > 900f) w = 900f;
-        var box = new Rect(12f, 12f, w, 36f);
-        GUI.Box(box, "");                                    // standaard achtergrond
-        GUI.Label(new Rect(24f, 20f, w, 24f), txt, _style);  // tekst erover
+        var box = new Rect(12f, 12f, w, 38f);
+        GUI.color = new Color(0.06f, 0.12f, 0.08f, 0.95f);
+        GUI.DrawTexture(box, Texture2D.whiteTexture);        // gevulde achtergrond (altijd zichtbaar)
+        GUI.color = Color.white;
+        GUI.Label(new Rect(26f, 20f, w, 26f), txt, _style);  // tekst erover
+      }
+      catch { /* IMGUI niet beschikbaar — web-app toont de status ook */ }
 
     }
 

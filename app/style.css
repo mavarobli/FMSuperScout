@@ -60,6 +60,12 @@ body {
 #btn-reload { background: var(--accent); color: #06220f; }
 #btn-reload:hover, #btn-cur:hover { filter: brightness(1.12); }
 
+/* ---------- statusbanner ---------- */
+#banner { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; }
+#banner.hidden { display: none; }
+#banner.scanning { background: #443a14; color: var(--warn); }
+#banner.done { background: #16412a; color: #6fe0a0; }
+
 /* ---------- layout ---------- */
 #main { display: flex; flex: 1 1 auto; min-height: 0; }
 

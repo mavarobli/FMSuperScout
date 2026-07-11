@@ -41,6 +41,14 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === '/api/status') {
     const dump = latestDump();
+    let plugin = null;
+    try {
+      const sf = path.join(DATA_DIR, 'status.json');
+      if (fs.existsSync(sf)) {
+        plugin = JSON.parse(fs.readFileSync(sf, 'utf8'));
+        plugin.mtime = fs.statSync(sf).mtimeMs;
+      }
+    } catch { /* geen status */ }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       dataDir: DATA_DIR,
@@ -48,6 +56,7 @@ const server = http.createServer((req, res) => {
       dumpFile: dump ? path.basename(dump.full) : null,
       dumpTime: dump ? dump.mtime : null,
       dumpSize: dump ? fs.statSync(dump.full).size : null,
+      plugin,
     }));
     return;
   }

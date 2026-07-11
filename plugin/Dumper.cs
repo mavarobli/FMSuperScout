@@ -16,6 +16,18 @@ internal static class Dumper
     internal static string ManagerName;  // naam van de human-manager
     internal static int MyClubRep;       // reputatie van jouw club (~0..10000)
 
+    // Statusbestand dat de web-app pollt (betrouwbare F9-feedback, ook zonder console).
+    private static void WriteStatus(string state, int players, int staff)
+    {
+        try
+        {
+            Directory.CreateDirectory(OutDir);
+            File.WriteAllText(Path.Combine(OutDir, "status.json"),
+                $"{{\"state\":\"{state}\",\"players\":{players},\"staff\":{staff},\"at\":\"{DateTime.Now:s}\"}}");
+        }
+        catch { }
+    }
+
     // 0xFFFFFFFF is FM's "niet ingesteld"-sentinel → onbekend (-1). Anders de waarde.
     private static long Money(uint v) => v == 0xFFFFFFFF ? -1 : v;
     // JSON: negatief (onbekend) → null, anders getal.
@@ -27,6 +39,7 @@ internal static class Dumper
         Plugin.Log.LogInfo("FMSuperScout: geheugen scannen…");
         Plugin.SetStatus("FMSuperScout: database scannen… (±20 sec)", 3600);
         Directory.CreateDirectory(OutDir);
+        WriteStatus("scanning", 0, 0);
 
         var mem = new MemScan();
         if (mem.GaBase == 0)
@@ -135,6 +148,7 @@ internal static class Dumper
                            "Open de FMSuperScout web-app en klik Verversen.");
         Plugin.SetStatus($"FMSuperScout klaar ✓  {players.Count:N0} spelers, {staff.Count:N0} staf — " +
                          "open de web-app en klik Verversen", 20);
+        WriteStatus("done", players.Count, staff.Count);
     }
 
     // ---------- speler ----------
@@ -185,6 +199,7 @@ internal static class Dumper
         }
         e.CurRep = m.U16(pl + Fields.PLAO_CUR_REP);
         e.WorldRep = m.U16(pl + Fields.PLAO_WORLD_REP);
+        e.PersonAddr = person;
         var (cname, crep) = ResolveClub(m, person);
         e.Club = cname; e.ClubRep = crep;
         if (DiagPersons.Count < 60) DiagPersons.Add((person, e.Name, e.Club));
@@ -247,24 +262,47 @@ internal static class Dumper
     //   naam     = indirecte string op club + 0xC0 (cluo.Cnam) / +0xC8 (Csnm)
     private const int CLUB_NAME = 0xC0;
     private const int CLUB_SHORT_NAME = 0xC8;
-    private const int CON_TEAM = 0x10;
-    private const int TEAM_CLUB = 0x30;
-    private const int TEAM_REP = 0xA8;   // teao.Trep — clubreputatie (2 bytes, ~0..10000)
+    private const int CLUB_ON_PERSON = 0x80;   // person→huidige club (60/60 gevuld, nationaliteit-passend)
+    private const int CLUB_TEAMS = 0x18;       // cluo→teams-vector (begin-pointer)
+    private const int TEAM_REP = 0xA8;         // teao.Trep — reputatie (2 bytes, ~0..10000)
 
-    // Volgt contract→team→club. Geeft clubnaam + teamreputatie (rep=0 als onbekend).
+    // Huidige club via person+0x80. Geeft clubnaam + reputatie (via eerste team van de club).
     private static (string name, int rep) ResolveClub(MemScan m, ulong person)
     {
-        ulong con = m.Ptr(person + (ulong)Fields.PERO_FULL_CONTRACT);
-        if (con == 0) return (null, 0);
-        ulong team = m.Ptr(con + CON_TEAM);
-        if (team == 0) return (null, 0);
-        int rep = m.U16(team + TEAM_REP);
-        if (rep is < 0 or > 12000) rep = 0;
-        ulong club = m.Ptr(team + (ulong)TEAM_CLUB);
-        return (club == 0 ? null : ClubNameOf(m, club), rep);
+        ulong club = m.Ptr(person + CLUB_ON_PERSON);
+        if (club == 0) return (null, 0);
+        string name = ClubNameOf(m, club);
+        return (name, name == null ? 0 : ClubRep(m, club));
+    }
+
+    // Reputatie: club→eerste team→teao.Trep.
+    private static int ClubRep(MemScan m, ulong club)
+    {
+        ulong teamsBegin = m.Ptr(club + CLUB_TEAMS);
+        if (teamsBegin == 0) return 0;
+        ulong firstTeam = m.Ptr(teamsBegin);
+        if (firstTeam == 0) return 0;
+        int rep = m.U16(firstTeam + TEAM_REP);
+        return rep is > 0 and <= 12000 ? rep : 0;
     }
 
     private static string ResolveClubName(MemScan m, ulong person) => ResolveClub(m, person).name;
+
+    // Diagnose-helpers: clubnaam via directe pointer op person+off, en via de oude keten.
+    private static string ClubNameAt(MemScan m, ulong addr)
+    {
+        ulong club = m.Ptr(addr);
+        return club == 0 ? "-" : (ClubNameOf(m, club) ?? "-");
+    }
+    private static string ChainClubName(MemScan m, ulong person)
+    {
+        ulong con = m.Ptr(person + (ulong)Fields.PERO_FULL_CONTRACT);
+        if (con == 0) return "-";
+        ulong team = m.Ptr(con + 0x10);
+        if (team == 0) return "-";
+        ulong club = m.Ptr(team + 0x30);
+        return club == 0 ? "-" : (ClubNameOf(m, club) ?? "-");
+    }
 
     private static string ClubNameOf(MemScan m, ulong club)
     {
@@ -449,6 +487,17 @@ internal static class Dumper
                 w.WriteLine($"  person+0x{kv.Key:X} : {kv.Value}/{DiagPersons.Count} hits  bv. [{string.Join(", ", clubSamples[kv.Key])}]");
             w.WriteLine();
             w.WriteLine($"Mijn club: {ManagerName} · {MyClub} · reputatie={MyClubRep}");
+            w.WriteLine();
+            w.WriteLine("=== TOP-20 CA — welke offset geeft de JUISTE huidige club? ===");
+            w.WriteLine("(vergelijk met wat je in-game ziet: 0x80 is nu live gebruikt)");
+            foreach (var p in players.Values.OrderByDescending(x => x.Ca).Take(20))
+            {
+                string c80 = ClubNameAt(m, p.PersonAddr + 0x80);
+                string c108 = ClubNameAt(m, p.PersonAddr + 0x108);
+                string cChain = ChainClubName(m, p.PersonAddr);
+                w.WriteLine($"  {p.Name,-22} CA{p.Ca} clubRep={p.ClubRep,-5} | 0x80={c80} | 0x108={c108} | keten={cChain}");
+            }
+            w.WriteLine();
             w.WriteLine("Sample spelers (eerste 12) — let op reputatie-schaal (clubRep/worldRep):");
             foreach (var p in players.Values.Take(12))
                 w.WriteLine($"  uid={p.Uid} {p.Name} lft={p.Age} CA={p.Ca} PA={p.Pa} pos={string.Join("/", p.PosArr)} club={p.Club} clubRep={p.ClubRep} worldRep={p.WorldRep} nat={string.Join(",", p.Nat)} val={p.Value} wage={p.Wage} exp={p.Expires}");
@@ -487,6 +536,7 @@ internal sealed class Person
     public int CurRep;
     public int WorldRep;
     public int ClubRep;
+    public ulong PersonAddr;
     public string Job;
     public Dictionary<string, int> Attrs = new();
     public Dictionary<string, int> StaffAttrs = new();
