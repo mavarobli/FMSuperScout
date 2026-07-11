@@ -10,6 +10,13 @@ internal static class Dumper
     // Diagnose-data (histogram van alle voorkomende class-offsets, gezet tijdens de scan).
     internal static Dictionary<int, long> AllOffHist = new();
     internal static long VtGp;
+    // Person-adressen van de eerste spelers, voor club-offset-discovery in de diagnose.
+    internal static readonly List<(ulong person, string name, string club)> DiagPersons = new();
+
+    // 0xFFFFFFFF is FM's "niet ingesteld"-sentinel → onbekend (-1). Anders de waarde.
+    private static long Money(uint v) => v == 0xFFFFFFFF ? -1 : v;
+    // JSON: negatief (onbekend) → null, anders getal.
+    private static void Money(JsonWriter j, string key, long v) { if (v < 0) j.Null4(key); else j.Prop(key, v); }
 
     public static void DumpAll()
     {
@@ -141,17 +148,18 @@ internal static class Dumper
             e.PosArr = pos.OrderByDescending(x => x.v).Take(1).Select(x => x.k).ToList();
 
         // waarde & contract
-        e.Value = m.U32(pl + Fields.PLAO_TRANSFER_VALUE);
-        e.GuideValue = m.U32(pl + Fields.PLAO_GUIDE_VALUE);
+        e.Value = Money(m.U32(pl + Fields.PLAO_TRANSFER_VALUE));
+        e.GuideValue = Money(m.U32(pl + Fields.PLAO_GUIDE_VALUE));
         ulong con = m.Ptr(person + Fields.PERO_FULL_CONTRACT);
         if (con != 0)
         {
-            e.Wage = m.U32(con + Fields.CON_WEEKLY_WAGE);
+            e.Wage = Money(m.U32(con + Fields.CON_WEEKLY_WAGE));
             e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
             byte flags = m.U8(con + Fields.CON_STATUS_FLAGS);
             e.Listed = (flags & (1 << 0)) != 0 || (flags & (1 << 3)) != 0;
         }
         e.Club = ResolveClubName(m, person);
+        if (DiagPersons.Count < 60) DiagPersons.Add((person, e.Name, e.Club));
         return e;
     }
 
@@ -171,7 +179,7 @@ internal static class Dumper
         ulong con = m.Ptr(person + Fields.PERO_FULL_CONTRACT);
         if (con != 0)
         {
-            e.Wage = m.U32(con + Fields.CON_WEEKLY_WAGE);
+            e.Wage = Money(m.U32(con + Fields.CON_WEEKLY_WAGE));
             e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
         }
         e.Club = ResolveClubName(m, person);
@@ -204,10 +212,17 @@ internal static class Dumper
         return s == null ? new List<string>() : new List<string> { s };
     }
 
-    // Best-effort clubnaam: probeer persoon-offsets die naar een club-object wijzen
-    // (club heeft geneste naam op +0xC0). Wordt in e2e vastgepind.
-    private static readonly int[] ClubCandidateOffsets = { 0x98, 0xA0, 0xB0, 0xB8, 0xC0, 0xC8, 0xD0, 0xE8, 0xF8 };
+    // Clubnaam: een club-object heeft een INDIRECTE naam-string op +0xC0 (kort op +0xC8).
+    // (Spelernamen zijn genest, club/natie indirect — verschil verklaarde lege clubs.)
+    // De persoon→club-pointer staat op een nog vast te pinnen offset; we proberen
+    // kandidaten en valideren op een plausibele naam. Discovery-diag pint het exact.
     private const int CLUB_NAME = 0xC0;
+    private const int CLUB_SHORT_NAME = 0xC8;
+    private static readonly int[] ClubCandidateOffsets =
+    {
+        0xA0, 0x98, 0x90, 0xA8, 0xB0, 0xB8, 0xC0, 0xC8, 0xD0, 0xD8, 0xE0, 0xE8, 0xF0, 0xF8,
+        0x100, 0x108, 0x110, 0x118, 0x120, 0x128, 0x130,
+    };
 
     private static string ResolveClubName(MemScan m, ulong person)
     {
@@ -215,15 +230,15 @@ internal static class Dumper
         {
             ulong club = m.Ptr(person + (ulong)off);
             if (club == 0) continue;
-            string name = m.NestedString(club + CLUB_NAME);
-            if (!string.IsNullOrEmpty(name) && name.Length is >= 2 and <= 48 && LooksLikeName(name))
-                return name;
+            string name = m.IndirectString(club + CLUB_NAME) ?? m.IndirectString(club + CLUB_SHORT_NAME);
+            if (PlausibleClub(name)) return name;
         }
         return null;
     }
 
-    private static bool LooksLikeName(string s)
+    private static bool PlausibleClub(string s)
     {
+        if (string.IsNullOrEmpty(s) || s.Length is < 2 or > 40) return false;
         int letters = s.Count(char.IsLetter);
         return letters >= 2 && letters >= s.Length / 2;
     }
@@ -258,7 +273,7 @@ internal static class Dumper
     private static string FmDateIso(uint raw)
     {
         var (year, doy) = DecodeFmDate(raw);
-        if (year == 0) return null;
+        if (year < 2000) return null; // contractdatums zijn 2025+; <2000 = sentinel/geen contract
         try { return new DateTime(year, 1, 1).AddDays(doy - 1).ToString("yyyy-MM-dd"); }
         catch { return null; }
     }
@@ -308,7 +323,7 @@ internal static class Dumper
         j.Null4("div");
         j.Prop("ca", p.Ca);
         j.Prop("pa", p.Pa);
-        j.Prop("wage", p.Wage);
+        Money(j, "wage", p.Wage);
         j.Prop("expires", p.Expires);
         if (isPlayer)
         {
@@ -316,8 +331,8 @@ internal static class Dumper
             j.Key("posArr"); j.BeginArr(); foreach (var x in p.PosArr) j.Val(x); j.EndArr();
             j.Prop("foot", p.Foot);
             if (p.Height > 0) j.Prop("height", p.Height);
-            j.Prop("value", p.Value);
-            j.Prop("askingPrice", p.Value); // v1: transferwaarde als benadering; echte vraagprijs in v2
+            Money(j, "value", p.Value);
+            Money(j, "askingPrice", p.Value); // v1: transferwaarde; echte vraagprijs in v2
             j.Null4("wageDemand");
             j.Prop("listed", p.Listed);
             j.Prop("loanListed", p.LoanListed);
@@ -358,6 +373,32 @@ internal static class Dumper
             w.WriteLine("Matches per offset (speler/staf-filter geslaagd):");
             foreach (var kv in hist.OrderByDescending(x => x.Value))
                 w.WriteLine($"  0x{kv.Key:X} ({kv.Key}) : {kv.Value}");
+            w.WriteLine();
+
+            // === CLUB-OFFSET DISCOVERY ===
+            // Voor de eerste spelers: welke person-offset wijst naar een object met een
+            // plausibele clubnaam (indirecte string op +0xC0/+0xC8)? De offset met de
+            // meeste hits is de echte persoon→club-pointer.
+            w.WriteLine("=== CLUB-OFFSET DISCOVERY (person→club) ===");
+            var clubHits = new Dictionary<int, int>();
+            var clubSamples = new Dictionary<int, List<string>>();
+            foreach (var (person, _, _) in DiagPersons)
+            {
+                for (int off = 0x08; off <= 0x180; off += 8)
+                {
+                    ulong club = m.Ptr(person + (ulong)off);
+                    if (club == 0) continue;
+                    string name = m.IndirectString(club + 0xC0) ?? m.IndirectString(club + 0xC8);
+                    if (!PlausibleClub(name)) continue;
+                    clubHits[off] = clubHits.GetValueOrDefault(off) + 1;
+                    var lst = clubSamples.GetValueOrDefault(off) ?? (clubSamples[off] = new List<string>());
+                    if (lst.Count < 5 && !lst.Contains(name)) lst.Add(name);
+                }
+            }
+            if (clubHits.Count == 0)
+                w.WriteLine("  (geen enkele offset gaf clubnamen — clubnaam-string zit mogelijk anders)");
+            foreach (var kv in clubHits.OrderByDescending(x => x.Value).Take(20))
+                w.WriteLine($"  person+0x{kv.Key:X} : {kv.Value}/{DiagPersons.Count} hits  bv. [{string.Join(", ", clubSamples[kv.Key])}]");
             w.WriteLine();
             w.WriteLine("Sample spelers (eerste 12):");
             foreach (var p in players.Values.Take(12))
