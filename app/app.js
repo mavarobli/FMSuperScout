@@ -21,7 +21,8 @@ const GBP_TO_EUR = 1.16;
 // ================= i18n =================
 const I18N = {
   nl: {
-    players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: '🔍 Zoek naam of club',
+    players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: 'Zoek naam of club',
+    settings: 'Instellingen', langLabel: 'Taal', curLabel: 'Valuta',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', refyear: 'Peiljaar', financial: 'Financieel', maxvalue: 'Max. waarde', maxwage: 'Max. loon p/w',
     origin: 'Herkomst', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
@@ -47,7 +48,8 @@ const I18N = {
     staffAttrs: 'Staf-attributen',
   },
   en: {
-    players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: '🔍 Search name or club',
+    players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
+    settings: 'Settings', langLabel: 'Language', curLabel: 'Currency',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', refyear: 'Game year', financial: 'Financial', maxvalue: 'Max. value', maxwage: 'Max. wage p/w',
     origin: 'Origin', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
@@ -732,6 +734,21 @@ $('sel-lang').addEventListener('change', () => {
   localStorage.setItem('fmss_lang', state.lang);
   applyLang();
 });
+// instellingen-menu (tandwiel)
+$('btn-settings').onclick = e => {
+  e.stopPropagation();
+  const m = $('settings-menu');
+  if (!m.classList.contains('hidden')) { m.classList.add('hidden'); return; }
+  const r = $('btn-settings').getBoundingClientRect();
+  m.style.top = (r.bottom + 6) + 'px';
+  m.style.right = (window.innerWidth - r.right) + 'px';
+  m.classList.remove('hidden');
+};
+document.addEventListener('click', e => {
+  if (!e.target.closest('#settings-menu') && !e.target.closest('#btn-settings')) $('settings-menu').classList.add('hidden');
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('settings-menu').classList.add('hidden'); });
+
 // nieuwe data ophalen (trigger de plugin)
 $('btn-fetch').onclick = async () => {
   try {

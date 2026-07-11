@@ -66,13 +66,30 @@ body {
 #club-badge:hover { background: var(--bg3); }
 #club-badge b { color: var(--accent); }
 #dump-info { margin-left: auto; color: var(--muted); font-size: 12px; }
-#sel-lang, #sel-cur { background: var(--bg3); color: var(--text); border: 1px solid var(--border); padding: 6px 6px; border-radius: 6px; cursor: pointer; font-size: 12px; }
-#btn-fetch, #btn-reload {
+#btn-fetch, #btn-reload, #btn-settings {
   border: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600;
 }
 #btn-fetch { background: var(--accent); color: #06220f; }
-#btn-reload { background: var(--bg3); color: var(--text); border: 1px solid var(--border); font-size: 15px; }
+#btn-reload, #btn-settings { background: var(--bg3); color: var(--muted); border: 1px solid var(--border); font-size: 15px; }
+#btn-settings { display: inline-flex; align-items: center; justify-content: center; padding: 6px 9px; }
 #btn-fetch:hover, #btn-reload:hover { filter: brightness(1.12); }
+#btn-settings:hover { color: var(--text); border-color: var(--accent2); }
+
+/* instellingen-menu */
+#settings-menu {
+  position: fixed; z-index: 200; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px; min-width: 210px; box-shadow: 0 8px 28px rgba(0,0,0,.5);
+}
+#settings-menu.hidden { display: none; }
+#settings-menu .set-head { font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); padding: 2px 4px 8px; }
+#settings-menu .set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 4px; font-size: 13px; }
+#settings-menu select { background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 5px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+
+/* zoekveld met icoon */
+.search-wrap { position: relative; }
+.search-ico { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); pointer-events: none; }
+.search-wrap input { width: 100%; padding-left: 31px !important; }
+.search-wrap input:focus + .search-ico, .search-wrap input:focus ~ .search-ico { color: var(--accent2); }
 
 /* ---------- statusbanner ---------- */
 #banner { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; }
