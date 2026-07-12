@@ -1,73 +1,117 @@
-# FMSuperScout
+<p align="center">
+  <img src="app/logo.svg" width="88" height="88" alt="FMSuperScout logo">
+</p>
 
-Snelle, accurate scout-tool voor **Football Manager 26** (Windows/Steam). Leest de volledige database van je openstaande save — spelers én staf — inclusief verborgen waarden zoals **CA/PA (huidige en potentiële punten)** en de verborgen persoonlijkheidsattributen.
+<h1 align="center">FMSuperScout</h1>
 
-Twee onderdelen: een kleine **BepInEx-plugin** die in de game meedraait en de database naar JSON dumpt, en een **lokale web-app** waarin je zoekt, filtert en spelers vergelijkt.
+<p align="center">A fast, accurate scouting tool for <strong>Football Manager 26</strong> (Windows / Steam).</p>
 
-## Hoe het werkt
+---
 
-1. **In de game:** de plugin draait mee in FM26. Je haalt data op via de knop **⬇ Nieuwe data** in de web-app, of met **F9** in de game.
-2. **De web-app:** dubbelklik `Start FMSuperScout.cmd` → opent op `http://localhost:8765`. Bovenin verschijnt een banner zodra de dump klaar is → klik om te laden (of gebruik **⟳**).
+FMSuperScout reads the full database of your open save — players **and** staff — including the
+hidden values FM normally masks: **CA/PA** (current & potential ability) and the hidden
+personality attributes. You get a snappy, spreadsheet-style app with search, filters, role
+ratings, player comparison and squad analysis over 50,000+ people.
 
-Data staat in `%LOCALAPPDATA%\FMSuperScout\` (`dump*.json` + `diagnostics.txt`).
+It has two parts: a small **BepInEx plugin** that runs inside the game and dumps the database to
+JSON, and a **local web app** (no internet, no accounts, data never leaves your PC) where you
+search, filter and compare.
+
+> Single-player use only. The plugin **only reads** memory (it never writes to the game) and runs
+> fully offline.
 
 ## Features
 
-**Zoeken & filteren**
-- Zoeken op naam of club; filteren op leeftijd, CA, PA, waarde, salaris, nationaliteit
-- Posities kiezen op een **klikbaar voetbalveld**
-- Filters: EU/EEA · haalbaar · op transferlijst · contract < 6 mnd / < 1 jaar · clubloos · mijn club · interesse ≥ · alleen shortlist
-- Sorteerbare, **aanpasbare kolommen**: rechtsklik om te tonen/verbergen, slepen om te herordenen (bewaard per modus)
-- Vloeiend met 50.000+ spelers (gevirtualiseerde tabel), dichtklapbare filterbalk
+- **Search & filter** — name/club, age, CA, PA, value, wage, nationality, EU/EEA, contract
+  expiring, free agents, transfer-listed, club reputation tier, and more. Pick positions on a
+  clickable pitch.
+- **Tactical role ratings** — 19 FM roles (Advanced Forward, Ball-Playing Defender, Deep-Lying
+  Playmaker, …) scored per player from the key/preferable attributes; sortable column + a
+  "best roles" panel in each profile.
+- **Player comparison** — put up to 3 players side by side, best value per attribute highlighted.
+- **Squad needs analysis** — breaks your squad down by position group, flags thin depth / aging /
+  no succession, and one-click scouts candidates for the gap.
+- **Player profile** — attributes exactly as in FM (grouped, keeper-aware) with FM colours, hidden
+  **personality** attributes, a CA/PA gauge, and an **estimated-potential** projection.
+- **Estimated market value** — calibrated against real in-game values (see *Accuracy*).
+- **Transfer-interest estimate** — reputation- and wage-based, and aware of the FIFA under-18
+  international-transfer rule.
+- **Shortlist** (★) with its own tab and CSV export.
+- **Settings** — language NL/EN, currency £/€, and a **Hide CA/PA** toggle for those who consider
+  it cheating (hidden everywhere consistently).
 
-**Spelerprofiel**
-- Attributen **exact als in FM** (groepen Technisch/Standaardsituaties/Mentaal/Fysiek/Keepen, keeper-aware), plus **Persoonlijkheid** (verborgen attributen)
-- Switch **geschatte potentie** (attributen geprojecteerd op PA)
-- Geschatte **marktwaarde als bandbreedte** (reputatie-model)
-- **Interesse-inschatting** (zie nauwkeurigheid hieronder)
-- Klik op een naam → **gekopieerd** naar klembord voor het FM-zoekscherm
+## Install (end users)
 
-**Shortlist & overig**
-- **Shortlist** met één klik (★), eigen tabblad, **CSV-export**
-- **Taal NL/EN** en **valuta £/€** in het ⚙ instellingen-menu
-- Kop toont je manager + club (klikbaar → filter op eigen club)
-- Apart **Staf**-tabblad met staf-attributen, rollenfilter en echte functie
+No coding needed, and you don't need Node installed — it's bundled.
 
-## Structuur
+1. Download **`FMSuperScout-Setup.zip`** from the [Releases](https://github.com/mavarobli/FMSuperScout/releases) page.
+2. Unzip it anywhere and double-click **`Install FMSuperScout.cmd`**.
+3. Launch **FMSuperScout** from the Start menu or desktop shortcut — it opens in its own window.
+   Close the window and the background server stops by itself.
 
-| Map | Inhoud |
+To remove it: *Apps & features* → FMSuperScout, or run `Uninstall FMSuperScout.cmd`.
+
+## Run from source (developers)
+
+Requires [Node.js](https://nodejs.org) (any recent version; no dependencies to install).
+
+```bash
+node app/server.js       # then open http://localhost:8765
+```
+
+Or double-click `Start FMSuperScout.cmd`. To build the shareable installer zip yourself:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File installer/build-package.ps1
+# → dist/FMSuperScout-Setup.zip
+```
+
+## Getting data out of Football Manager
+
+The app reads whatever the FMSuperScout plugin last dumped from your **active save**:
+
+1. Start FM26 and load your save.
+2. Press **F9** in-game (or click **⬇ New data** in the app).
+3. When the green bar appears, click it to load.
+
+Data lives in `%LOCALAPPDATA%\FMSuperScout\` (`dump*.json` + `diagnostics.txt`).
+
+The plugin install/removal steps for the game itself are in [`docs/`](docs/) and the in-repo
+`Installeer plugin.cmd`. BepInEx only *adds* files to the FM folder — it is fully reversible
+(or use Steam → Verify integrity of game files).
+
+## Accuracy
+
+**Read straight from memory (reliable):** name, nationality, birth year, height, foot · **CA and
+PA** (the real values) · all visible + hidden attributes and positions · wage, contract end,
+transfer status · current club · club & player reputation · staff CA/PA, attributes and role.
+
+**Estimates (clearly labelled as such):**
+
+- **Market value** — FM usually computes value live rather than storing it. FMSuperScout's estimate
+  is a log-linear model **calibrated on the players in your save that do have a stored value**
+  (~29% median error). Value roughly doubles every ~7 CA points and scales with age, club
+  reputation and remaining contract length. Method: [`docs/value-model.md`](docs/value-model.md).
+- **Transfer interest** — a heuristic from reputation gap (your club vs theirs and vs the player's
+  own stature), wage affordability, availability, age, and the FIFA Article 19 rule (a non-EU
+  player under 18 can't move internationally until they turn 18). Not an exact FM number, but built
+  on FM's dominant factors.
+
+## Project structure
+
+| Path | Contents |
 |---|---|
-| `plugin/` | C#-bron van de BepInEx-plugin + meegeleverde build in `plugin/dist/` |
-| `app/` | Lokale web-app (Node, geen dependencies): `server.js`, `index.html`, `app.js`, `style.css` |
-| `Start FMSuperScout.cmd` | Start de web-app |
-| `Installeer plugin.cmd` | Kopieert `plugin/dist/FMSuperScout.dll` naar de FM26-map (sluit eerst de game) |
+| `app/` | Local web app (Node, zero dependencies) |
+| `plugin/` | C# source of the BepInEx plugin |
+| `installer/` | Icon generator, launcher, PowerShell installer, package builder |
+| `docs/` | Value-model and .fmf-format research notes |
 
-> `refs/` (gekloonde referentieprojecten voor het reverse-engineeren) staat in `.gitignore` en is niet nodig voor gebruik — mag je verwijderen.
+## Support
 
-## Installatie
-
-- **BepInEx 6** (be.738, FM26-communitybuild) is geïnstalleerd in de FM26-map — volledig omkeerbaar, er zijn alleen bestanden *toegevoegd*.
-- De plugin staat in `BepInEx/plugins/FMSuperScout.dll`.
-- **Plugin bijwerken:** sluit FM26 → dubbelklik `Installeer plugin.cmd` → start FM26.
-- De console-popup is uitgezet; logging staat in `BepInEx/LogOutput.log`.
-
-## Verwijderen
-
-Verwijder uit de FM26-map: `BepInEx/`, `dotnet/`, `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`, `changelog.txt`. De game is dan weer 100% origineel (of: Steam → verify files).
-
-## Nauwkeurigheid
-
-**Rechtstreeks & betrouwbaar uit het geheugen** (geverifieerde offsets, FM 26.3.x):
-naam, nationaliteit, geboortejaar, lengte, voorkeursvoet · **CA en PA** (de échte waarden, niet de scout-schatting) · alle zichtbare + verborgen attributen, posities · **persoonlijkheid** (Ambitie, Loyaliteit, Professionaliteit, Druk, Temperament, Sportiviteit, Aanpassing, Controverse) · weeksalaris, contracteinddatum, transferstatus · **huidige club** (via de selectie waarin de speler staat) · club- en spelerreputatie · staf-CA/PA, staf-attributen en echte functie.
-
-**Leeftijd** wordt automatisch berekend: het seizoensjaar wordt afgeleid uit de data (grootste jongste jeugd-cohort + 16). Klopt het net niet, pas dan het **Peiljaar** links aan.
-
-**Schattingen (duidelijk als zodanig gelabeld):**
-- **Marktwaarde** — FM slaat de waarde meestal niet op maar berekent 'm live; de app schat op basis van reputatie × CA × leeftijd × contract en toont een bandbreedte.
-- **Interesse-inschatting** — heuristiek op basis van clubreputatie (jouw club vs hun club), ambitie/loyaliteit, beschikbaarheid, contract en leeftijd. Geen exacte FM-waarde; reputatie en persoonlijkheid zijn wél FM's dominante factoren, dus indicatief voor je shortlist.
-
-`diagnostics.txt` bevat aantallen, het offset-histogram en per-topspeler club-checks — handig om de afgeleide waarden tegen je echte save te ijken.
+FMSuperScout is free. If it helps your scouting and you'd like to say thanks, you can
+[buy me a coffee](https://REPLACE-WITH-YOUR-DONATION-LINK). Totally optional. 🙏
 
 ## Disclaimer
 
-Alleen voor eigen singleplayer-gebruik. De plugin **leest alleen** (schrijft niets in de game) en werkt volledig offline.
+Not affiliated with Sports Interactive or SEGA. For personal, single-player use. Football Manager
+is a trademark of Sports Interactive.
