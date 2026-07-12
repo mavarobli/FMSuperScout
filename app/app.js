@@ -11,6 +11,7 @@ const state = {
   cur: localStorage.getItem('fmss_cur') || '£',
   lang: localStorage.getItem('fmss_lang') || 'nl',
   showPot: false,
+  role: localStorage.getItem('fmss_role') || '',
   refYear: new Date().getFullYear(),
   refDoy: 183,
   shortlist: new Set(JSON.parse(localStorage.getItem('fmss_shortlist') || '[]')),
@@ -51,6 +52,7 @@ const I18N = {
     step2: 'Druk in de game op <kbd>F9</kbd>, of klik hier op <b>⬇ Nieuwe data</b>',
     step3: 'Klik op de groene balk zodra de dump klaar is',
     playersWord: 'spelers', staffWord: 'staf', clickClubFilter: 'Klik = filter op jouw club', repWord: 'reputatie',
+    roleFit: 'Tactische rol', roleColHdr: 'Rol', roleAny: 'Geen rol gekozen', bestRoles: 'Beste rollen', roleScoreOf: 'Rolscore',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -83,6 +85,7 @@ const I18N = {
     step2: 'Press <kbd>F9</kbd> in-game, or click <b>⬇ New data</b> here',
     step3: 'Click the green bar when the dump is ready',
     playersWord: 'players', staffWord: 'staff', clickClubFilter: 'Click = filter on your club', repWord: 'reputation',
+    roleFit: 'Tactical role', roleColHdr: 'Role', roleAny: 'No role selected', bestRoles: 'Best roles', roleScoreOf: 'Role score',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
@@ -280,6 +283,65 @@ function isAttainable(p) {
   return p.listed || p.setForRelease || isFree(p) || (m != null && m <= 12);
 }
 
+// ---------- tactische rollen (rolgeschiktheid) ----------
+// Per rol: welke posities passen, plus KEY-attributen (zwaar) en PREF-attributen (licht),
+// naar het model van FM's groen/blauw gemarkeerde eigenschappen. Score = gewogen gemiddelde
+// op de 1-20 schaal (key telt 2x, pref 1x), zodat het naast de losse attributen leesbaar blijft.
+const ROLES = [
+  // Keepers
+  { id: 'gk', short: 'DK', pos: ['GK'], key: ['Handling', 'Reflexes', 'OneOnOnes', 'Positioning', 'Concentration', 'Agility'], pref: ['AerialReach', 'CommandOfArea', 'Communication', 'Kicking', 'Anticipation', 'Decisions', 'Bravery'] },
+  { id: 'sk', short: 'Sweeper', pos: ['GK'], key: ['Reflexes', 'OneOnOnes', 'RushingOut', 'Handling', 'Positioning', 'Agility', 'Composure', 'Decisions'], pref: ['CommandOfArea', 'Communication', 'Kicking', 'FirstTouch', 'Passing', 'Anticipation', 'Concentration'] },
+  // Centrale verdedigers
+  { id: 'cd', short: 'CV', pos: ['DC'], key: ['Marking', 'Tackling', 'Positioning', 'Heading', 'JumpingReach', 'Strength', 'Concentration', 'Decisions'], pref: ['Anticipation', 'Bravery', 'Composure', 'Aggression', 'Pace', 'Acceleration'] },
+  { id: 'bpd', short: 'Opbouwer', pos: ['DC'], key: ['Marking', 'Tackling', 'Positioning', 'Passing', 'Composure', 'Vision', 'Decisions', 'JumpingReach'], pref: ['Heading', 'Strength', 'FirstTouch', 'Technique', 'Anticipation', 'Concentration', 'Pace'] },
+  // Backs
+  { id: 'fb', short: 'Vleugelverd.', pos: ['DL', 'DR'], key: ['Marking', 'Tackling', 'Positioning', 'Anticipation', 'Concentration', 'Stamina', 'Pace', 'WorkRate'], pref: ['Crossing', 'Dribbling', 'Passing', 'Decisions', 'Teamwork', 'Acceleration', 'Agility'] },
+  { id: 'wb', short: 'Wingback', pos: ['DL', 'DR', 'WBL', 'WBR'], key: ['Crossing', 'Dribbling', 'Tackling', 'OffTheBall', 'Stamina', 'Pace', 'Acceleration', 'WorkRate', 'Teamwork'], pref: ['Marking', 'FirstTouch', 'Passing', 'Technique', 'Anticipation', 'Positioning', 'Agility', 'Balance'] },
+  // Verdedigende middenvelders
+  { id: 'dm', short: 'Verd. MV', pos: ['DM'], key: ['Tackling', 'Marking', 'Positioning', 'Anticipation', 'Concentration', 'Teamwork', 'WorkRate', 'Decisions', 'Stamina'], pref: ['Aggression', 'Passing', 'Composure', 'Strength', 'Bravery', 'FirstTouch'] },
+  { id: 'dlp', short: 'Regisseur', pos: ['DM', 'MC'], key: ['Passing', 'Vision', 'FirstTouch', 'Technique', 'Composure', 'Decisions', 'Teamwork', 'OffTheBall'], pref: ['Anticipation', 'Positioning', 'Tackling', 'Balance', 'WorkRate', 'Flair'] },
+  { id: 'bwm', short: 'Baljager', pos: ['DM', 'MC'], key: ['Tackling', 'Aggression', 'WorkRate', 'Stamina', 'Teamwork', 'Anticipation', 'Marking', 'Bravery'], pref: ['Positioning', 'Determination', 'Concentration', 'Strength', 'Acceleration', 'Pace'] },
+  // Centrale middenvelders
+  { id: 'cm', short: 'Centrale MV', pos: ['MC'], key: ['Passing', 'Tackling', 'Decisions', 'Teamwork', 'WorkRate', 'Stamina', 'FirstTouch', 'Composure'], pref: ['Technique', 'Vision', 'OffTheBall', 'Anticipation', 'Positioning'] },
+  { id: 'b2b', short: 'Box-to-box', pos: ['MC'], key: ['Stamina', 'WorkRate', 'Tackling', 'Passing', 'OffTheBall', 'Teamwork', 'Decisions', 'FirstTouch'], pref: ['Finishing', 'LongShots', 'Technique', 'Composure', 'Anticipation', 'Strength', 'Acceleration', 'Determination'] },
+  { id: 'ap', short: 'Aanv. spelmaker', pos: ['MC', 'AMC'], key: ['Passing', 'Vision', 'Technique', 'FirstTouch', 'Composure', 'Decisions', 'OffTheBall', 'Flair'], pref: ['Dribbling', 'Anticipation', 'Agility', 'Teamwork', 'Acceleration'] },
+  // Aanvallende / brede middenvelders
+  { id: 'wing', short: 'Buitenspeler', pos: ['ML', 'MR', 'AML', 'AMR'], key: ['Crossing', 'Dribbling', 'Technique', 'Pace', 'Acceleration', 'Agility', 'OffTheBall'], pref: ['FirstTouch', 'Passing', 'Flair', 'Balance', 'Stamina', 'Anticipation'] },
+  { id: 'if', short: 'Schaduwspits', pos: ['AML', 'AMR'], key: ['Dribbling', 'Finishing', 'FirstTouch', 'Technique', 'OffTheBall', 'Pace', 'Acceleration', 'Agility', 'Composure'], pref: ['LongShots', 'Passing', 'Flair', 'Anticipation', 'Balance', 'Vision'] },
+  { id: 'am', short: 'Hangende spits', pos: ['AMC'], key: ['OffTheBall', 'FirstTouch', 'Technique', 'Finishing', 'Composure', 'Decisions', 'Dribbling', 'Passing'], pref: ['LongShots', 'Vision', 'Flair', 'Anticipation', 'Acceleration', 'Agility'] },
+  // Spitsen
+  { id: 'af', short: 'Diepe spits', pos: ['ST'], key: ['Finishing', 'OffTheBall', 'Composure', 'FirstTouch', 'Dribbling', 'Technique', 'Acceleration', 'Pace'], pref: ['Anticipation', 'Decisions', 'Agility', 'Balance', 'Flair'] },
+  { id: 'poacher', short: 'Afmaker', pos: ['ST'], key: ['Finishing', 'OffTheBall', 'Anticipation', 'Composure', 'FirstTouch'], pref: ['Dribbling', 'Heading', 'Technique', 'Decisions', 'Acceleration', 'Pace'] },
+  { id: 'tm', short: 'Targetman', pos: ['ST'], key: ['Heading', 'JumpingReach', 'Strength', 'Bravery', 'FirstTouch', 'OffTheBall', 'Finishing', 'Balance'], pref: ['Aggression', 'Anticipation', 'Composure', 'Teamwork', 'Determination'] },
+  { id: 'cf', short: 'Complete spits', pos: ['ST'], key: ['Finishing', 'FirstTouch', 'Technique', 'OffTheBall', 'Composure', 'Dribbling', 'Heading', 'Strength', 'Acceleration', 'Pace'], pref: ['Passing', 'Vision', 'LongShots', 'Anticipation', 'Decisions', 'Agility', 'Balance', 'JumpingReach'] },
+];
+const ROLE_LABEL = {
+  nl: { gk: 'Keeper', sk: 'Meevoetballende keeper', cd: 'Centrale verdediger', bpd: 'Opbouwende verdediger', fb: 'Vleugelverdediger', wb: 'Wingback', dm: 'Verdedigende middenvelder', dlp: 'Verdiepte spelmaker', bwm: 'Baljagende middenvelder', cm: 'Centrale middenvelder', b2b: 'Box-to-box middenvelder', ap: 'Aanvallende spelmaker', wing: 'Buitenspeler', if: 'Schaduwspits', am: 'Hangende spits', af: 'Diepliggende spits', poacher: 'Afmaker', tm: 'Targetman', cf: 'Complete spits' },
+  en: { gk: 'Goalkeeper', sk: 'Sweeper Keeper', cd: 'Central Defender', bpd: 'Ball Playing Defender', fb: 'Full Back', wb: 'Wing Back', dm: 'Defensive Midfielder', dlp: 'Deep Lying Playmaker', bwm: 'Ball Winning Midfielder', cm: 'Central Midfielder', b2b: 'Box to Box Midfielder', ap: 'Advanced Playmaker', wing: 'Winger', if: 'Inside Forward', am: 'Attacking Midfielder', af: 'Advanced Forward', poacher: 'Poacher', tm: 'Target Man', cf: 'Complete Forward' },
+};
+const roleName = id => (ROLE_LABEL[state.lang]?.[id] ?? ROLE_LABEL.nl[id] ?? id);
+const ROLE_BY_ID = Object.fromEntries(ROLES.map(r => [r.id, r]));
+// Rolscore op de 1-20 schaal; key-attributen tellen dubbel. Vereist attributen (spelers).
+function roleScore(p, role) {
+  if (!p.attrs) return null;
+  let sum = 0, w = 0;
+  for (const k of role.key) { const v = p.attrs[k]; if (v != null) { sum += v * 2; w += 2; } }
+  for (const k of role.pref) { const v = p.attrs[k]; if (v != null) { sum += v; w += 1; } }
+  return w ? sum / w : null;
+}
+function rolesForPos(posArr) {
+  const set = new Set(posArr || []);
+  if (!set.size) return ROLES;                      // onbekende positie: toon alle
+  const isGk = set.has('GK');
+  return ROLES.filter(r => r.pos.some(x => set.has(x)) && (r.pos.includes('GK') === isGk));
+}
+// Beste rollen voor een speler (gesorteerd), voor het profiel.
+function bestRoles(p, n = 5) {
+  return rolesForPos(p.posArr).map(r => ({ id: r.id, score: roleScore(p, r) }))
+    .filter(x => x.score != null).sort((a, b) => b.score - a.score).slice(0, n);
+}
+const roleClass = v => v == null ? '' : v >= 15 ? 'g5' : v >= 13 ? 'g4' : v >= 10.5 ? 'g3' : v >= 8 ? 'g2' : 'g1';
+
 // ---------- posities & veld ----------
 const PITCH = [
   ['ST', 50, 9], ['AML', 17, 24], ['AMC', 50, 24], ['AMR', 83, 24],
@@ -361,6 +423,22 @@ function buildStaffRoles() {
   const jobs = [...new Set(state.staff.map(s => s.job).filter(Boolean))].sort();
   $('f-staffrole').innerHTML = `<option value="">${t('all')}</option>` + jobs.map(j => `<option>${j}</option>`).join('');
   $('f-staffrole').value = cur;
+}
+// Rol-keuze: gegroepeerd op linie zodat de lijst overzichtelijk blijft.
+function buildRoleSelect() {
+  const groups = [
+    ['GK', ['gk', 'sk']], ['DEF', ['cd', 'bpd', 'fb', 'wb']],
+    ['MID', ['dm', 'dlp', 'bwm', 'cm', 'b2b', 'ap']], ['AANV', ['wing', 'if', 'am', 'af', 'poacher', 'tm', 'cf']],
+  ];
+  const heads = { GK: 'Keeper', DEF: 'Verdediging', MID: 'Middenveld', AANV: 'Aanval' };
+  const headsEn = { GK: 'Goalkeeper', DEF: 'Defence', MID: 'Midfield', AANV: 'Attack' };
+  const H = state.lang === 'en' ? headsEn : heads;
+  let html = `<option value="">${t('roleAny')}</option>`;
+  for (const [g, ids] of groups) {
+    html += `<optgroup label="${H[g]}">` + ids.map(id => `<option value="${id}">${roleName(id)}</option>`).join('') + '</optgroup>';
+  }
+  $('f-role').innerHTML = html;
+  $('f-role').value = state.role;
 }
 
 // ---------- filters ----------
@@ -483,14 +561,30 @@ function colCfg() {
   return saved;
 }
 function saveColCfg() { localStorage.setItem('fmss_cols', JSON.stringify(state.colCfg)); }
+// Kolom voor de gekozen tactische rol (verschijnt alleen als er een rol geselecteerd is).
+function roleCol() {
+  const r = ROLE_BY_ID[state.role];
+  if (!r) return null;
+  return {
+    key: 'role', label: 'roleColHdr', num: true,
+    get: p => { const s = roleScore(p, r); return s == null ? -1 : s; },
+    render: p => { const s = roleScore(p, r); return s == null ? '<span class="dim">·</span>' : `<span class="${roleClass(s)}">${s.toFixed(1)}</span>`; },
+  };
+}
 function activeCols() {
   const base = baseCols();
   const byKey = Object.fromEntries(base.map(c => [c.key, c]));
   const cf = colCfg();
   const hidden = new Set(cf.hidden);
   const sl = base.find(c => c.star);                     // ster-kolom altijd vooraan
-  const rest = cf.order.filter(k => !hidden.has(k) && byKey[k]).map(k => byKey[k]);
-  return sl ? [sl, ...rest] : rest;
+  const name = base.find(c => c.name);
+  const rc = state.mode !== 'staff' ? roleCol() : null;  // rol-kolom direct na naam
+  const rest = cf.order.filter(k => !hidden.has(k) && byKey[k] && !(rc && k === 'role')).map(k => byKey[k]);
+  const out = [];
+  if (sl) out.push(sl);
+  for (const c of rest) { out.push(c); if (rc && c === name) out.push(rc); }
+  if (rc && !name) out.splice(1, 0, rc);
+  return out;
 }
 function reorderCol(fromKey, toKey) {
   if (fromKey === toKey) return;
@@ -726,6 +820,21 @@ function showDetail(p) {
     if (i) html += `<div class="interest-box"><b>${t('interestTitle')}:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100)</span></div>`;
   }
 
+  // Beste tactische rollen (met de gekozen rol bovenaan als die past)
+  if (isPlayer && p.attrs) {
+    let roles = bestRoles(p, 5);
+    if (state.role && ROLE_BY_ID[state.role]) {
+      const sc = roleScore(p, ROLE_BY_ID[state.role]);
+      if (sc != null && !roles.some(r => r.id === state.role)) roles = [{ id: state.role, score: sc }, ...roles].slice(0, 5);
+    }
+    if (roles.length) {
+      html += `<div class="roles-box"><div class="rb-head">${t('bestRoles')}</div>` + roles.map(r => {
+        const sel = r.id === state.role ? ' sel' : '';
+        return `<div class="role-row${sel}"><span class="rn">${roleName(r.id)}</span><span class="abar rb"><i class="ab-${roleClass(r.score)}" style="width:${Math.min(100, r.score * 5)}%"></i></span><span class="v ${roleClass(r.score)}">${r.score.toFixed(1)}</span></div>`;
+      }).join('') + '</div>';
+    }
+  }
+
   if (isPlayer && p.attrs) {
     const canPot = p.pa > p.ca;
     html += `<label class="potswitch${canPot ? '' : ' off'}"><input type="checkbox" id="pot-toggle" ${state.showPot ? 'checked' : ''} ${canPot ? '' : 'disabled'}> ${t('showPot')}${state.showPot ? ` <span class="dim">(${t('potNote')})</span>` : ''}</label>`;
@@ -778,6 +887,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-cl
 ['f-eu', 'f-myclub', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
 $('f-staffrole').addEventListener('change', applyFilters);
 $('f-interest').addEventListener('change', applyFilters);
+$('f-role').addEventListener('change', () => {
+  state.role = $('f-role').value;
+  localStorage.setItem('fmss_role', state.role);
+  if (state.role) { state.sortKey = 'role'; state.sortDir = -1; }        // meteen op rolscore sorteren
+  else if (state.sortKey === 'role') { state.sortKey = 'ca'; state.sortDir = -1; }
+  applyFilters();
+  if (state.selected) showDetail(state.selected);
+});
 $('f-refyear').addEventListener('input', () => { const y = +$('f-refyear').value; if (y >= 2000 && y <= 2100) { state.refYear = y; applyFilters(); } });
 $('pos-clear').onclick = () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); applyFilters(); };
 
@@ -879,6 +996,7 @@ function applyLang() {
   renderDumpInfo();
   renderClubBadge();
   buildStaffRoles();
+  buildRoleSelect();
   applyFilters();
   if (state.selected) showDetail(state.selected);
 }
@@ -890,6 +1008,7 @@ function setMode(mode) {
   $('tab-shortlist').classList.toggle('active', mode === 'shortlist');
   $('fg-pitch').style.display = mode === 'staff' ? 'none' : '';
   $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
+  $('fg-role').style.display = mode === 'staff' ? 'none' : '';
   $('sl-bar').classList.toggle('hidden', mode !== 'shortlist');
   state.selected = null;
   $('detail').classList.add('hidden');

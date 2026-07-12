@@ -247,6 +247,17 @@ td.exp-year { color: #d8c88a; }
 .int-k { background: #2a3441; color: #9fb0c2; }
 .int-n { background: #3a1c1c; color: #e08a8a; }
 .interest-box { margin: 10px 0; padding: 8px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; }
+/* rol-selector in de sidebar */
+#fg-role select { width: 100%; }
+/* beste-rollen-blok in het profiel */
+.roles-box { margin: 12px 0 4px; }
+.rb-head { font-size: 11px; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 3px; margin-bottom: 5px; font-weight: 700; }
+.role-row { display: flex; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 4px; font-size: 12.5px; }
+.role-row .rn { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-row .abar.rb { width: 70px; }
+.role-row .v { min-width: 26px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.role-row.sel { background: #21314a; }
+.role-row.sel .rn { color: var(--accent2); font-weight: 600; }
 .star-cell { cursor: pointer; color: #3a4658; font-size: 15px; text-align: center; }
 .star-cell.on { color: var(--star); }
 
