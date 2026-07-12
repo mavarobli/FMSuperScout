@@ -1,6 +1,18 @@
 # Marktwaarde- en interesse-inschatting
 
-## Marktwaarde (estValue in app/app.js)
+## Update: reputatie-gedreven model
+
+Na meer echte bedragen (o.a. mid-range spelers zoals Bidstrup €17M, Beukema €14M) bleek het
+CA-gedreven model de mid-range fors te overschatten (Bidstrup kwam op €62M). Analyse van de data:
+**FM-waarde volgt vooral de wereldreputatie (faam), niet CA** — twee spelers met dezelfde reputatie
+zijn ~even veel waard. CA en reputatie zijn zo sterk gecorreleerd dat CA meenemen de regressie
+onstabiel maakt (coëfficiënten klappen tussen fits van CA-zwaar naar reputatie-zwaar). Daarom nu:
+**reputatie (met verzadiging boven ~7500) + leeftijd + contractduur + lichte jeugdcorrectie, zonder CA.**
+Resultaat: mid-range klopt (Bidstrup £17M, Beukema £14M), top getemperd (Haaland ~£280M vs €274M).
+Beperking: sterke speler met lage faam wordt eerder onderschat. De écht accurate route is de waarde
+uit het geheugen lezen (GenieScout doet dat via een memory-agent) — zie `backlog.md`.
+
+## Marktwaarde (estValue in app/app.js) — historisch (CA-gedreven, vervangen)
 
 FM berekent transferwaarde intern (niet gedocumenteerd) en slaat voor de meeste spelers
 `0xFFFFFFFF`/geen waarde op; slechts een handvol spelers heeft een concrete waarde in het
