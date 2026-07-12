@@ -1065,7 +1065,7 @@ function showDetail(p) {
         const raw = p.attrs[k];
         const shown = state.showPot ? potAttr(p, raw, k, rel) : raw;
         const grew = state.showPot && shown > raw;
-        return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span>${abar(shown)}<span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
+        return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span><span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
       }).join('') + '</div>';
     }
     // Persoonlijkheid (verborgen kenmerken) — net als een normale eigenschappengroep.
@@ -1073,14 +1073,14 @@ function showDetail(p) {
       ['pressure', p.pressure], ['temperament', p.temperament], ['sportsmanship', p.sportsmanship],
       ['adaptability', p.adaptability], ['controversy', p.controversy]].filter(x => x[1] > 0);
     const persHtml = pd.length ? `<div class="attr-col"><h3>${t('personaTitle')}</h3>` + pd.map(([k, v], idx) =>
-      `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span>${abar(v)}<span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
+      `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
     // Overige verborgen kenmerken. Bij InjuryProneness/Dirtiness is HOOG slecht → kleur omkeren.
     const hd = [['Consistency', true], ['ImportantMatches', true], ['Versatility', true],
       ['InjuryProneness', false], ['Dirtiness', false]]
       .map(([k, good]) => [k, p.attrs ? p.attrs[k] : 0, good]).filter(x => x[1] > 0);
     const hidHtml = hd.length ? `<div class="attr-col"><h3>${t('hiddenTitle')}</h3>` + hd.map(([k, v, good], idx) => {
       const cls = good ? attrClass(v) : attrClass(21 - v);   // "slecht-hoog": omgekeerde kleur
-      return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t('a_' + k)}</span><span class="abar"><i class="${cls}" style="width:${Math.min(100, v * 5)}%"></i></span><span class="v ${cls}">${v}</span></div>`;
+      return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t('a_' + k)}</span><span class="v ${cls}">${v}</span></div>`;
     }).join('') + '</div>' : '';
     // Grid: links Technisch/Keepen + Standaardsituaties (Mentaal loopt ernaast over 2 rijen),
     // onderste rij Fysiek | Persoonlijkheid op gelijke hoogte.
@@ -1095,7 +1095,7 @@ function showDetail(p) {
   } else if (p.staffAttrs) {
     html += `<div class="attr-cols"><div class="attr-col"><h3>${t('staffAttrs')}</h3>` +
       Object.entries(p.staffAttrs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v], idx) =>
-        `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${k.replace(/_/g, ' ')}</span>${abar(v)}<span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div></div>';
+        `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${k.replace(/_/g, ' ')}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div></div>';
   }
   $('detail-body').innerHTML = html;
   document.querySelector('.detail-star').onclick = () => toggleShortlist(p.id);
