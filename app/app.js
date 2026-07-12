@@ -39,6 +39,7 @@ const I18N = {
     c_status: 'Status', c_role: 'Rol', foot: 'Voet', height: 'Lengte', repLabel: 'Reputatie',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
     int_big: 'Groot', int_ok: 'Redelijk', int_small: 'Klein', int_no: 'Nee', interestTitle: 'Interesse-inschatting',
+    minorNote: 'Te jong voor een transfer.', minorIntlNote: 'Als niet-EU-minderjarige pas vanaf 18 haalbaar (FIFA-regel voor internationale transfers).',
     ambition: 'Ambitie', loyalty: 'Loyaliteit', professionalism: 'Professionaliteit', adaptability: 'Aanpassing',
     pressure: 'Druk', sportsmanship: 'Sportiviteit', temperament: 'Temperament', controversy: 'Controverse', determination: 'Vastberadenheid',
     personaTitle: 'Persoonlijkheid',
@@ -90,6 +91,7 @@ const I18N = {
     c_status: 'Status', c_role: 'Role', foot: 'Foot', height: 'Height', repLabel: 'Reputation',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
     int_big: 'High', int_ok: 'Fair', int_small: 'Low', int_no: 'No', interestTitle: 'Interest estimate',
+    minorNote: 'Too young for a transfer.', minorIntlNote: 'As a non-EU minor, only feasible from age 18 (FIFA rule on international transfers).',
     ambition: 'Ambition', loyalty: 'Loyalty', professionalism: 'Professionalism', adaptability: 'Adaptability',
     pressure: 'Pressure', sportsmanship: 'Sportsmanship', temperament: 'Temperament', controversy: 'Controversy', determination: 'Determination',
     personaTitle: 'Personality',
@@ -217,7 +219,7 @@ const PLAYER_COLS = [
   { key: 'sl', label: '★', star: true },
   { key: 'name', label: 'c_name', get: p => p.name, name: true },
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p) },
-  { key: 'pos', label: 'c_pos', get: p => p.pos || '–' },
+  { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => p.pos || '<span class="dim">–</span>' },
   { key: 'club', label: 'c_club', get: p => p.club, dimNull: true },
   { key: 'nat', label: 'c_nat', get: p => (p.nat || []).join(', ') },
   { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? '<span class="eu-yes">✓</span>' : '<span class="dim">–</span>' },
@@ -314,10 +316,15 @@ function interestEstimate(p) {
     else score += Math.min(6, (1 - ratio) * 8);                  // ruim betaalbaar: klein duwtje
   }
 
-  // Leeftijd: heel jonge spelers verhuizen zelden (werkvergunning, ontwikkeling bij eigen club)
+  // Leeftijd + FIFA Art. 19 (internationale transfer van minderjarigen).
+  // Een niet-EU-speler onder de 18 kan internationaal niet komen tot z'n 18e; een EU/EEA-speler
+  // van 16-17 mag binnen de EU wél overstappen (uitzondering), maar blijft jong.
   const age = getAge(p);
-  if (age <= 15) score = Math.min(score, 10);
-  else if (age <= 17 && !isFree(p)) score -= 8;
+  const eu = isEu(p);
+  let note = null;
+  if (age <= 15) { score = Math.min(score, 6); note = 'minor'; }
+  else if (age <= 17 && !eu) { score = Math.min(score, 8); note = 'minorIntl'; }
+  else if (age <= 17) { score -= 8; }
 
   // Optionele persoonlijkheid (alleen als de dump ze bevat; nu meestal afwezig)
   if (p.ambition) score += (clubGap >= 0 ? 1.4 : -1.4) * (p.ambition - 10);
@@ -326,7 +333,7 @@ function interestEstimate(p) {
   score = Math.max(0, Math.min(100, Math.round(score)));
   const label = score >= 70 ? t('int_big') : score >= 45 ? t('int_ok') : score >= 25 ? t('int_small') : t('int_no');
   const cls = score >= 70 ? 'int-g' : score >= 45 ? 'int-r' : score >= 25 ? 'int-k' : 'int-n';
-  return { score, label, cls };
+  return { score, label, cls, note };
 }
 function intHtml(p) {
   const i = interestEstimate(p);
@@ -343,6 +350,14 @@ function statusHtml(p) {
   return h || '<span class="dim">–</span>';
 }
 const isFree = p => !p.club;
+// Positievolgorde zoals in FM: van doel naar aanval (GK ... ST), niet alfabetisch.
+const POS_ORDER = ['GK', 'DL', 'DC', 'DR', 'WBL', 'WBR', 'DM', 'ML', 'MC', 'MR', 'AML', 'AMC', 'AMR', 'ST'];
+const POS_RANK = Object.fromEntries(POS_ORDER.map((p, i) => [p, i]));
+function posRank(p) {
+  const arr = p.posArr || [];
+  if (!arr.length) return 99;
+  return Math.min(...arr.map(x => POS_RANK[x] ?? 98));   // rangschik op de meest verdedigende positie
+}
 function isAttainable(p) {
   if (p.notForSale) return false;
   const m = monthsUntil(p.expires);
@@ -702,12 +717,11 @@ let ROW_H = 28;              // wordt na de eerste render gemeten (zoom/DPI-onaf
 let renderQueued = false;
 // Meet de echte rijhoogte zodat spacer + translateY exact kloppen (voorkomt drift/verdwijnende lijnen).
 function measureRowH() {
-  const tr = $('grid-body').querySelector('tr');
+  const tr = $('grid-body').querySelector('tr[data-i]');
   if (!tr) return false;
   const h = tr.getBoundingClientRect().height;
   if (h > 12 && Math.abs(h - ROW_H) > 0.02) {
     ROW_H = h;
-    $('grid-spacer').style.height = (state.filtered.length * ROW_H) + 'px';
     return true;
   }
   return false;
@@ -724,7 +738,8 @@ function renderTable() {
     const col = cols.find(c => c.key === k);
     th.onclick = () => {
       if (col?.star) return;
-      if (state.sortKey === k) state.sortDir *= -1; else { state.sortKey = k; state.sortDir = -1; }
+      if (state.sortKey === k) state.sortDir *= -1;
+      else { state.sortKey = k; state.sortDir = (k === 'pos' || k === 'name' || k === 'nat') ? 1 : -1; }
       sortRows(); renderTable();
     };
     if (col?.star) return;
@@ -735,7 +750,6 @@ function renderTable() {
     th.ondragend = () => $('grid-head').querySelectorAll('th').forEach(x => x.classList.remove('dragging', 'drop-target'));
     th.ondrop = e => { e.preventDefault(); th.classList.remove('drop-target'); reorderCol(e.dataTransfer.getData('text/plain'), k); };
   });
-  $('grid-spacer').style.height = (state.filtered.length * ROW_H) + 'px';
   renderVisible();
   if (measureRowH()) renderVisible();   // hermeet en herpositioneer met echte hoogte
 }
@@ -773,12 +787,18 @@ document.addEventListener('click', e => { if (!e.target.closest('#colmenu')) clo
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeColMenu(); });
 function renderVisible() {
   const wrap = $('table-wrap'), cols = activeCols();
+  const total = state.filtered.length;
   const first = Math.max(0, Math.floor(wrap.scrollTop / ROW_H) - 10);
   const count = Math.ceil(wrap.clientHeight / ROW_H) + 20;
-  const slice = state.filtered.slice(first, first + count);
+  const last = Math.min(total, first + count);
+  const slice = state.filtered.slice(first, last);
   const body = $('grid-body');
-  body.style.transform = `translateY(${first * ROW_H}px)`;
-  body.innerHTML = slice.map((p, i) => {
+  // Virtualisatie via spacer-rijen binnen de tbody: totale hoogte = exact total*ROW_H,
+  // dus je kunt nooit voorbij de lijst scrollen (geen leeg veld bij korte lijsten).
+  const ncol = cols.length;
+  const topPad = first * ROW_H, botPad = (total - last) * ROW_H;
+  const spacer = h => h > 0 ? `<tr class="vspacer"><td colspan="${ncol}" style="height:${h}px;padding:0;border:0"></td></tr>` : '';
+  body.innerHTML = spacer(topPad) + slice.map((p, i) => {
     const idx = first + i;
     const tds = cols.map(c => {
       const stick = c.star ? 'c-sticky' : c.name ? 'c-sticky stick-end' : '';
@@ -795,8 +815,8 @@ function renderVisible() {
       return `<td class="${c.num ? 'num' : ''} ${c.cls || ''} ${c.tdCls ? c.tdCls(p) : ''}">${v}</td>`;
     }).join('');
     return `<tr data-i="${idx}" class="${state.selected === p ? 'sel' : ''}${idx % 2 ? ' even' : ''}" style="height:${ROW_H}px">${tds}</tr>`;
-  }).join('');
-  body.querySelectorAll('tr').forEach(tr => {
+  }).join('') + spacer(botPad);
+  body.querySelectorAll('tr[data-i]').forEach(tr => {
     tr.onclick = e => {
       const star = e.target.closest('[data-star]');
       if (star) { toggleShortlist(+star.dataset.star); e.stopPropagation(); return; }
@@ -864,8 +884,9 @@ function exportShortlist() {
 }
 
 // ---------- detailpaneel ----------
-const attrClass = v => v >= 17 ? 'g5' : v >= 14 ? 'g4' : v >= 10 ? 'g3' : v >= 6 ? 'g2' : 'g1';
-const abar = v => `<span class="abar"><i class="ab-${attrClass(v)}" style="width:${Math.min(100, v * 5)}%"></i></span>`;
+// FM-attribuutkleuren: 16-20 groen, 11-15 oranje, 1-10 witachtig. Ook voor potentie-projectie.
+const attrClass = v => v >= 16 ? 'at-hi' : v >= 11 ? 'at-mid' : 'at-lo';
+const abar = v => `<span class="abar"><i class="${attrClass(v)}" style="width:${Math.min(100, v * 5)}%"></i></span>`;
 // Fysieke attributen pieken vroeg en groeien nauwelijks; technisch/mentaal groeit langer door.
 const PHYS_ATTRS = new Set(['Acceleration', 'Agility', 'Balance', 'JumpingReach', 'NaturalFitness', 'Pace', 'Stamina', 'Strength']);
 // Aandeel van de resterende groei dat op deze leeftijd nog realistisch is (grofweg de FM-groeicurve).
@@ -932,7 +953,7 @@ function showDetail(p) {
 
   if (isPlayer) {
     const i = interestEstimate(p);
-    if (i) html += `<div class="interest-box"><b>${t('interestTitle')}:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100)</span></div>`;
+    if (i) html += `<div class="interest-box"><b>${t('interestTitle')}:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100)</span>${i.note ? `<div class="int-note">${t(i.note === 'minor' ? 'minorNote' : 'minorIntlNote')}</div>` : ''}</div>`;
   }
 
   // Beste tactische rollen (met de gekozen rol bovenaan als die past)
