@@ -1361,6 +1361,11 @@ async function poll() {
   setTimeout(poll, 2000);
 }
 
+// Heartbeat: laat de standalone-server weten dat het venster nog open is (app-modus).
+function beat() { fetch('/api/heartbeat', { method: 'POST' }).catch(() => {}); }
+setInterval(beat, 4000); beat();
+window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch {} });
+
 buildPitch();
 applyLang();
 $('sl-count').textContent = state.shortlist.size;

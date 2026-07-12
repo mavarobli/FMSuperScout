@@ -44,7 +44,8 @@ body {
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
 }
-#topbar h1 { font-size: 17px; letter-spacing: .5px; }
+#brand-logo { display: block; border-radius: 6px; flex: 0 0 auto; }
+#topbar h1 { font-size: 17px; letter-spacing: .5px; margin-left: -6px; }
 #topbar h1 span { color: var(--accent); }
 #topbar nav { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
 .tab {

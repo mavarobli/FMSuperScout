@@ -6,11 +6,23 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { spawn } = require('child_process');
 
 const PORT = 8765;
 const APP_DIR = __dirname;
 // De plugin schrijft dumps hierheen:
 const DATA_DIR = path.join(os.homedir(), 'AppData', 'Local', 'FMSuperScout');
+
+// App-modus (standalone venster): server sluit zichzelf af zodra het venster dicht is.
+// De pagina stuurt elke paar seconden een heartbeat; blijft die te lang uit, dan stoppen we.
+const APP_MODE = process.env.FMSS_APP === '1';
+let lastBeat = Date.now();
+let pendingExit = null;
+if (APP_MODE) {
+  setInterval(() => {
+    if (Date.now() - lastBeat > 12000) { console.log('Venster gesloten, server stopt.'); process.exit(0); }
+  }, 3000);
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -61,6 +73,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/heartbeat') {
+    lastBeat = Date.now();
+    if (pendingExit) { clearTimeout(pendingExit); pendingExit = null; }   // herladen: toch openhouden
+    res.writeHead(204); res.end();
+    return;
+  }
+
+  if (url.pathname === '/api/bye') {
+    res.writeHead(204); res.end();
+    // Venster dicht: stop, tenzij binnen 2,5s een nieuwe heartbeat komt (bij herladen).
+    if (APP_MODE && !pendingExit) pendingExit = setTimeout(() => process.exit(0), 2500);
+    return;
+  }
+
   if (url.pathname === '/api/refresh' && req.method === 'POST') {
     // Schrijf een trigger-bestand; de plugin pollt hierop en start een dump.
     try {
@@ -103,7 +129,37 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(full).pipe(res);
 });
 
+const URL_LOCAL = `http://localhost:${PORT}`;
+
+// Open de app in een chromeless Edge-venster (app-modus); anders in de standaardbrowser.
+function openApp() {
+  const edge = [
+    path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+    path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+  ].find(p => { try { return fs.existsSync(p); } catch { return false; } });
+  try {
+    if (edge) {
+      const profile = path.join(DATA_DIR, 'window');
+      spawn(edge, [`--app=${URL_LOCAL}`, `--user-data-dir=${profile}`, '--window-size=1440,900', '--no-first-run'],
+        { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      spawn('cmd', ['/c', 'start', '""', URL_LOCAL], { detached: true, stdio: 'ignore' }).unref();
+    }
+  } catch { /* browser openen mislukt: gebruiker kan handmatig naar de URL */ }
+}
+
+server.on('error', err => {
+  if (err.code === 'EADDRINUSE') {
+    // Al een instantie actief: gewoon het venster (opnieuw) openen en afsluiten.
+    if (APP_MODE) openApp();
+    else console.error(`Poort ${PORT} is al in gebruik; open ${URL_LOCAL}`);
+    process.exit(0);
+  }
+  throw err;
+});
+
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`FMSuperScout draait op http://localhost:${PORT}`);
+  console.log(`FMSuperScout draait op ${URL_LOCAL}`);
   console.log(`Data-map: ${DATA_DIR}`);
+  if (APP_MODE) openApp();
 });
