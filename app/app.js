@@ -39,8 +39,8 @@ const I18N = {
     pressure: 'Druk', sportsmanship: 'Sportiviteit', temperament: 'Temperament', controversy: 'Controverse', determination: 'Vastberadenheid',
     personaTitle: 'Persoonlijkheid',
     showPot: 'Toon geschatte potentie', potNote: 'geschatte waarden op potentieel (PA)',
-    clubless: 'clubloos', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd — FM haalt de data op…',
-    dumping: '⏳ FM is de database aan het ophalen…', dumpReady: '✓ Nieuwe data klaar — klik om te laden',
+    clubless: 'clubloos', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd, FM haalt de data op…',
+    dumping: '⏳ FM haalt de database op…', dumpReady: '✓ Nieuwe data klaar, klik om te laden',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
@@ -48,7 +48,7 @@ const I18N = {
     clearAll: 'alles wissen', chipSearch: 'Zoek',
     loading: '⏳ Data laden…',
     step1: 'Start <b>FM26</b> en laad je save',
-    step2: 'Druk in de game op <kbd>F9</kbd> — of klik hier op <b>⬇ Nieuwe data</b>',
+    step2: 'Druk in de game op <kbd>F9</kbd>, of klik hier op <b>⬇ Nieuwe data</b>',
     step3: 'Klik op de groene balk zodra de dump klaar is',
     playersWord: 'spelers', staffWord: 'staf', clickClubFilter: 'Klik = filter op jouw club', repWord: 'reputatie',
   },
@@ -71,8 +71,8 @@ const I18N = {
     pressure: 'Pressure', sportsmanship: 'Sportsmanship', temperament: 'Temperament', controversy: 'Controversy', determination: 'Determination',
     personaTitle: 'Personality',
     showPot: 'Show estimated potential', potNote: 'estimated values at potential (PA)',
-    clubless: 'free agent', copied: 'Copied', reqSent: '⏳ Request sent — FM is fetching the data…',
-    dumping: '⏳ FM is dumping the database…', dumpReady: '✓ New data ready — click to load',
+    clubless: 'free agent', copied: 'Copied', reqSent: '⏳ Request sent, FM is fetching the data…',
+    dumping: '⏳ FM is fetching the database…', dumpReady: '✓ New data ready, click to load',
     tag_free: 'free', tag_listed: 'listed', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
@@ -80,7 +80,7 @@ const I18N = {
     clearAll: 'clear all', chipSearch: 'Search',
     loading: '⏳ Loading data…',
     step1: 'Start <b>FM26</b> and load your save',
-    step2: 'Press <kbd>F9</kbd> in-game — or click <b>⬇ New data</b> here',
+    step2: 'Press <kbd>F9</kbd> in-game, or click <b>⬇ New data</b> here',
     step3: 'Click the green bar when the dump is ready',
     playersWord: 'players', staffWord: 'staff', clickClubFilter: 'Click = filter on your club', repWord: 'reputation',
   },
@@ -161,12 +161,8 @@ function gameNow() {
 
 // ---------- kolommen ----------
 const qClass = v => v == null ? '' : v >= 150 ? 'q5' : v >= 120 ? 'q4' : v >= 90 ? 'q3' : v >= 60 ? 'q2' : 'q1';
-const qHtml = v => {
-  if (v == null) return '–';
-  const q = qClass(v), pct = Math.min(100, v / 2);
-  return `<span class="qcell"><span class="qnum ${q}">${v}</span><span class="qtrack"><span class="qfill ${q.replace('q', 'qb')}" style="width:${pct}%"></span></span></span>`;
-};
-// contract-cel: amber als het contract (bijna) afloopt — scouting-signaal
+const qHtml = v => v == null ? '<span class="dim">·</span>' : `<span class="${qClass(v)}">${v}</span>`;
+// contract-cel: amber als het contract bijna afloopt, als scouting-signaal
 function expiresHtml(p) {
   const m = monthsUntil(p.expires);
   if (m == null) return { cls: 'dim', txt: '–' };
@@ -349,12 +345,11 @@ async function loadDump() {
   } catch (e) { $('dump-info').textContent = 'fout'; console.error(e); }
 }
 function renderDumpInfo() {
-  if (!state.dumpStamp) return;
+  if (!state.dumpStamp) { $('dump-info').textContent = ''; return; }
   const when = new Date(state.dumpStamp);
-  const sameDay = when.toDateString() === new Date().toDateString();
-  const whenTxt = sameDay ? when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : when.toLocaleDateString();
-  $('dump-info').innerHTML = `<b>${state.players.length.toLocaleString()}</b> ${t('playersWord')} · <b>${state.staff.length.toLocaleString()}</b> ${t('staffWord')} · ${whenTxt}`;
-  $('dump-info').title = when.toLocaleString();
+  const n = state.players.length.toLocaleString();
+  $('dump-info').textContent = n;
+  $('dump-info').title = `${state.players.length.toLocaleString()} ${t('playersWord')} · ${state.staff.length.toLocaleString()} ${t('staffWord')}\n${when.toLocaleString()}`;
 }
 function renderClubBadge() {
   const mgr = state.meta.manager, club = state.meta.myClub, rep = state.meta.myClubRep;
@@ -540,7 +535,7 @@ function renderTable() {
   const cols = activeCols();
   $('grid-head').innerHTML = cols.map(c => {
     const stick = c.star ? 'c-sticky' : c.name ? 'c-sticky stick-end' : '';
-    return `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}" class="${stick} ${c.key === state.sortKey ? 'sorted' : ''}" title="${c.star ? '' : t('colHint')}">${colLabel(c)}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`;
+    return `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}" class="${stick} ${c.key === state.sortKey ? 'sorted' : ''}">${colLabel(c)}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`;
   }).join('');
   $('grid-head').querySelectorAll('th').forEach(th => {
     const k = th.dataset.key;

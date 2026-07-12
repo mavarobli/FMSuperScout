@@ -66,8 +66,8 @@ body {
 #club-badge { color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; padding: 3px 6px; border-radius: 5px; }
 #club-badge:hover { background: var(--bg3); }
 #club-badge b { color: var(--accent); }
-#dump-info { margin-left: auto; color: var(--muted); font-size: 12px; text-align: right; }
-#dump-info b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+#dump-info { margin-left: auto; color: #5c6b7d; font-size: 11px; font-variant-numeric: tabular-nums; cursor: default; padding-right: 2px; }
+#dump-info::before { content: '▦'; margin-right: 4px; opacity: .7; }
 #btn-fetch, #btn-reload, #btn-settings {
   border: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600;
 }
@@ -92,12 +92,6 @@ body {
 .search-ico { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); pointer-events: none; }
 .search-wrap input { width: 100%; padding-left: 31px !important; }
 .search-wrap input:focus + .search-ico, .search-wrap input:focus ~ .search-ico { color: var(--accent2); }
-.search-key {
-  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-  font-size: 10.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
-  padding: 0 5px; line-height: 15px; pointer-events: none;
-}
-.search-wrap input:focus ~ .search-key, .search-wrap input:not(:placeholder-shown) ~ .search-key { display: none; }
 
 /* ---------- statusbanner ---------- */
 #banner { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; }
@@ -238,13 +232,6 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 /* CA/PA kwaliteitskleuren (snel scannen) */
 .q1 { color: #7f8ea0; } .q2 { color: #b9c6d4; } .q3 { color: #e8d17a; }
 .q4 { color: #7ddc9e; } .q5 { color: #35d67a; font-weight: 700; }
-/* CA/PA-cel: getal + mini-balk (schaal 0–200) */
-.qcell { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; line-height: 1; vertical-align: middle; }
-.qcell .qnum { font-weight: 600; font-variant-numeric: tabular-nums; }
-.qtrack { width: 34px; height: 3px; border-radius: 2px; background: #232d3a; overflow: hidden; }
-.qfill { display: block; height: 100%; border-radius: 2px; }
-.qb1 { background: #7f8ea0; } .qb2 { background: #b9c6d4; } .qb3 { background: #e8d17a; }
-.qb4 { background: #7ddc9e; } .qb5 { background: #35d67a; }
 /* contract loopt (bijna) af */
 td.exp-soon { color: var(--warn); }
 td.exp-year { color: #d8c88a; }
