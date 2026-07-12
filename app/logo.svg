@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FMSuperScout">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3fbf74"/>
+      <stop offset="1" stop-color="#2c9b56"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#g)"/>
+  <!-- speelveldlijnen, subtiel -->
+  <g stroke="#ffffff" stroke-opacity="0.16" stroke-width="1.4" fill="none">
+    <line x1="10" y1="32" x2="54" y2="32"/>
+    <circle cx="32" cy="32" r="9"/>
+  </g>
+  <!-- vergrootglas -->
+  <circle cx="28" cy="27" r="12.5" fill="none" stroke="#ffffff" stroke-width="4.4"/>
+  <circle cx="28" cy="27" r="5.2" fill="#ffffff" fill-opacity="0.92"/>
+  <rect x="37.5" y="36.5" width="15.5" height="6.2" rx="3.1" transform="rotate(45 37.5 36.5)" fill="#ffffff"/>
+</svg>
