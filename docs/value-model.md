@@ -11,8 +11,8 @@ dump-opgeslagen waarden (mid-range) plus bekende sterren waarvan de waarde uit i
 screenshots is afgelezen (top-range, €→£ via 1,16). Zo dekt de ijking het hele bereik.
 Voorspellers: **verzadigde CA + wereldreputatie (faam) + clubreputatie + ln(contractmaanden)**.
 
-Belangrijk inzicht uit de screenshots: aan de top **verzadigt** de waarde sterk — tussen CA 165
-en 196 beweegt de waarde nauwelijks (£160–240M), want daar telt reputatie/faam, niet CA. Een
+Belangrijk inzicht uit de screenshots: aan de top **verzadigt** de waarde sterk. Tussen CA 165
+en 196 beweegt de waarde nauwelijks (£160-240M), want daar telt reputatie/faam, niet CA. Een
 pure CA-exponentiaal explodeerde daardoor (CA 196 → miljarden); vandaar de verzadigingsknik en
 `worldRep` als aparte term.
 
@@ -26,7 +26,7 @@ pure CA-exponentiaal explodeerde daardoor (CA 196 → miljarden); vandaar de ver
 | Contractduur | waarde ∝ √maanden; (bijna) transfervrij: extra ×0.7 |
 | Leeftijd | >29 aflopende korting; ≤23 krijgt deel van de PA-koppenruimte als extra "ability" |
 
-Sanity-check top (gekalibreerd): Haaland ~£350M, Mbappé ~£228M, Pedri ~£212M — orde van grootte
+Sanity-check top (gekalibreerd): Haaland ~£350M, Mbappé ~£228M, Pedri ~£212M, orde van grootte
 klopt (echte waarden £236M/£185M/£187M). Spelers met een échte opgeslagen waarde tonen die direct.
 
 **Tieners zijn een uitzondering.** Hun waarde hangt in FM af van potentie én hype/reputatie die we

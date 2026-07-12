@@ -46,7 +46,7 @@ conclusie te trekken:
   elk bestand totaal verschillend; slechts 15% van de dataregio komt overeen en dat is enkel
   de framing/lengte-kop. Identieke input → verschillende output = versleuteling, geen compressie.
 
-**Gevolg: een geldige `.fmf` schrijven is niet haalbaar.** Meer samples helpen niet meer —
+**Gevolg: een geldige `.fmf` schrijven is niet haalbaar.** Meer samples helpen niet meer,
 de sleutel zit in `GameAssembly.dll` en is niet uit ciphertext af te leiden. De enige echte
 route zou zijn: de encryptie-routine + sleutel uit de game-binary halen (grote, aparte RE-klus,
 niet te verifiëren zonder de game), of SI's eigen Resource Archiver aanroepen.
