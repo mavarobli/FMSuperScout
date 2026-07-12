@@ -46,6 +46,7 @@ const I18N = {
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
     staffAttrs: 'Staf-attributen',
+    clearAll: 'alles wissen', chipSearch: 'Zoek',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -73,6 +74,7 @@ const I18N = {
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
     staffAttrs: 'Staff attributes',
+    clearAll: 'clear all', chipSearch: 'Search',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
@@ -407,8 +409,53 @@ function applyFilters() {
     return true;
   });
   sortRows();
-  $('result-count').textContent = state.filtered.length.toLocaleString() + ' ' + t('results');
+  renderChips(buildChips());
   renderTable();
+}
+
+// ---------- actieve filters als chips boven de tabel ----------
+const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function buildChips() {
+  const chips = [];
+  const add = (label, clear) => chips.push({ label, clear });
+  const clearInput = id => () => { $(id).value = ''; };
+  const uncheck = id => () => { $(id).checked = false; };
+  const range = (minId, maxId, label) => {
+    const lo = $(minId).value, hi = $(maxId).value;
+    if (lo || hi) add(`${label} ${lo || '…'}–${hi || '…'}`, () => { $(minId).value = ''; $(maxId).value = ''; });
+  };
+  const v = id => $(id).value.trim();
+
+  if (v('f-name')) add(`${t('chipSearch')}: "${v('f-name')}"`, clearInput('f-name'));
+  if (activePos.size) add(`${t('position')}: ${[...activePos].join(', ')}`,
+    () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); });
+  if (state.mode === 'staff' && $('f-staffrole').value) add($('f-staffrole').value, () => { $('f-staffrole').value = ''; });
+  range('f-age-min', 'f-age-max', t('age'));
+  range('f-ca-min', 'f-ca-max', 'CA');
+  range('f-pa-min', 'f-pa-max', 'PA');
+  if (v('f-price')) add(`${t('maxvalue')} ${v('f-price')}`, clearInput('f-price'));
+  if (v('f-wage')) add(`${t('maxwage')} ${v('f-wage')}`, clearInput('f-wage'));
+  if (v('f-nat')) add(`${t('nat')}: ${v('f-nat')}`, clearInput('f-nat'));
+  if ($('f-eu').checked) add(t('euonly'), uncheck('f-eu'));
+  if (+$('f-interest').value > 0) add(`${t('interestmin')} ${$('f-interest').selectedOptions[0].textContent}`, () => { $('f-interest').value = '0'; });
+  if ($('f-attain').checked) add(t('attainable'), uncheck('f-attain'));
+  if ($('f-listed').checked) add(t('listed'), uncheck('f-listed'));
+  if ($('f-exp6').checked) add(t('exp6'), uncheck('f-exp6'));
+  if ($('f-exp12').checked) add(t('exp12'), uncheck('f-exp12'));
+  if ($('f-free').checked) add(t('free'), uncheck('f-free'));
+  if ($('f-myclub').checked) add(t('myclub'), uncheck('f-myclub'));
+  if ($('f-shortlist').checked && state.mode !== 'shortlist') add(t('onlyshortlist'), uncheck('f-shortlist'));
+  return chips;
+}
+function renderChips(chips) {
+  const bar = $('chipbar');
+  const n = state.filtered.length.toLocaleString();
+  bar.innerHTML = `<span class="chip-count"><b>${n}</b> ${t('results')}</span>` +
+    chips.map((c, i) => `<button class="chip" data-i="${i}" title="${t('clear')}">${escHtml(c.label)}<span class="x">✕</span></button>`).join('') +
+    (chips.length > 1 ? `<button class="chip-clear">${t('clearAll')}</button>` : '');
+  bar.querySelectorAll('.chip').forEach(el => el.onclick = () => { chips[+el.dataset.i].clear(); applyFilters(); });
+  const ca = bar.querySelector('.chip-clear');
+  if (ca) ca.onclick = () => $('btn-clear').onclick();
 }
 // ---------- kolomconfiguratie (volgorde + verbergen, per modus) ----------
 const modeKey = () => state.mode === 'staff' ? 'staff' : 'players';
