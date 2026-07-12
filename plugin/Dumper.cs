@@ -34,6 +34,8 @@ internal static class Dumper
 
     // 0xFFFFFFFF is FM's "niet ingesteld"-sentinel → onbekend (-1). Anders de waarde.
     private static long Money(uint v) => v == 0xFFFFFFFF ? -1 : v;
+    // Marktwaarde-veld (pl+0x234): naast 0xFFFFFFFF gebruikt FM 300.000.000 als "niet vastgelegd".
+    private static long MoneyVal(uint v) => (v == 0xFFFFFFFF || v == 300_000_000u) ? -1 : v;
     // JSON: negatief (onbekend) → null, anders getal.
     private static void Money(JsonWriter j, string key, long v) { if (v < 0) j.Null4(key); else j.Prop(key, v); }
 
@@ -256,9 +258,10 @@ internal static class Dumper
         if (e.PosArr.Count == 0 && pos.Count > 0)
             e.PosArr = pos.OrderByDescending(x => x.v).Take(1).Select(x => x.k).ToList();
 
-        // waarde & contract
-        e.Value = Money(m.U32(pl + Fields.PLAO_TRANSFER_VALUE));
-        e.GuideValue = Money(m.U32(pl + Fields.PLAO_GUIDE_VALUE));
+        // Marktwaarde: 0x234 is FM's echte transferwaarde (geverifieerd via offset-discovery
+        // tegen in-game bedragen); 0x238 is de vraagprijs (meestal niet ingesteld).
+        e.Value = MoneyVal(m.U32(pl + Fields.PLAO_GUIDE_VALUE));   // 0x234
+        e.GuideValue = Money(m.U32(pl + Fields.PLAO_TRANSFER_VALUE)); // 0x238 (vraagprijs)
         ulong con = m.Ptr(person + Fields.PERO_FULL_CONTRACT);
         if (con != 0)
         {
