@@ -196,6 +196,11 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
   cursor: pointer; user-select: none; white-space: nowrap; z-index: 2;
 }
 #grid th:hover { color: var(--text); }
+/* kolombreedte-sleepgreep */
+.col-resize { position: absolute; top: 0; right: 0; width: 7px; height: 100%; cursor: col-resize; z-index: 4; }
+.col-resize:hover { background: var(--accent2); opacity: .5; }
+#grid th { overflow: hidden; text-overflow: ellipsis; }
+#grid td { text-overflow: ellipsis; }
 #grid th.sorted { color: var(--accent); }
 #grid th.dragging { opacity: .45; }
 #grid th.drop-target { box-shadow: inset 3px 0 0 var(--accent); color: var(--accent); }

@@ -18,6 +18,7 @@ const state = {
   refDoy: 183,
   shortlist: new Set(JSON.parse(localStorage.getItem('fmss_shortlist') || '[]')),
   colCfg: JSON.parse(localStorage.getItem('fmss_cols') || '{}'),  // per modus: {order:[], hidden:[]}
+  colW: JSON.parse(localStorage.getItem('fmss_colw') || '{}'),    // per modus: {kolomkey: breedte px}
 };
 const GBP_TO_EUR = 1.16;
 
@@ -26,7 +27,7 @@ const I18N = {
   nl: {
     players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: 'Zoek naam of club',
     settings: 'Instellingen', langLabel: 'Taal', curLabel: 'Valuta',
-    hideCapa: 'CA/PA verbergen', hideCapaNote: 'Verbergt current/potential ability, voor wie dat als spieken ziet.',
+    hideCapa: 'CA/PA verbergen',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', refyear: 'Peiljaar', financial: 'Financieel', maxvalue: 'Max. waarde', maxwage: 'Max. loon p/w',
     origin: 'Herkomst', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
@@ -44,7 +45,7 @@ const I18N = {
     pressure: 'Druk', sportsmanship: 'Sportiviteit', temperament: 'Temperament', controversy: 'Controverse', determination: 'Vastberadenheid',
     personaTitle: 'Persoonlijkheid',
     showPot: 'Toon geschatte potentie', potNote: 'geschatte waarden op potentieel (PA)',
-    clubless: 'clubloos', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd, FM haalt de data op…',
+    clubless: 'clubloos', clubUnknown: 'onbekende club', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd, FM haalt de data op…',
     dumping: '⏳ FM haalt de database op…', dumpReady: '✓ Nieuwe data klaar, klik om te laden',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
@@ -78,7 +79,7 @@ const I18N = {
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
     settings: 'Settings', langLabel: 'Language', curLabel: 'Currency',
-    hideCapa: 'Hide CA/PA', hideCapaNote: 'Hides current/potential ability, for those who consider it cheating.',
+    hideCapa: 'Hide CA/PA',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', refyear: 'Game year', financial: 'Financial', maxvalue: 'Max. value', maxwage: 'Max. wage p/w',
     origin: 'Origin', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
@@ -96,7 +97,7 @@ const I18N = {
     pressure: 'Pressure', sportsmanship: 'Sportsmanship', temperament: 'Temperament', controversy: 'Controversy', determination: 'Determination',
     personaTitle: 'Personality',
     showPot: 'Show estimated potential', potNote: 'estimated values at potential (PA)',
-    clubless: 'free agent', copied: 'Copied', reqSent: '⏳ Request sent, FM is fetching the data…',
+    clubless: 'free agent', clubUnknown: 'unknown club', copied: 'Copied', reqSent: '⏳ Request sent, FM is fetching the data…',
     dumping: '⏳ FM is fetching the database…', dumpReady: '✓ New data ready, click to load',
     tag_free: 'free', tag_listed: 'listed', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
@@ -220,7 +221,7 @@ const PLAYER_COLS = [
   { key: 'name', label: 'c_name', get: p => p.name, name: true },
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p) },
   { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => p.pos || '<span class="dim">–</span>' },
-  { key: 'club', label: 'c_club', get: p => p.club, dimNull: true },
+  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p) },
   { key: 'nat', label: 'c_nat', get: p => (p.nat || []).join(', ') },
   { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? '<span class="eu-yes">✓</span>' : '<span class="dim">–</span>' },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
@@ -236,7 +237,7 @@ const STAFF_COLS = [
   { key: 'name', label: 'c_name', get: p => p.name, name: true },
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p) },
   { key: 'job', label: 'c_role', get: p => p.job || '–' },
-  { key: 'club', label: 'c_club', get: p => p.club, dimNull: true },
+  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p) },
   { key: 'nat', label: 'c_nat', get: p => (p.nat || []).join(', ') },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
@@ -245,28 +246,44 @@ const STAFF_COLS = [
 ];
 
 // ---------- geschatte marktwaarde (GBP) ----------
-// Log-lineair model, gekalibreerd op de spelers in de dump met een échte FM-waarde
-// (28 ijkpunten; mediane fout ~29%). Kernbevindingen: waarde verdubbelt elke ~7 CA-punten,
-// daalt licht per jaar leeftijd, stijgt met clubreputatie en met resterende contractduur
-// (∝ √maanden). Boven CA 150 vlakt de CA-curve af zodat de top niet naar miljarden explodeert.
-const VAL_B = { c0: 0.7724, ca: 0.1025, age: -0.0252, cRep: 0.0720, lnC: 0.4969 };
-function caSaturated(ca) { return Math.min(ca, 150) + 0.20 * Math.max(0, ca - 150); }
+// Log-lineair model, gekalibreerd op 43 spelers met een échte FM-waarde (dump-opgeslagen +
+// bekende sterren uit in-game screenshots). Mediane fout ~24% op volwassen spelers, 86% binnen 50%.
+// Kern: verzadigende CA (boven 150 vlakt af, zodat de top niet explodeert) + wereldreputatie
+// (faam) + clubreputatie + resterende contractduur (∝ √maanden). Jonge spelers krijgen een deel
+// van hun PA-koppenruimte als extra "ability". Leeftijd >29 geeft een aflopende korting.
+// Let op: waarde van tieners is in FM zeer grillig; behandel die als grove indicatie.
+const VAL_B = { c0: -1.1725, ca: 0.1065, wRep: 0.0875, cRep: 0.1289, lnC: 0.4878, HI: 0.15 };
+function caSaturated(ca) { return Math.min(ca, 150) + VAL_B.HI * Math.max(0, ca - 150); }
+// Écht clubloos = geen club én geen clubreputatie. (Club met wél rep maar zonder naam is een
+// niet-opgeloste clubverwijzing, geen transfervrije speler — zie clubLabel.)
+const isFree = p => !p.club && !(p.clubRep > 0);
+// Clublabel: naam, of "onbekende club" als de plugin wél een clubreputatie vond maar de naam
+// niet kon uitlezen (bekende beperking), of "clubloos" bij een echte transfervrije speler.
+function clubLabel(p) {
+  if (p.club) return escHtml(p.club);
+  if (p.clubRep > 0) return `<span class="dim" title="Club niet uitgelezen (rep ${p.clubRep})">${t('clubUnknown')}</span>`;
+  return `<span class="dim">${t('clubless')}</span>`;
+}
 function estValue(p) {
   if (p.value != null && p.value > 0) return { v: p.value, est: false, lo: Math.round(p.value * 0.85), hi: Math.round(p.value * 1.15) };
   if (!p.ca || p.ca < 1) return { v: null, est: false };
-  if (!p.club) return { v: 0, est: true };
+  if (isFree(p)) return { v: 0, est: true };
   const a = getAge(p) || 25;
   const m = monthsUntil(p.expires);
+  const head = Math.max(0, (p.pa || p.ca) - p.ca);
+  const lift = a <= 20 ? 0.4 : a <= 23 ? 0.2 : 0;         // jonge spelers: deel van de potentie telt mee
+  const ability = p.ca + lift * Math.min(head, 45);
   let ln = VAL_B.c0
-    + VAL_B.ca * caSaturated(p.ca)
-    + VAL_B.age * a
+    + VAL_B.ca * caSaturated(ability)
+    + VAL_B.wRep * ((p.worldRep || 3000) / 1000)
     + VAL_B.cRep * ((p.clubRep || 4000) / 1000)
     + VAL_B.lnC * Math.log(Math.max(2, m == null ? 36 : m));
-  if (a > 31) ln -= 0.13 * (a - 31);                 // steilere daling op leeftijd (buiten de ijkrange)
   let v = Math.exp(ln);
-  if (m != null && m <= 4) v *= 0.7;                 // (bijna) transfervrij: extra korting
+  if (a > 29) v *= Math.exp(-0.08 * (a - 29));           // aflopende leeftijd
+  if (m != null && m <= 4) v *= 0.7;                     // (bijna) transfervrij
   v = v >= 1e6 ? Math.round(v / 1e5) * 1e5 : Math.round(v / 1e4) * 1e4;
-  return { v, est: true, lo: Math.round(v * 0.7), hi: Math.round(v * 1.3) };
+  const band = a <= 20 ? 0.55 : 0.32;                    // tieners: bredere bandbreedte (grilliger)
+  return { v, est: true, lo: Math.round(v * (1 - band)), hi: Math.round(v * (1 + band)) };
 }
 function estHtml(p) {
   const e = estValue(p);
@@ -349,7 +366,6 @@ function statusHtml(p) {
   if (p.notForSale) h += `<span class="tag nfs">${t('tag_nfs')}</span>`;
   return h || '<span class="dim">–</span>';
 }
-const isFree = p => !p.club;
 // Positievolgorde zoals in FM: van doel naar aanval (GK ... ST), niet alfabetisch.
 const POS_ORDER = ['GK', 'DL', 'DC', 'DR', 'WBL', 'WBR', 'DM', 'ML', 'MC', 'MR', 'AML', 'AMC', 'AMR', 'ST'];
 const POS_RANK = Object.fromEntries(POS_ORDER.map((p, i) => [p, i]));
@@ -727,14 +743,32 @@ function measureRowH() {
   return false;
 }
 function colLabel(c) { return c.star ? '★' : (c.label.startsWith('c_') || I18N.nl[c.label] ? t(c.label) : c.label); }
+function colWidths() { return state.colW[modeKey()] || (state.colW[modeKey()] = {}); }
+function saveColW() { localStorage.setItem('fmss_colw', JSON.stringify(state.colW)); }
 function renderTable() {
   const cols = activeCols();
+  const W = colWidths();
   $('grid-head').innerHTML = cols.map(c => {
     const stick = c.star ? 'c-sticky' : c.name ? 'c-sticky stick-end' : '';
-    return `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}" class="${stick} ${c.key === state.sortKey ? 'sorted' : ''}">${colLabel(c)}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`;
+    const w = W[c.key] ? ` style="width:${W[c.key]}px"` : '';
+    const grip = c.star ? '' : '<span class="col-resize"></span>';   // sleepgreep rechts
+    return `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}"${w} class="${stick} ${c.key === state.sortKey ? 'sorted' : ''}">${colLabel(c)}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}${grip}</th>`;
   }).join('');
   $('grid-head').querySelectorAll('th').forEach(th => {
     const k = th.dataset.key;
+    // kolombreedte slepen via de greep rechts
+    const grip = th.querySelector('.col-resize');
+    if (grip) {
+      grip.addEventListener('mousedown', e => {
+        e.preventDefault(); e.stopPropagation();
+        const startX = e.clientX, startW = th.getBoundingClientRect().width;
+        th.draggable = false;
+        const move = ev => { const nw = Math.max(40, Math.round(startW + ev.clientX - startX)); th.style.width = nw + 'px'; colWidths()[k] = nw; };
+        const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); th.draggable = true; saveColW(); renderVisible(); };
+        document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+      });
+      grip.ondragstart = e => { e.preventDefault(); e.stopPropagation(); };
+    }
     const col = cols.find(c => c.key === k);
     th.onclick = () => {
       if (col?.star) return;
@@ -932,7 +966,7 @@ function showDetail(p) {
   let html = `<h2>${p.name} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span>
     <button class="copybtn" title="Kopieer naam">📋</button>
     <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">⚖</button></h2>
-  <div class="sub">${getAge(p)} · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${p.club || t('clubless')}</div>
+  <div class="sub">${getAge(p)} · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}</div>
   ${gauge}
   <div class="kv">
     ${isPlayer ? `<div><b>${t('c_pos')}</b> ${p.pos || '–'}</div><div><b>${t('foot')}</b> ${p.foot || '–'}</div>` : `<div><b>${t('c_role')}</b> ${p.job || '–'}</div>`}
