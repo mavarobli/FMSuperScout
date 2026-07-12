@@ -2,7 +2,7 @@
 
 Status-overzicht van wat af is, wat open staat, en ideeën. Nog niet gebouwd waar "backlog" staat.
 
-## 1. Volledige standalone installer (.exe) — BACKLOG, onderzocht
+## 1. Volledige standalone installer (.exe) — UITGESTELD tot na goed doortesten
 
 Doel: één `.exe` die je op Reddit deelt; gebruiker dubbelklikt, alles wordt geïnstalleerd
 (viewer + plugin + BepInEx), en het draait als een echt Windows-programma. Nu is het een zip
@@ -28,46 +28,41 @@ met alleen de viewer; de plugin en BepInEx ontbreken, dus een downloader ziet ee
 **Belangrijk:** de plugin-installatie kan hier niet end-to-end getest worden (geen draaiende FM);
 mavarobli moet de eindstroom op zijn eigen game natrekken vóór brede verspreiding.
 
-## 2. In-app data ophalen met FM-detectie — BACKLOG
+## 2. In-app data ophalen met FM-detectie — GEDAAN
 
-- Server-endpoint `/api/fmstatus` dat via `tasklist` checkt of `fm.exe` draait.
-- Knop "Nieuwe data": eerst `fmstatus` checken. Draait FM niet → nette foutmelding
-  ("Start Football Manager 26 eerst") i.p.v. eindeloos wachten. Draait FM wél → `request.flag`
-  schrijven (bestaat al) zodat de plugin de dump start; poll tot de nieuwe dump binnen is.
-- Klein en zonder plugin-wijziging te bouwen.
+Server-endpoint `/api/fmstatus` checkt via `tasklist` of `fm.exe` draait. Knop "Nieuwe data"
+checkt dit eerst: draait FM niet → rode banner "Start Football Manager 26 eerst" i.p.v. eindeloos
+wachten; draait FM wél → `request.flag` schrijven zodat de plugin de dump start. Getest tegen de
+echte draaiende game (correcte detectie).
 
-## 3. Data-nauwkeurigheid (vereist plugin-uitbreiding) — BACKLOG
+## 3. Data-nauwkeurigheid (plugin) — deels gedaan
 
-Deze drie zitten in de plugin (geheugen-offsets), niet in de web-app, en vereisen Marks
-F9-testloop met `diagnostics.txt`:
-- **Persoonlijkheid uitlezen** (Ambitie, Professionaliteit, Loyaliteit): staan nu op 0 in de dump.
-  Dit zijn FM's **dominante interesse-factoren**; zonder deze blijft interesse voor (jonge) spelers
-  ruw. Grootste hefboom voor betere interesse. Zie analyse hieronder.
-- **Clubnaam-offset**: sommige clubs geven wel een clubreputatie maar geen naam ("onbekende club",
-  bv. Filip Wisłocki / Lech). Indirecte-string-offset nog niet gepind.
-- **Divisie/competitie-offset**: `div` is overal leeg → echte competitie-/divisiefilter kan pas
-  als dit is uitgelezen. Filter staat klaar en verschijnt automatisch zodra data aanwezig is.
+- **Persoonlijkheid uitlezen: GEDAAN** — de plugin vult nu Ambitie/Loyaliteit/Professionaliteit
+  e.a. (100% in de huidige dump). Meegenomen in het interesse-model (punt 4).
+- **Clubnaam-offset — OPEN**: sommige clubs geven wel clubreputatie maar geen naam
+  ("onbekende club", bv. Filip Wisłocki / Lech). Indirecte-string-offset nog niet gepind.
+  Vereist Marks F9-testloop met `diagnostics.txt`.
+- **Divisie/competitie-offset — OPEN**: `div` is overal leeg → echte divisiefilter kan pas als dit
+  is uitgelezen. Filter staat klaar en verschijnt automatisch zodra data aanwezig is.
 
-## 4. Interesse-model — verbeterpunt
+## 4. Interesse-model — GEDAAN (persoonlijkheid meegenomen)
 
-Getest tegen echte data (18 tieners, 3 wilden naar Feyenoord): **13/17 goed**. De 4 missers zijn
-allemaal **gehypte EU-tieners bij sterke clubs** (Flippot/Rennes, Zanardo/Bologna, Joksić/Partizan,
-Lindqvist/Kopenhagen): reputatie zegt "ja", maar in werkelijkheid willen ze een goede club niet uit.
-De Art.19-regel (non-EU <18) klopte 100%.
-- **Snelle heuristiek** (zonder plugin): demp interesse voor jonge spelers bij clubs met hoge
-  reputatie (een 16-jarige bij een top-club vertrekt zelden voor een laterale stap).
-- **Echte fix**: persoonlijkheid uit de plugin (punt 3).
+Herbouwd met de nu-beschikbare persoonlijkheid: ambitie stuwt naar een stap omhoog en remt
+zijwaarts/omlaag, loyaliteit remt, jonge spelers verhuizen minder makkelijk (leeftijdsdemping),
+en voor jonge spelers weegt de clubkloof zwaarder dan de statuskloof. Art.19 (non-EU <18) blijft.
+Getest tegen echte data (wie wil wel/niet naar Feyenoord): van "iedereen wil komen" naar
+**~13-15/17 goed**; de bekende valse positieven zijn weg. Restfouten zijn grensgevallen (48-49,
+label "Redelijk") die op de data niet te onderscheiden zijn van de echte gevallen — niet verder
+overfitten. Verdere winst zou een FM-"interesse"-veld vergen als dat ergens is uit te lezen.
 
-## 5. Marktwaarde — grotendeels af, klein verbeterpunt
+## 5. Marktwaarde — geijkt, verdere winst vereist meer data
 
-Geijkt op 43 echte waarden (~24% mediaan op volwassenen). Tienerwaarde blijft grillig. Meer
-ijkpunten uit **andere competities** en **echte tienerwaarden** zouden de randen aanscherpen.
+Geijkt op 43 echte waarden (~24% in-sample; ~44% out-of-sample op een later seizoen). Herijken op
+alleen de ~30 punten van één dump geeft instabiele/foutgetekende coëfficiënten (overfitting), dus
+het robuuste model blijft staan. Echte verbetering vereist **meer ijkpunten uit verschillende
+competities/seizoenen** (mavarobli kan die uit FM aanleveren). Tienerwaarde blijft intrinsiek grillig.
 
-## 6. `.fmf`-shortlistexport — GEBLOKKEERD
-
-Payloads versleuteld met per-bestand nonce; niet reproduceerbaar. Zie `docs/fmf-format.md`.
-
-## 7. UX-ideeën (nice-to-have)
+## 6. UX-ideeën (nice-to-have)
 - Filteren op losse attributen / attribuut-drempels (bv. "Pace ≥ 15").
 - Opgeslagen filter-presets ("mijn wonderkid-zoekopdracht").
 - Snelknoppen: wonderkids, aflopende contracten, vrije spelers.

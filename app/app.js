@@ -50,6 +50,7 @@ const I18N = {
     showPot: 'Toon geschatte potentie', potNote: 'geschatte waarden op potentieel (PA)',
     clubless: 'clubloos', clubUnknown: 'onbekende club', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd, FM haalt de data op…',
     dumping: '⏳ FM haalt de database op…', dumpReady: '✓ Nieuwe data klaar, klik om te laden',
+    fmNotRunning: '⚠ Start eerst Football Manager 26 en laad je save.',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
@@ -105,6 +106,7 @@ const I18N = {
     showPot: 'Show estimated potential', potNote: 'estimated values at potential (PA)',
     clubless: 'free agent', clubUnknown: 'unknown club', copied: 'Copied', reqSent: '⏳ Request sent, FM is fetching the data…',
     dumping: '⏳ FM is fetching the database…', dumpReady: '✓ New data ready, click to load',
+    fmNotRunning: '⚠ Start Football Manager 26 and load your save first.',
     tag_free: 'free', tag_listed: 'listed', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
@@ -317,10 +319,14 @@ function interestEstimate(p) {
   if (!myRep) return null;
   if (p.club && (p.club || '').toLowerCase() === (state.meta.myClub || '').toLowerCase()) return null; // eigen speler
 
-  // Reputatie: mijn club versus (a) huidige club en (b) de persoonlijke status van de speler.
+  // Reputatie: mijn club vs (a) huidige club en (b) de persoonlijke status van de speler.
+  // Bij jonge spelers weegt de clubkloof zwaarder: hun lage wereldreputatie is vooral leeftijd,
+  // geen "klein spelertje", dus statuskloof zou de interesse anders kunstmatig opblazen.
+  const age = getAge(p);
+  const eu = isEu(p);
   const clubGap = myRep - (p.clubRep || 0);
   const statGap = myRep - (p.worldRep || 0);
-  const blend = 0.55 * clubGap + 0.45 * statGap;
+  const blend = age <= 19 ? (0.9 * clubGap + 0.15 * statGap) : (0.55 * clubGap + 0.45 * statGap);
   let score = 100 / (1 + Math.exp(-blend / 1400));   // 0 kloof → 50; +1400 → ~73; -1400 → ~27
 
   // Beschikbaarheidssignalen
@@ -339,19 +345,19 @@ function interestEstimate(p) {
     else score += Math.min(6, (1 - ratio) * 8);                  // ruim betaalbaar: klein duwtje
   }
 
-  // Leeftijd + FIFA Art. 19 (internationale transfer van minderjarigen).
-  // Een niet-EU-speler onder de 18 kan internationaal niet komen tot z'n 18e; een EU/EEA-speler
-  // van 16-17 mag binnen de EU wél overstappen (uitzondering), maar blijft jong.
-  const age = getAge(p);
-  const eu = isEu(p);
+  // Persoonlijkheid (nu uit de dump): ambitie stuwt naar een stap omhoog en remt een stap
+  // omlaag/lateraal; loyaliteit houdt spelers bij hun club.
+  if (p.ambition) score += (blend >= 0 ? 1.2 : -2.2) * (p.ambition - 10);
+  if (p.loyalty && !isFree(p)) score *= (1 - 0.45 * (p.loyalty / 20));
+
+  // Leeftijd: jonge spelers verhuizen minder makkelijk (settelen, ontwikkelen bij eigen club).
+  if (age <= 16) score *= 0.7;
+  else if (age <= 17) score *= 0.85;
+
+  // FIFA Art. 19: non-EU-speler onder de 18 kan internationaal pas komen vanaf z'n 18e.
   let note = null;
   if (age <= 15) { score = Math.min(score, 6); note = 'minor'; }
   else if (age <= 17 && !eu) { score = Math.min(score, 8); note = 'minorIntl'; }
-  else if (age <= 17) { score -= 8; }
-
-  // Optionele persoonlijkheid (alleen als de dump ze bevat; nu meestal afwezig)
-  if (p.ambition) score += (clubGap >= 0 ? 1.4 : -1.4) * (p.ambition - 10);
-  if (p.loyalty && !isFree(p)) score *= (1 - 0.35 * (p.loyalty / 20));
 
   score = Math.max(0, Math.min(100, Math.round(score)));
   const label = score >= 70 ? t('int_big') : score >= 45 ? t('int_ok') : score >= 25 ? t('int_small') : t('int_no');
@@ -1426,9 +1432,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('settings-
 
 // nieuwe data ophalen (trigger de plugin)
 $('btn-fetch').onclick = async () => {
+  const b = $('banner');
   try {
+    const st = await (await fetch('/api/fmstatus')).json();
+    if (!st.running) { b.className = 'scanning error'; b.textContent = t('fmNotRunning'); b.onclick = null; return; }
     await fetch('/api/refresh', { method: 'POST' });
-    const b = $('banner'); b.className = 'scanning'; b.textContent = t('reqSent');
+    b.className = 'scanning'; b.textContent = t('reqSent'); b.onclick = null;
   } catch { showToast('!'); }
 };
 

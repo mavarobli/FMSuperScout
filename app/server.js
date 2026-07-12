@@ -6,7 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 
 const PORT = Number(process.env.PORT) || 8765;
 const APP_DIR = __dirname;
@@ -85,6 +85,17 @@ const server = http.createServer((req, res) => {
     res.writeHead(204); res.end();
     // Venster dicht: stop, tenzij binnen 2,5s een nieuwe heartbeat komt (bij herladen).
     if (APP_MODE && !pendingExit) pendingExit = setTimeout(() => process.exit(0), 2500);
+    return;
+  }
+
+  if (url.pathname === '/api/fmstatus') {
+    // Draait Football Manager? (De plugin leeft in fm.exe, dus zonder draaiende game
+    // wordt een data-verzoek nooit opgepikt.)
+    execFile('tasklist', ['/FI', 'IMAGENAME eq fm.exe', '/NH'], { windowsHide: true }, (err, out) => {
+      const running = !err && /fm\.exe/i.test(out || '');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ running }));
+    });
     return;
   }
 
