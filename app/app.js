@@ -598,6 +598,7 @@ function applyFilters() {
   if (state.mode === 'shortlist') rows = [...state.players, ...state.staff];
 
   state.filtered = rows.filter(p => {
+    if (!p.name || !p.name.trim() || p.name.trim() === '?') return false;   // naamloze stubs verbergen
     if (onlySl && !state.shortlist.has(p.id)) return false;
     if (name && !((p.name || '').toLowerCase().includes(name) || (p.club || '').toLowerCase().includes(name))) return false;
     const age = getAge(p);
@@ -737,6 +738,7 @@ function sortRows() {
 // ---------- gevirtualiseerde tabel ----------
 let ROW_H = 28;              // wordt na de eerste render gemeten (zoom/DPI-onafhankelijk)
 let renderQueued = false;
+let resizing = false;        // true tijdens/vlak na kolombreedte slepen (onderdrukt sorteer-klik)
 // Meet de echte rijhoogte zodat spacer + translateY exact kloppen (voorkomt drift/verdwijnende lijnen).
 function measureRowH() {
   const tr = $('grid-body').querySelector('tr[data-i]');
@@ -767,17 +769,20 @@ function renderTable() {
     if (grip) {
       grip.addEventListener('mousedown', e => {
         e.preventDefault(); e.stopPropagation();
+        resizing = true;                                     // onderdruk de sorteer-klik hierna
         const startX = e.clientX, startW = th.getBoundingClientRect().width;
         th.draggable = false;
         const move = ev => { const nw = Math.max(40, Math.round(startW + ev.clientX - startX)); th.style.width = nw + 'px'; colWidths()[k] = nw; };
         const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); th.draggable = true; saveColW(); renderVisible(); };
         document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
       });
+      grip.addEventListener('click', e => { e.stopPropagation(); });   // greep-klik nooit sorteren
       grip.ondragstart = e => { e.preventDefault(); e.stopPropagation(); };
     }
     const col = cols.find(c => c.key === k);
     th.onclick = () => {
       if (col?.star) return;
+      if (resizing) { resizing = false; return; }            // net een kolom versmald/verbreed: niet sorteren
       if (state.sortKey === k) state.sortDir *= -1;
       else { state.sortKey = k; state.sortDir = (k === 'pos' || k === 'name' || k === 'nat') ? 1 : -1; }
       sortRows(); renderTable();
