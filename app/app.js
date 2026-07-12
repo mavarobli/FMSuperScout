@@ -243,27 +243,28 @@ const STAFF_COLS = [
 ];
 
 // ---------- geschatte marktwaarde (GBP) ----------
+// Log-lineair model, gekalibreerd op de spelers in de dump met een échte FM-waarde
+// (28 ijkpunten; mediane fout ~29%). Kernbevindingen: waarde verdubbelt elke ~7 CA-punten,
+// daalt licht per jaar leeftijd, stijgt met clubreputatie en met resterende contractduur
+// (∝ √maanden). Boven CA 150 vlakt de CA-curve af zodat de top niet naar miljarden explodeert.
+const VAL_B = { c0: 0.7724, ca: 0.1025, age: -0.0252, cRep: 0.0720, lnC: 0.4969 };
+function caSaturated(ca) { return Math.min(ca, 150) + 0.20 * Math.max(0, ca - 150); }
 function estValue(p) {
-  if (p.value != null && p.value > 0) return { v: p.value, est: false, lo: Math.round(p.value * 0.8), hi: Math.round(p.value * 1.2) };
+  if (p.value != null && p.value > 0) return { v: p.value, est: false, lo: Math.round(p.value * 0.85), hi: Math.round(p.value * 1.15) };
   if (!p.ca || p.ca < 1) return { v: null, est: false };
   if (!p.club) return { v: 0, est: true };
-  const effRep = Math.max(p.worldRep || 0, p.ca * 38, (p.clubRep || 0) * 0.5);
-  const base = 860000 * Math.exp(effRep / 2400);
-  const fCA = Math.pow(p.ca / 100, 2.2);
   const a = getAge(p) || 25;
-  const paHead = Math.max(0, (p.pa || p.ca) - p.ca);
-  let fage;
-  if (a <= 21) fage = 1.0 + Math.min(1.0, paHead / 45);
-  else if (a <= 26) fage = 1.0;
-  else if (a <= 30) fage = 0.7;
-  else if (a <= 33) fage = 0.4;
-  else fage = 0.18;
   const m = monthsUntil(p.expires);
-  const yrs = m != null ? m / 12 : 3;
-  let fcon = Math.min(1.0, 0.4 + 0.2 * yrs);
-  if (m != null && m <= 4) fcon = 0.28;
-  const v = Math.round(base * fCA * fage * fcon / 1e5) * 1e5;
-  return { v, est: true, lo: Math.round(v * 0.78), hi: Math.round(v * 1.22) };
+  let ln = VAL_B.c0
+    + VAL_B.ca * caSaturated(p.ca)
+    + VAL_B.age * a
+    + VAL_B.cRep * ((p.clubRep || 4000) / 1000)
+    + VAL_B.lnC * Math.log(Math.max(2, m == null ? 36 : m));
+  if (a > 31) ln -= 0.13 * (a - 31);                 // steilere daling op leeftijd (buiten de ijkrange)
+  let v = Math.exp(ln);
+  if (m != null && m <= 4) v *= 0.7;                 // (bijna) transfervrij: extra korting
+  v = v >= 1e6 ? Math.round(v / 1e5) * 1e5 : Math.round(v / 1e4) * 1e4;
+  return { v, est: true, lo: Math.round(v * 0.7), hi: Math.round(v * 1.3) };
 }
 function estHtml(p) {
   const e = estValue(p);
