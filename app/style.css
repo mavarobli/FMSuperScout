@@ -306,6 +306,41 @@ td.exp-year { color: #d8c88a; }
 .star-cell { cursor: pointer; color: #3a4658; font-size: 15px; text-align: center; }
 .star-cell.on { color: var(--star); }
 
+/* ---------- squad-behoefteanalyse ---------- */
+#analysis { flex: 1 1 auto; overflow-y: auto; padding: 16px 20px 40px; }
+#analysis.hidden { display: none; }
+.an-empty { color: var(--muted); padding: 40px; text-align: center; }
+.an-head h2 { font-size: 17px; margin-bottom: 12px; }
+.an-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.an-sum-item { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 96px; }
+.an-sum-n { font-size: 22px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.an-sum-l { font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.an-sum-item.need { margin-left: auto; border-color: var(--accent2); }
+.an-sum-need { font-size: 15px; font-weight: 700; color: var(--accent2); }
+.an-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.an-card { background: var(--bg2); border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.an-card.ok { border-left-color: var(--accent); }
+.an-card.thin, .an-card.aging { border-left-color: var(--warn); }
+.an-card.short { border-left-color: var(--bad); }
+.an-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.an-pos { font-weight: 700; font-size: 13.5px; }
+.an-badge { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 20px; font-weight: 700; white-space: nowrap; }
+.an-badge.green { background: #16412a; color: #6fe0a0; }
+.an-badge.amber { background: #443a14; color: var(--warn); }
+.an-badge.red { background: #3a1414; color: #e08080; }
+.an-depth { display: flex; align-items: center; gap: 4px; }
+.an-depth .dot { flex: 1 1 auto; height: 5px; border-radius: 3px; background: #232d3a; }
+.an-depth .dot.on { background: var(--accent); }
+.an-card.short .an-depth .dot.on { background: var(--bad); }
+.an-card.thin .an-depth .dot.on, .an-card.aging .an-depth .dot.on { background: var(--warn); }
+.an-depth .dot-extra { font-size: 10.5px; color: var(--muted); font-weight: 600; flex: 0 0 auto; }
+.an-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 12px; color: var(--muted); }
+.an-stats b { color: var(--text); font-variant-numeric: tabular-nums; font-size: 13px; }
+.an-young { font-size: 11.5px; color: var(--text); }
+.an-rec { font-size: 12px; color: var(--warn); background: rgba(232,185,60,.08); border-radius: 6px; padding: 6px 8px; line-height: 1.35; }
+.an-scout { align-self: flex-start; background: var(--accent2); color: #04203d; border: 0; border-radius: 6px; padding: 6px 12px; font-weight: 700; font-size: 12px; cursor: pointer; }
+.an-scout:hover { filter: brightness(1.1); }
+
 #empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); text-align: center; background: var(--bg); }
 #empty-state.hidden { display: none; }
 #empty-state h2 { color: var(--text); font-size: 18px; }

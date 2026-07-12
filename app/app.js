@@ -56,6 +56,15 @@ const I18N = {
     roleFit: 'Tactische rol', roleColHdr: 'Rol', roleAny: 'Geen rol gekozen', bestRoles: 'Beste rollen', roleScoreOf: 'Rolscore',
     compare: 'Vergelijk', comparing: 'Vergelijken', addCompare: 'Vergelijk', inCompare: 'In vergelijking', compareFull: 'Max. 3 spelers',
     cmpTitle: 'Spelervergelijking', cmpValue: 'Waarde', cmpTopRole: 'Beste rol',
+    analysis: 'Analyse', anTitle: 'Squad-behoefteanalyse', anNoClub: 'Geen eigen club in de data gevonden.',
+    anPlayers: 'spelers', anAvgAge: 'gem. leeftijd', anAvgCa: 'gem. CA', anTopCa: 'beste CA', anDepth: 'diepte',
+    anOk: 'Op sterkte', anThin: 'Dunne bezetting', anShort: 'Tekort', anAging: 'Vergrijzing', anNoSucc: 'Geen opvolging',
+    anScout: 'Scout spelers', anYoungTalent: 'jongste talent', anNone: 'geen',
+    anSummary: 'Samenvatting', anBiggestNeed: 'Grootste behoefte', anSquadSize: 'Selectie',
+    anRecAging: 'Vergrijst; zoek een opvolger jonger dan {age} met PA boven {pa}.',
+    anRecShort: 'Te weinig spelers; werf minimaal {n} extra ({pa}+ PA).',
+    anRecThin: 'Dunne cover; een aanvulling van {pa}+ PA versterkt de diepte.',
+    anRecSucc: 'Geen jong talent dat het niveau haalt; zoek U{age} met PA boven {pa}.',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -91,6 +100,15 @@ const I18N = {
     roleFit: 'Tactical role', roleColHdr: 'Role', roleAny: 'No role selected', bestRoles: 'Best roles', roleScoreOf: 'Role score',
     compare: 'Compare', comparing: 'Comparing', addCompare: 'Compare', inCompare: 'In comparison', compareFull: 'Max. 3 players',
     cmpTitle: 'Player comparison', cmpValue: 'Value', cmpTopRole: 'Best role',
+    analysis: 'Analysis', anTitle: 'Squad needs analysis', anNoClub: 'No own club found in the data.',
+    anPlayers: 'players', anAvgAge: 'avg age', anAvgCa: 'avg CA', anTopCa: 'top CA', anDepth: 'depth',
+    anOk: 'Well stocked', anThin: 'Thin cover', anShort: 'Shortage', anAging: 'Aging', anNoSucc: 'No succession',
+    anScout: 'Scout players', anYoungTalent: 'youngest talent', anNone: 'none',
+    anSummary: 'Summary', anBiggestNeed: 'Biggest need', anSquadSize: 'Squad',
+    anRecAging: 'Aging; find a successor under {age} with PA above {pa}.',
+    anRecShort: 'Too few players; sign at least {n} more ({pa}+ PA).',
+    anRecThin: 'Thin cover; an addition of {pa}+ PA improves depth.',
+    anRecSucc: 'No young talent reaching the level; look for U{age} with PA above {pa}.',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
@@ -1023,6 +1041,120 @@ function openCompare() {
 function closeCompare() { $('compare-modal').classList.add('hidden'); }
 $('compare-modal').addEventListener('click', e => { if (e.target.id === 'compare-modal') closeCompare(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('compare-modal').classList.contains('hidden')) closeCompare(); });
+
+// ---------- squad-behoefteanalyse ----------
+// Positiegroepen met een streefaantal (basis + degelijke cover) en de bijhorende pitch-codes.
+const SQUAD_GROUPS = [
+  { id: 'gk', label: { nl: 'Keeper', en: 'Goalkeeper' }, pos: ['GK'], target: 2 },
+  { id: 'cb', label: { nl: 'Centrale verdediger', en: 'Central defender' }, pos: ['DC'], target: 4 },
+  { id: 'fb', label: { nl: 'Vleugelverdediger', en: 'Full back' }, pos: ['DL', 'DR', 'WBL', 'WBR'], target: 4 },
+  { id: 'dm', label: { nl: 'Verdedigende mid', en: 'Defensive mid' }, pos: ['DM'], target: 2 },
+  { id: 'cm', label: { nl: 'Centrale middenvelder', en: 'Central midfielder' }, pos: ['MC'], target: 3 },
+  { id: 'wing', label: { nl: 'Buitenspeler', en: 'Winger' }, pos: ['ML', 'MR', 'AML', 'AMR'], target: 4 },
+  { id: 'am', label: { nl: 'Aanvallende mid', en: 'Attacking mid' }, pos: ['AMC'], target: 2 },
+  { id: 'st', label: { nl: 'Spits', en: 'Striker' }, pos: ['ST'], target: 3 },
+];
+const avg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
+function analyseSquad() {
+  const club = (state.meta.myClub || '').toLowerCase();
+  if (!club) return null;
+  const squad = state.players.filter(p => (p.club || '').toLowerCase() === club);
+  const groups = SQUAD_GROUPS.map(g => {
+    const set = new Set(g.pos);
+    const members = squad.filter(p => (p.posArr || []).some(x => set.has(x))).sort((a, b) => (b.ca || 0) - (a.ca || 0));
+    const cas = members.map(p => p.ca || 0);
+    const ages = members.map(p => getAge(p)).filter(x => x != null);
+    const bestCa = cas.length ? Math.max(...cas) : 0;
+    const youngTalents = members.filter(p => getAge(p) <= 21 && (p.pa || 0) > 0).sort((a, b) => (b.pa || 0) - (a.pa || 0));
+    const succ = youngTalents.find(p => (p.pa || 0) >= bestCa);   // jong talent dat het niveau haalt
+    // Statusbepaling
+    let status = 'ok';
+    if (members.length < Math.ceil(g.target / 2)) status = 'short';
+    else if (members.length < g.target) status = 'thin';
+    const avgAge = avg(ages);
+    const aging = avgAge >= 28.5 && !succ && members.length > 0;
+    // Aanbeveling + scout-parameters
+    let rec = null, scout = null;
+    const suggPa = Math.max(bestCa, Math.round(avg(cas) + 12) || 120);
+    if (status === 'short') {
+      const n = g.target - members.length;
+      rec = tf('anRecShort', { n, pa: suggPa }); scout = { pos: g.pos, minPa: Math.max(80, suggPa - 20) };
+    } else if (aging) {
+      rec = tf('anRecAging', { age: 23, pa: bestCa }); scout = { pos: g.pos, maxAge: 23, minPa: bestCa };
+    } else if (!succ && members.length) {
+      rec = tf('anRecSucc', { age: 23, pa: bestCa }); scout = { pos: g.pos, maxAge: 23, minPa: bestCa };
+    } else if (status === 'thin') {
+      rec = tf('anRecThin', { pa: suggPa }); scout = { pos: g.pos, minPa: suggPa };
+    }
+    // prioriteit voor sortering/samenvatting
+    const prio = status === 'short' ? 3 : aging ? 2.5 : (!succ && members.length) ? 1.5 : status === 'thin' ? 1 : 0;
+    return { g, members, count: members.length, avgAge, avgCa: avg(cas), bestCa, youngTalents, succ, status, aging, rec, scout, prio };
+  });
+  return { squad, groups };
+}
+// simpele template-invuller {key}
+function tf(key, vars) { return t(key).replace(/\{(\w+)\}/g, (_, k) => vars[k]); }
+
+function renderAnalysis() {
+  const box = $('analysis');
+  const data = analyseSquad();
+  if (!data) { box.innerHTML = `<div class="an-empty">${t('anNoClub')}</div>`; return; }
+  const { squad, groups } = data;
+  const needs = groups.filter(x => x.rec).sort((a, b) => b.prio - a.prio);
+  const topNeed = needs[0];
+  const statusLabel = { ok: t('anOk'), thin: t('anThin'), short: t('anShort') };
+
+  const summary = `<div class="an-summary">
+    <div class="an-sum-item"><span class="an-sum-n">${squad.length}</span><span class="an-sum-l">${t('anSquadSize')}</span></div>
+    <div class="an-sum-item"><span class="an-sum-n">${Math.round(avg(squad.map(p => p.ca || 0)))}</span><span class="an-sum-l">${t('anAvgCa')}</span></div>
+    <div class="an-sum-item"><span class="an-sum-n">${avg(squad.map(p => getAge(p)).filter(Boolean)).toFixed(1)}</span><span class="an-sum-l">${t('anAvgAge')}</span></div>
+    <div class="an-sum-item need"><span class="an-sum-l">${t('anBiggestNeed')}</span><span class="an-sum-need">${topNeed ? topNeed.g.label[state.lang] || topNeed.g.label.nl : '–'}</span></div>
+  </div>`;
+
+  const cards = groups.map(x => {
+    const st = x.aging ? 'aging' : x.status;
+    const badge = x.status === 'short' ? `<span class="an-badge red">${t('anShort')}</span>`
+      : x.aging ? `<span class="an-badge amber">${t('anAging')}</span>`
+        : (!x.succ && x.count) ? `<span class="an-badge amber">${t('anNoSucc')}</span>`
+          : x.status === 'thin' ? `<span class="an-badge amber">${t('anThin')}</span>`
+            : `<span class="an-badge green">${t('anOk')}</span>`;
+    const dots = Array.from({ length: x.g.target }, (_, i) =>
+      `<span class="dot ${i < x.count ? 'on' : ''}"></span>`).join('');
+    const depthDots = dots + (x.count > x.g.target ? `<span class="dot-extra">+${x.count - x.g.target}</span>` : '');
+    const yt = x.youngTalents[0];
+    return `<div class="an-card ${st}">
+      <div class="an-card-top"><span class="an-pos">${x.g.label[state.lang] || x.g.label.nl}</span>${badge}</div>
+      <div class="an-depth" title="${x.count}/${x.g.target}">${depthDots}</div>
+      <div class="an-stats">
+        <span><b>${x.count}</b> ${t('anPlayers')}</span>
+        <span><b>${Math.round(x.avgCa)}</b> ${t('anAvgCa')}</span>
+        <span><b>${x.bestCa}</b> ${t('anTopCa')}</span>
+        <span><b>${x.avgAge ? x.avgAge.toFixed(0) : '–'}</b> ${t('anAvgAge')}</span>
+      </div>
+      <div class="an-young">${t('anYoungTalent')}: ${yt ? `${yt.name} <span class="dim">(${getAge(yt)}, PA ${yt.pa || '·'})</span>` : t('anNone')}</div>
+      ${x.rec ? `<div class="an-rec">${x.rec}</div>` : ''}
+      ${x.scout ? `<button class="an-scout" data-grp="${x.g.id}">${t('anScout')} →</button>` : ''}
+    </div>`;
+  }).join('');
+
+  box.innerHTML = `<div class="an-head"><h2>${t('anTitle')}</h2></div>${summary}<div class="an-grid">${cards}</div>`;
+  box.querySelectorAll('.an-scout').forEach(b => b.onclick = () => {
+    const grp = groups.find(x => x.g.id === b.dataset.grp);
+    if (grp && grp.scout) scoutFor(grp.scout);
+  });
+}
+// Zet filters + veld op de gevraagde behoefte en spring naar het Spelers-tabblad.
+function scoutFor(s) {
+  setMode('players');
+  $('btn-clear').onclick();                 // schone lei
+  activePos.clear();
+  const codes = new Set(s.pos);
+  document.querySelectorAll('.pos-node').forEach(n => { if (codes.has(n.dataset.pos)) { activePos.add(n.dataset.pos); n.classList.add('on'); } });
+  if (s.minPa) $('f-pa-min').value = s.minPa;
+  if (s.maxAge) $('f-age-max').value = s.maxAge;
+  applyFilters();
+  showToast('🔍 ' + [...codes].join(', '));
+}
 $('detail-close').onclick = () => { $('detail').classList.add('hidden'); state.selected = null; renderVisible(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-close').onclick(); });
 
@@ -1149,21 +1281,35 @@ function applyLang() {
 
 function setMode(mode) {
   state.mode = mode;
+  const isAn = mode === 'analysis';
   $('tab-players').classList.toggle('active', mode === 'players');
   $('tab-staff').classList.toggle('active', mode === 'staff');
   $('tab-shortlist').classList.toggle('active', mode === 'shortlist');
-  $('fg-pitch').style.display = mode === 'staff' ? 'none' : '';
+  $('tab-analysis').classList.toggle('active', isAn);
+  $('fg-pitch').style.display = mode === 'staff' || isAn ? 'none' : '';
   $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
-  $('fg-role').style.display = mode === 'staff' ? 'none' : '';
+  $('fg-role').style.display = mode === 'staff' || isAn ? 'none' : '';
   $('sl-bar').classList.toggle('hidden', mode !== 'shortlist');
+  document.body.classList.toggle('mode-analysis', isAn);
   state.selected = null;
   $('detail').classList.add('hidden');
+  if (isAn) {
+    $('chipbar').innerHTML = '';
+    $('table-wrap').style.display = 'none';
+    $('empty-state').classList.add('hidden');
+    $('analysis').classList.remove('hidden');
+    renderAnalysis();
+    return;
+  }
+  $('table-wrap').style.display = '';
+  $('analysis').classList.add('hidden');
   if (!activeCols().find(c => c.key === state.sortKey)) { state.sortKey = 'ca'; state.sortDir = -1; }
   applyFilters();
 }
 $('tab-players').onclick = () => setMode('players');
 $('tab-staff').onclick = () => setMode('staff');
 $('tab-shortlist').onclick = () => setMode('shortlist');
+$('tab-analysis').onclick = () => setMode('analysis');
 $('btn-reload').onclick = loadDump;
 
 // ---------- statuspolling (F9 / knop-feedback) ----------
