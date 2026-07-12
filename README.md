@@ -9,9 +9,9 @@
 ---
 
 FMSuperScout reads the full database of your open save (players **and** staff), including the
-hidden values FM normally masks: **CA/PA** (current & potential ability) and the hidden
-personality attributes. You get a snappy, spreadsheet-style app with search, filters, role
-ratings, player comparison and squad analysis over 50,000+ people.
+values FM normally hides: **CA/PA** (current and potential ability), the hidden personality
+attributes, and FM's **real transfer value**. You get a snappy, spreadsheet-style app with search,
+filters, role ratings, player comparison and squad analysis over 50,000+ people.
 
 It has two parts: a small **BepInEx plugin** that runs inside the game and dumps the database to
 JSON, and a **local web app** (no internet, no accounts, data never leaves your PC) where you
@@ -22,34 +22,43 @@ search, filter and compare.
 
 ## Features
 
-- **Search & filter**: name/club, age, CA, PA, value, wage, nationality, EU/EEA, contract
-  expiring, free agents, transfer-listed, club reputation tier, and more. Pick positions on a
-  clickable pitch.
-- **Tactical role ratings**: 19 FM roles (Advanced Forward, Ball-Playing Defender, Deep-Lying
-  Playmaker, …) scored per player from the key/preferable attributes; sortable column + a
-  "best roles" panel in each profile.
+- **Search and filter**: name/club, age, CA, PA, value, asking price, wage, nationality, EU/EEA,
+  contract expiring, free agents, transfer-listed, club reputation tier, and more. Pick positions
+  on a clickable pitch.
+- **Tactical role ratings**: FM roles (Advanced Forward, Ball-Playing Defender, Deep-Lying
+  Playmaker, and more) scored per player from the key/preferable attributes; sortable column plus
+  a "best roles" panel in each profile.
 - **Player comparison**: put up to 3 players side by side, best value per attribute highlighted.
-- **Squad needs analysis**: breaks your squad down by position group, flags thin depth / aging /
-  no succession, and one-click scouts candidates for the gap.
-- **Player profile**: attributes exactly as in FM (grouped, keeper-aware) with FM colours, hidden
-  **personality** attributes, a CA/PA gauge, and an **estimated-potential** projection.
-- **Estimated market value**: calibrated against real in-game values (see *Accuracy*).
-- **Transfer-interest estimate**: reputation- and wage-based, and aware of the FIFA under-18
-  international-transfer rule.
+- **Squad needs analysis**: breaks your squad down by position group, flags thin depth, aging, or
+  no succession, and scouts candidates for the gap with one click.
+- **Player profile**: attributes exactly as in FM (grouped, keeper-aware) with FM colours, the
+  hidden **personality** and hidden characteristics (consistency, injury proneness, and more), a
+  CA/PA gauge, and a **potential-attributes projection**.
+- **Market value read from memory**: FM's actual transfer value for most players, with a calibrated
+  estimate as fallback for the rest (see *Accuracy*).
+- **Asking-price estimate**: what a club is likely to want for the player (value adjusted for
+  contract length, transfer status, age/potential and club size).
+- **Transfer-interest estimate**: reputation- and wage-based, aware of youth settling and the FIFA
+  under-18 international-transfer rule.
 - **Shortlist** (★) with its own tab and CSV export.
-- **Settings**: language NL/EN, currency £/€, and a **Hide CA/PA** toggle for those who consider
-  it cheating (hidden everywhere consistently).
+- **Settings**: language NL/EN, currency GBP/EUR, and a **Show hidden stats** toggle (on by
+  default; turn it off to hide CA/PA, personality and hidden characteristics everywhere at once,
+  for those who consider them cheating).
 
 ## Install (end users)
 
-No coding needed, and you don't need Node installed. It's bundled.
+No coding needed, and you don't need Node installed; it's bundled.
 
 1. Download **`FMSuperScout-Setup.zip`** from the [Releases](https://github.com/mavarobli/FMSuperScout/releases) page.
 2. Unzip it anywhere and double-click **`Install FMSuperScout.cmd`**.
 3. Launch **FMSuperScout** from the Start menu or desktop shortcut. It opens in its own window.
    Close the window and the background server stops by itself.
 
-To remove it: *Apps & features* → FMSuperScout, or run `Uninstall FMSuperScout.cmd`.
+To remove it: *Apps and features* → FMSuperScout, or run `Uninstall FMSuperScout.cmd`.
+
+> Note: the plugin that reads the game is installed separately into your FM folder (see *Getting
+> data out of Football Manager* below). A packaged one-click installer that also places the plugin
+> is on the roadmap.
 
 ## Run from source (developers)
 
@@ -57,13 +66,20 @@ Requires [Node.js](https://nodejs.org) (any recent version; no dependencies to i
 
 ```bash
 node app/server.js       # then open http://localhost:8765
+npm test                 # run the model tests (zero dependency, node:test)
 ```
 
 Or double-click `Start FMSuperScout.cmd`. To build the shareable installer zip yourself:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File installer/build-package.ps1
-# → dist/FMSuperScout-Setup.zip
+# -> dist/FMSuperScout-Setup.zip
+```
+
+The plugin is C# (BepInEx 6, IL2CPP). It builds with a standard .NET SDK:
+
+```bash
+dotnet build plugin/FMSuperScout.csproj -c Release
 ```
 
 ## Getting data out of Football Manager
@@ -72,9 +88,11 @@ The app reads whatever the FMSuperScout plugin last dumped from your **active sa
 
 1. Start FM26 and load your save.
 2. Press **F9** in-game (or click **⬇ New data** in the app).
-3. When the green bar appears, click it to load.
+3. When the green bar appears, click it to load. If a read fails, the app shows a red bar with the
+   reason instead of waiting forever.
 
-Data lives in `%LOCALAPPDATA%\FMSuperScout\` (`dump*.json` + `diagnostics.txt`).
+Data lives in `%LOCALAPPDATA%\FMSuperScout\` (`dump*.json`, `status.json`, `diagnostics.txt`, and a
+growing `value-history.json` of real in-game values used to recalibrate the value model over time).
 
 The plugin install/removal steps for the game itself are in [`docs/`](docs/) and the in-repo
 `Installeer plugin.cmd`. BepInEx only *adds* files to the FM folder, so it is fully reversible
@@ -82,20 +100,28 @@ The plugin install/removal steps for the game itself are in [`docs/`](docs/) and
 
 ## Accuracy
 
-**Read straight from memory (reliable):** name, nationality, birth year, height, foot · **CA and
-PA** (the real values) · all visible + hidden attributes and positions · wage, contract end,
-transfer status · current club · club & player reputation · staff CA/PA, attributes and role.
+**Read straight from memory (reliable):** name, nationality, birth year, height, foot; **CA and
+PA** (the real values); all visible and hidden attributes and positions; wage, contract end,
+transfer status; current club; club and player reputation; **FM's real transfer value** for most
+players; staff CA/PA, attributes and role.
 
 **Estimates (clearly labelled as such):**
 
-- **Market value**: FM usually computes value live rather than storing it. FMSuperScout's estimate
-  is a log-linear model **calibrated on players with a real in-game value** (dump plus known stars),
-  around 24% median error on mature players. It uses a saturating CA curve, world reputation, club
-  reputation and remaining contract length. Method: [`docs/value-model.md`](docs/value-model.md).
+- **Market value fallback**: for the minority of players where FM does not store a value, a
+  log-linear model calibrated on players with a real in-game value fills the gap (saturating
+  reputation curve, age, and remaining contract length). Read values are shown exactly; estimates
+  are shown as a range. Method: [`docs/value-model.md`](docs/value-model.md).
+- **Asking price**: the read/estimated value adjusted by contract length, transfer status
+  (listed, not-for-sale, release clause), age and potential, and club reputation.
+- **Potential attributes**: projects each attribute toward the player's PA. Derived from how FM's
+  Current Ability works (CA is a linear, weighted sum of the attributes, so scaling toward PA is
+  the profile-preserving projection), then tilted by age and attribute type so physical attributes
+  fade with age while mental and technical keep improving, and capped at 20.
 - **Transfer interest**: a heuristic from reputation gap (your club vs theirs and vs the player's
-  own stature), wage affordability, availability, age, and the FIFA Article 19 rule (a non-EU
-  player under 18 can't move internationally until they turn 18). Not an exact FM number, but built
-  on FM's dominant factors.
+  own stature), wage affordability, availability, personality, age, and FIFA Article 19.
+
+None of the estimates are exact FM numbers, but each is built on FM's dominant factors and covered
+by the model tests in [`test/`](test/).
 
 ## Project structure
 
@@ -104,7 +130,8 @@ transfer status · current club · club & player reputation · staff CA/PA, attr
 | `app/` | Local web app (Node, zero dependencies) |
 | `plugin/` | C# source of the BepInEx plugin |
 | `installer/` | Icon generator, launcher, PowerShell installer, package builder |
-| `docs/` | Value-model and .fmf-format research notes |
+| `test/` | Zero-dependency model tests (`npm test`) |
+| `docs/` | Value-model, .fmf-format and status/backlog notes |
 
 ## Support
 
