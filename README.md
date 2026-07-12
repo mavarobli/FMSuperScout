@@ -108,8 +108,8 @@ transfer status · current club · club & player reputation · staff CA/PA, attr
 
 ## Support
 
-FMSuperScout is free. If it helps your scouting and you'd like to say thanks, you can
-[buy me a coffee](https://REPLACE-WITH-YOUR-DONATION-LINK). Totally optional. 🙏
+FMSuperScout is free and stays free. If it saved you an hour of squinting at slow menus, you can
+[buy me a coffee](https://ko-fi.com/fmsuperscout). If not, it keeps working anyway. ☕
 
 ## Disclaimer
 

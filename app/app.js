@@ -28,6 +28,9 @@ const I18N = {
     players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: 'Zoek naam of club',
     settings: 'Instellingen', langLabel: 'Taal', curLabel: 'Valuta',
     hideCapa: 'CA/PA verbergen',
+    donateBtn: 'Steun FMSuperScout', donateTitle: 'Lekker aan het scouten?',
+    donateBody: 'FMSuperScout is gratis en blijft gratis. Als het je een uur turen in traag menu bespaart, is een koffie welkom. Zo niet, draait ie ook gewoon door.',
+    donateCta: '☕ Koffie', donateLater: 'Later',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', refyear: 'Peiljaar', financial: 'Financieel', maxvalue: 'Max. waarde', maxwage: 'Max. loon p/w',
     origin: 'Herkomst', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
@@ -80,6 +83,9 @@ const I18N = {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
     settings: 'Settings', langLabel: 'Language', curLabel: 'Currency',
     hideCapa: 'Hide CA/PA',
+    donateBtn: 'Support FMSuperScout', donateTitle: 'Found your next signing?',
+    donateBody: 'FMSuperScout is free and stays free. If it beat squinting at slow menus, a coffee helps. If not, it keeps working anyway.',
+    donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', refyear: 'Game year', financial: 'Financial', maxvalue: 'Max. value', maxwage: 'Max. wage p/w',
     origin: 'Origin', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
@@ -1048,6 +1054,30 @@ function showDetail(p) {
   if (cmp) cmp.onclick = () => { toggleCompare(p.id); cmp.classList.toggle('on', state.compare.includes(p.id)); };
   const pt = $('pot-toggle');
   if (pt) pt.onchange = () => { state.showPot = pt.checked; showDetail(p); };
+  if (p.id !== state._donLast) { state._donLast = p.id; maybeDonateNudge(); }   // telt per nieuw profiel
+}
+
+// ---------- steun (Ko-fi), sympathiek en niet-opdringerig ----------
+const KOFI = 'https://ko-fi.com/fmsuperscout';
+function openKofi() { window.open(KOFI, '_blank', 'noopener'); }
+// Eénmalige, wegklikbare nudge na echt gebruik (25 bekeken profielen). Daarna nooit meer.
+function maybeDonateNudge() {
+  if (localStorage.getItem('fmss_donate')) return;
+  const n = (+localStorage.getItem('fmss_uses') || 0) + 1;
+  localStorage.setItem('fmss_uses', String(n));
+  if (n < 25) return;
+  localStorage.setItem('fmss_donate', '1');
+  const el = $('donate-nudge');
+  el.innerHTML = `<button class="dn-x" title="${t('donateLater')}">✕</button>
+    <div class="dn-title">☕ ${t('donateTitle')}</div>
+    <div class="dn-text">${t('donateBody')}</div>
+    <div class="dn-actions"><a class="dn-cta" href="${KOFI}" target="_blank" rel="noopener">${t('donateCta')}</a>
+      <button class="dn-later">${t('donateLater')}</button></div>`;
+  el.classList.remove('hidden');
+  const close = () => el.classList.add('hidden');
+  el.querySelector('.dn-cta').onclick = close;
+  el.querySelector('.dn-later').onclick = close;
+  el.querySelector('.dn-x').onclick = close;
 }
 
 // ---------- spelervergelijking ----------
@@ -1288,6 +1318,7 @@ $('btn-clear').onclick = () => {
 };
 $('btn-sidebar').onclick = () => document.body.classList.toggle('sidebar-collapsed');
 $('btn-export').onclick = exportShortlist;
+$('btn-coffee').onclick = openKofi;
 
 // inklapbare filtersecties (voorkeur onthouden)
 const collapsedSecs = new Set(JSON.parse(localStorage.getItem('fmss_secs') || '[]'));
@@ -1389,6 +1420,7 @@ function applyLang() {
   document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
   document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
   $('f-name').placeholder = t('searchph');
+  $('btn-coffee').title = t('donateBtn');
   renderDumpInfo();
   renderClubBadge();
   buildStaffRoles();
