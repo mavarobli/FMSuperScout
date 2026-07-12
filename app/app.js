@@ -65,6 +65,8 @@ const I18N = {
     anRecShort: 'Te weinig spelers; werf minimaal {n} extra ({pa}+ PA).',
     anRecThin: 'Dunne cover; een aanvulling van {pa}+ PA versterkt de diepte.',
     anRecSucc: 'Geen jong talent dat het niveau haalt; zoek U{age} met PA boven {pa}.',
+    competition: 'Competitie', divLabel: 'Divisie', clubTier: 'Clubniveau',
+    tierTop: 'Top (rep 7500+)', tierStrong: 'Sterk (6000+)', tierMid: 'Middel (4000+)', tierLow: 'Laag (<4000)',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -109,6 +111,8 @@ const I18N = {
     anRecShort: 'Too few players; sign at least {n} more ({pa}+ PA).',
     anRecThin: 'Thin cover; an addition of {pa}+ PA improves depth.',
     anRecSucc: 'No young talent reaching the level; look for U{age} with PA above {pa}.',
+    competition: 'Competition', divLabel: 'Division', clubTier: 'Club level',
+    tierTop: 'Top (rep 7500+)', tierStrong: 'Strong (6000+)', tierMid: 'Mid (4000+)', tierLow: 'Low (<4000)',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
@@ -475,6 +479,20 @@ function buildStaffRoles() {
   $('f-staffrole').innerHTML = `<option value="">${t('all')}</option>` + jobs.map(j => `<option>${j}</option>`).join('');
   $('f-staffrole').value = cur;
 }
+// Divisie-select: vult zich uit de aanwezige div-waarden; blijft verborgen zolang de
+// plugin nog geen divisie meestuurt (div is momenteel leeg in de dump).
+function buildDivisions() {
+  const cur = $('f-div').value;
+  const divs = [...new Set(state.players.map(p => p.div).filter(Boolean))].sort();
+  const wrap = $('fg-div');
+  if (!divs.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  $('f-div').innerHTML = `<option value="">${t('all')}</option>` + divs.map(d => `<option>${d}</option>`).join('');
+  $('f-div').value = cur;
+}
+// Clubniveau-drempels op basis van clubreputatie (werkt nu; benadert de competitiesterkte).
+const TIER_MIN = { top: 7500, strong: 6000, mid: 4000, low: 0 };
+const TIER_MAX = { top: Infinity, strong: 7499, mid: 5999, low: 3999 };
 // Rol-keuze: gegroepeerd op linie zodat de lijst overzichtelijk blijft.
 function buildRoleSelect() {
   const groups = [
@@ -525,6 +543,8 @@ function applyFilters() {
   const wantListed = $('f-listed').checked, wantExp6 = $('f-exp6').checked, wantExp12 = $('f-exp12').checked;
   const wantFree = $('f-free').checked, onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
   const staffRole = $('f-staffrole').value;
+  const divVal = $('f-div').value;
+  const tier = $('f-tier').value;
   const myClub = (state.meta.myClub || '').toLowerCase();
   if (state.mode === 'shortlist') rows = [...state.players, ...state.staff];
 
@@ -548,6 +568,8 @@ function applyFilters() {
     if (wantExp12) { const m = monthsUntil(p.expires); if (m == null || m > 12) return false; }
     if (activePos.size && !(p.posArr || []).some(x => activePos.has(x))) return false;
     if (state.mode === 'staff' && staffRole && p.job !== staffRole) return false;
+    if (divVal && p.div !== divVal) return false;
+    if (tier) { const r = p.clubRep || 0; if (r < TIER_MIN[tier] || r > TIER_MAX[tier]) return false; }
     return true;
   });
   sortRows();
@@ -572,6 +594,8 @@ function buildChips() {
   if (activePos.size) add(`${t('position')}: ${[...activePos].join(', ')}`,
     () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); });
   if (state.mode === 'staff' && $('f-staffrole').value) add($('f-staffrole').value, () => { $('f-staffrole').value = ''; });
+  if ($('f-div').value) add(`${t('divLabel')}: ${$('f-div').value}`, () => { $('f-div').value = ''; });
+  if ($('f-tier').value) add(`${t('clubTier')}: ${$('f-tier').selectedOptions[0].textContent}`, () => { $('f-tier').value = ''; });
   range('f-age-min', 'f-age-max', t('age'));
   range('f-ca-min', 'f-ca-max', 'CA');
   range('f-pa-min', 'f-pa-max', 'PA');
@@ -1164,6 +1188,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-cl
 });
 ['f-eu', 'f-myclub', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
 $('f-staffrole').addEventListener('change', applyFilters);
+$('f-div').addEventListener('change', applyFilters);
+$('f-tier').addEventListener('change', applyFilters);
 $('f-interest').addEventListener('change', applyFilters);
 $('f-role').addEventListener('change', () => {
   state.role = $('f-role').value;
@@ -1180,6 +1206,7 @@ $('btn-clear').onclick = () => {
   document.querySelectorAll('#filters input[type=text], #filters input[type=number]').forEach(i => { if (i.id !== 'f-refyear') i.value = ''; });
   document.querySelectorAll('#filters input[type=checkbox]').forEach(i => i.checked = false);
   $('f-staffrole').value = ''; $('f-interest').value = '0';
+  $('f-div').value = ''; $('f-tier').value = '';
   activePos.clear();
   document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on'));
   applyFilters();
@@ -1275,6 +1302,7 @@ function applyLang() {
   renderClubBadge();
   buildStaffRoles();
   buildRoleSelect();
+  buildDivisions();
   applyFilters();
   if (state.selected) showDetail(state.selected);
 }
