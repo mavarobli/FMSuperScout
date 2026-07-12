@@ -1021,20 +1021,23 @@ function growthRelevance(p) {
   }
   return rel;
 }
+// Set-pieces groeien het minst (laagst gewogen in CA, zelden getraind).
+const SETPIECE_ATTRS = new Set(['Corners', 'FreeKicks', 'PenaltyTaking', 'LongThrows']);
 // Projecteer één attribuut naar het potentieel (PA): additieve, positie-gewogen groei uit de
-// CA-koppenruimte, gedempt door leeftijd, Determination en attribuuttype (fysiek groeit minder
-// en stopt na ~24). Niet elk attribuut schiet naar 20; alleen wat relevant is groeit echt door.
+// CA-koppenruimte, gedempt door leeftijd, PROFESSIONALITEIT (blijkt in FM de sterkste
+// ontwikkelingsfactor, sterker dan Determination) en attribuuttype (fysiek groeit minder en
+// stopt na ~24; set-pieces groeien nauwelijks). Alleen positie-relevante attributen groeien echt door.
 function potAttr(p, v, key, rel) {
   if (!p.pa || !p.ca || p.pa <= p.ca) return v;
   const head = p.pa - p.ca;                               // CA-koppenruimte (0-200 schaal)
   const age = getAge(p);
   const ageF = ageRemainFactor(age);
-  const det = (p.attrs && p.attrs.Determination) || p.determination || 10;
-  const detF = 0.6 + 0.4 * Math.min(1, det / 18);         // vastberadenheid benut meer groei
+  const prof = p.professionalism || (p.attrs && p.attrs.Determination) || 10;
+  const profF = 0.55 + 0.45 * Math.min(1, prof / 18);     // professionaliteit benut de groei
   const isPhys = key && PHYS_ATTRS.has(key);
-  const physF = isPhys ? (age != null && age >= 24 ? 0.15 : 0.6) : 1.0;
+  const physF = isPhys ? (age != null && age >= 24 ? 0.15 : 0.6) : (SETPIECE_ATTRS.has(key) ? 0.4 : 1.0);
   const r = rel ? (rel[key] ?? 0.25) : 0.5;               // positie-relevantie
-  const growth = r * ageF * detF * physF * 0.05 * head;
+  const growth = r * ageF * profF * physF * 0.05 * head;
   return Math.min(20, Math.round(v + growth));
 }
 function showDetail(p) {
