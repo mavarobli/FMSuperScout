@@ -55,7 +55,14 @@ Getest tegen echte data (wie wil wel/niet naar Feyenoord): van "iedereen wil kom
 label "Redelijk") die op de data niet te onderscheiden zijn van de echte gevallen — niet verder
 overfitten. Verdere winst zou een FM-"interesse"-veld vergen als dat ergens is uit te lezen.
 
-## 5. Marktwaarde — geijkt, verdere winst vereist meer data
+## 5. Marktwaarde — OPGELOST (echte waarde uit geheugen)
+
+De plugin leest FM's echte transferwaarde nu uit `pl+0x234` (geverifieerd via offset-discovery
+tegen in-game bedragen). ~74% van de spelers krijgt de exacte FM-waarde; de rest (sentinel
+0xFFFFFFFF/300000000) valt terug op het reputatie-schatmodel hieronder. Bidstrup: €62M-gok →
+echte €15.8M. Dit maakt de aparte schatting grotendeels overbodig, maar die blijft als fallback.
+
+### Historie: reputatie-schatmodel (fallback)
 
 Geijkt op 43 echte waarden (~24% in-sample; ~44% out-of-sample op een later seizoen). Herijken op
 alleen de ~30 punten van één dump geeft instabiele/foutgetekende coëfficiënten (overfitting), dus
