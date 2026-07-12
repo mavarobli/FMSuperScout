@@ -90,8 +90,42 @@ alleen de ~30 punten van één dump geeft instabiele/foutgetekende coëfficiënt
 het robuuste model blijft staan. Echte verbetering vereist **meer ijkpunten uit verschillende
 competities/seizoenen** (mavarobli kan die uit FM aanleveren). Tienerwaarde blijft intrinsiek grillig.
 
-## 6. UX-ideeën (nice-to-have)
+## 6. Opgeslagen filterpresets - GEDAAN
+
+Sidebar-sectie "Opgeslagen filters": sla de complete filterstand op onder een naam (tekstvelden,
+vinkjes, selects, veldposities én de gekozen tactische rol), klik om toe te passen, ✕ om te
+verwijderen, zelfde naam = overschrijven. Bewaard in localStorage (`fmss_presets`). Getest
+end-to-end tegen de echte dump (opslaan → wissen → toepassen → herladen → verwijderen).
+
+## 7. Meta-score kolom (FM-Arena) - GEDAAN
+
+Sorteerbare kolom "Meta" (na PA) + regel in het profiel: gewogen attribuutscore op de
+1-20-schaal met als gewichten de gemeten punten-impact uit FM-Arena's attribute testing
+(Pace 20.5, Acceleration 20.4, JumpingReach 11.6, Dribbling 9.8, …; bron:
+fm-arena.com/table/26-player-attributes-testing). Zegt "hoe meta is deze speler" los van CA/rol —
+Adama Traoré (CA 135) scoort er hoger dan menig CA-160-speler, precies de bedoeling. Keepers
+vallen buiten de test → geen score. Nieuwe kolommen worden nu op hun standaardplek in een
+bestaande kolomconfiguratie ingevoegd (niet meer achteraan).
+
+## 8. Versie-waarschuwing bij FM-patch - GEDAAN (plugin herbouwen)
+
+De plugin leest de bestandsversie van `game_plugin.dll` en zet `gameVersion` /
+`supportedVersion` / `versionOk` in de dump-meta (gepind op major.minor 26.3 in `Fields.cs`).
+Wijkt de versie af, dan toont de app een ambergele balk "data mogelijk onbetrouwbaar". Bij een
+nieuwe FM-patch: offsets verifiëren en `SUPPORTED_*` in `Fields.cs` ophogen.
+
+## 9. In-game datum - discovery gebouwd (verifiëren met F9-loop)
+
+`MemScan.ScanGpDates` zoekt in de game_plugin-image naar u32's die exact een FM-datum coderen
+(jaar<<16 | dag, bits 9-15 leeg) rond het afgeleide seizoensjaar. De dump kiest de waarde met
+≥2 hits (voorkeur cohort-jaar), herberekent alle leeftijden ermee en zet
+`gameDate`/`gameDateSource:"memory"` in de meta; lukt het niet, dan blijft de oude fallback
+(seizoensjaar + systeemmaand/-dag, `"derived"`) staan. `diagnostics.txt` krijgt een sectie
+"GAME-DATUM DISCOVERY" met de top-kandidaten incl. `gp+0x…`-offsets: klopt de gekozen datum
+niet met in-game, pin dan de juiste offset uit die lijst. **Nog niet tegen de echte game
+getest — plugin herbouwen + F9 + diagnostics checken.**
+
+## 10. UX-ideeën (nice-to-have)
 - Filteren op losse attributen / attribuut-drempels (bv. "Pace ≥ 15").
-- Opgeslagen filter-presets ("mijn wonderkid-zoekopdracht").
 - Snelknoppen: wonderkids, aflopende contracten, vrije spelers.
 - Rol-vergelijking tussen shortlist-spelers; export van de vergelijking.

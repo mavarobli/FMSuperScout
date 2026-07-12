@@ -19,6 +19,11 @@ internal static class Dumper
     internal static string ManagerName;  // naam van de human-manager
     internal static int MyClubRep;       // reputatie van jouw club (~0..10000)
     internal static int GameYear;        // afgeleid huidig seizoensjaar
+    internal static DateTime? GameDate;  // exacte in-game datum uit geheugen (null = niet gevonden)
+    internal static string GameVersion;  // versie van game_plugin.dll (bv. "26.3.2.0")
+    internal static bool VersionOk = true; // major.minor == gepinde offsets-versie
+    // Datum-kandidaten voor de diagnose (waarde, aantal hits, voorbeeld-offsets t.o.v. GpBase).
+    internal static List<(uint val, int n, List<ulong> offs)> DateCands = new();
 
     // Statusbestand dat de web-app pollt (betrouwbare F9-feedback, ook zonder console).
     private static void WriteStatus(string state, int players, int staff, string error = null)
@@ -52,6 +57,7 @@ internal static class Dumper
         Plugin.Log.LogInfo("FMSuperScout: geheugen scannen…");
         Directory.CreateDirectory(OutDir);
         WriteStatus("scanning", 0, 0);
+        GameDate = null;   // niet de datum van een vorige dump/save laten doorwerken in AgeFrom
 
         var mem = new MemScan();
         if (mem.GaBase == 0)
@@ -62,6 +68,7 @@ internal static class Dumper
         }
         Plugin.Log.LogInfo($"Scanregio's: {mem.ScanRegions.Count}, GameAssembly {mem.GaBase:X}-{mem.GaEnd:X}, " +
                            $"game_plugin {mem.GpBase:X}-{mem.GpEnd:X}");
+        DetectGameVersion(mem);
         if (mem.GpBase == 0)
             Plugin.Log.LogWarning("game_plugin.dll niet gevonden! Person-objecten leven daar — dump zal leeg zijn.");
 
@@ -221,6 +228,14 @@ internal static class Dumper
         int youngestCohort = byHist.Where(kv => kv.Value >= 30).Select(kv => kv.Key).DefaultIfEmpty(0).Max();
         GameYear = youngestCohort > 0 ? youngestCohort + 16 : DateTime.Now.Year;
         Plugin.Log.LogInfo($"Afgeleid seizoensjaar: {GameYear} (jongste cohort {youngestCohort})");
+
+        // ---- Exacte in-game datum (best effort) ----
+        // Zoek in de statics/code van game_plugin naar u32's die exact een FM-datum coderen
+        // rond het afgeleide seizoensjaar. De echte "vandaag" staat daar doorgaans in meerdere
+        // globals tegelijk; een toevallige constante vrijwel nooit. Daarom eisen we ≥2 hits op
+        // exact dezelfde waarde en geven we voorrang aan het cohort-jaar. Vinden we niets
+        // betrouwbaars, dan blijft de oude fallback (systeemmaand/-dag) gewoon staan.
+        FindGameDate(mem, players.Values, staff.Values);
 
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
@@ -449,10 +464,59 @@ internal static class Dumper
     private static int AgeFrom(int year, int doy)
     {
         if (year == 0) return 0;
-        var now = DateTime.Now; // in-game datum ≈ echte datum voor deze save; wordt in v2 exact ingelezen
-        int nowDoy = now.DayOfYear;
-        int age = now.Year - year - (doy <= nowDoy ? 0 : 1);
+        // Eerste schatting met de systeemdatum; wordt na FindGameDate herberekend met de
+        // echte in-game datum als die gevonden is.
+        return AgeAt(year, doy, GameDate ?? DateTime.Now);
+    }
+
+    private static int AgeAt(int year, int doy, DateTime now)
+    {
+        int age = now.Year - year - (doy <= now.DayOfYear ? 0 : 1);
         return age is >= 0 and <= 80 ? age : 0;
+    }
+
+    // Versie van game_plugin.dll (de module waarop alle offsets zijn gepind). Wijkt de
+    // major.minor af van de gepinde versie, dan meldt de web-app "data mogelijk onbetrouwbaar".
+    private static void DetectGameVersion(MemScan mem)
+    {
+        GameVersion = null; VersionOk = true;
+        try
+        {
+            if (string.IsNullOrEmpty(mem.GpPath)) return;
+            var fvi = FileVersionInfo.GetVersionInfo(mem.GpPath);
+            GameVersion = fvi.FileVersion;
+            if (string.IsNullOrEmpty(GameVersion)) return;   // geen versie-info: geen oordeel
+            VersionOk = fvi.FileMajorPart == Fields.SUPPORTED_MAJOR && fvi.FileMinorPart == Fields.SUPPORTED_MINOR;
+            Plugin.Log.LogInfo($"game_plugin.dll versie {GameVersion} (offsets gepind op {Fields.SUPPORTED_VERSION}.x → {(VersionOk ? "ok" : "AFWIJKEND")})");
+        }
+        catch (Exception e) { Plugin.Log.LogWarning("Versiedetectie mislukt: " + e.Message); }
+    }
+
+    // Exacte in-game datum zoeken in de game_plugin-image en, indien gevonden, de leeftijden
+    // herberekenen. Kandidaten en keuze gaan naar diagnostics.txt zodat de offset later
+    // hard gepind kan worden.
+    private static void FindGameDate(MemScan mem, IEnumerable<Person> players, IEnumerable<Person> staff)
+    {
+        GameDate = null;
+        DateCands = new List<(uint, int, List<ulong>)>();
+        try
+        {
+            var cands = mem.ScanGpDates(GameYear - 1, GameYear + 1);
+            DateCands = cands.GroupBy(c => c.val)
+                .Select(g => (val: g.Key, n: g.Count(), offs: g.Select(x => x.addr - mem.GpBase).Take(3).ToList()))
+                .OrderByDescending(x => (int)(x.val >> 16) == GameYear ? 1 : 0)   // cohort-jaar eerst
+                .ThenByDescending(x => x.n)
+                .ToList();
+            var best = DateCands.FirstOrDefault(x => x.n >= 2);
+            if (best.val == 0) { Plugin.Log.LogInfo("In-game datum: geen betrouwbare kandidaat (≥2 hits) gevonden."); return; }
+            var (year, doy) = DecodeFmDate(best.val);
+            GameDate = new DateTime(year, 1, 1).AddDays(doy - 1);
+            GameYear = year;   // datum uit geheugen is leidend boven de cohort-afleiding
+            foreach (var p in players.Concat(staff))
+                if (p.BirthYear > 0) p.Age = AgeAt(p.BirthYear, p.BirthDoy, GameDate.Value);
+            Plugin.Log.LogInfo($"In-game datum: {GameDate.Value:yyyy-MM-dd} ({best.n} hits, bv. gp+0x{best.offs[0]:X})");
+        }
+        catch (Exception e) { Plugin.Log.LogWarning("Datum-discovery mislukt: " + e.Message); }
     }
 
     // ---------- output ----------
@@ -463,10 +527,23 @@ internal static class Dumper
         j.BeginObj();
         j.Key("meta"); j.BeginObj();
         j.Prop("generated", DateTime.Now.ToString("s"));
-        // Afgeleid seizoensjaar met de systeemmaand/-dag (jaar is het betrouwbare deel).
         int gy = GameYear > 0 ? GameYear : DateTime.Now.Year;
-        j.Prop("gameDate", $"{gy:D4}-{DateTime.Now:MM-dd}");
+        if (GameDate is DateTime gd)
+        {
+            // Exacte in-game datum uit het geheugen gevonden.
+            j.Prop("gameDate", gd.ToString("yyyy-MM-dd"));
+            j.Prop("gameDateSource", "memory");
+        }
+        else
+        {
+            // Fallback: afgeleid seizoensjaar met de systeemmaand/-dag (jaar is het betrouwbare deel).
+            j.Prop("gameDate", $"{gy:D4}-{DateTime.Now:MM-dd}");
+            j.Prop("gameDateSource", "derived");
+        }
         j.Prop("gameYear", gy);
+        j.Prop("gameVersion", GameVersion);
+        j.Prop("supportedVersion", Fields.SUPPORTED_VERSION);
+        j.Prop("versionOk", VersionOk);
         j.Prop("manager", ManagerName);
         j.Prop("myClub", MyClub);
         j.Prop("myClubRep", MyClubRep);
@@ -587,6 +664,21 @@ internal static class Dumper
             w.WriteLine();
             w.WriteLine($"Mijn club: {ManagerName} · {MyClub} · reputatie={MyClubRep}");
             w.WriteLine($"Clubs gedetecteerd: {ClubCount} · spelers via selectie gekoppeld: {LinkedViaSquad}");
+            w.WriteLine();
+
+            // === GAME-DATUM DISCOVERY ===
+            // Vergelijk de gekozen datum met de echte in-game datum; klopt een andere kandidaat
+            // beter, dan is dát de offset om te pinnen (gp+0x… blijft stabiel binnen een versie).
+            w.WriteLine("=== GAME-DATUM DISCOVERY (u32 FM-datums in game_plugin, venster = seizoensjaar ±1) ===");
+            w.WriteLine($"Gekozen: {(GameDate is DateTime g2 ? g2.ToString("yyyy-MM-dd") : "GEEN (fallback naar systeemdatum)")} · game-versie: {GameVersion ?? "?"}");
+            foreach (var c in DateCands.Take(20))
+            {
+                var (cy, cdoy) = DecodeFmDate(c.val);
+                string iso = "?";
+                try { iso = new DateTime(cy, 1, 1).AddDays(cdoy - 1).ToString("yyyy-MM-dd"); } catch { }
+                w.WriteLine($"  0x{c.val:X8} = {iso}  hits={c.n}  offs: {string.Join(", ", c.offs.Select(o => $"gp+0x{o:X}"))}");
+            }
+            if (DateCands.Count == 0) w.WriteLine("  (geen kandidaten — datum leeft mogelijk alleen op de heap)");
             w.WriteLine();
             w.WriteLine("=== TOP-20 CA — huidige club (via selectie) vs alternatieven ===");
             w.WriteLine("(FINAL = wat de app toont; vergelijk met in-game. 0x80=geboorteplaats, 0x108/keten=oude bron)");

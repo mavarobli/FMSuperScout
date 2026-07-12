@@ -57,6 +57,7 @@ internal sealed class MemScan
     public ulong GaEnd { get; private set; }
     public ulong GpBase { get; private set; }   // game_plugin.dll (native C++ database — hier leven person-objecten)
     public ulong GpEnd { get; private set; }
+    public string GpPath { get; private set; }  // bestandspad van game_plugin.dll (voor versiedetectie)
 
     [ThreadStatic] private static byte[] _tls;
     private static byte[] Tls => _tls ??= new byte[16];
@@ -154,7 +155,7 @@ internal sealed class MemScan
             if (string.Equals(m.ModuleName, "GameAssembly.dll", StringComparison.OrdinalIgnoreCase))
             { GaBase = b; GaEnd = e; }
             else if (string.Equals(m.ModuleName, "game_plugin.dll", StringComparison.OrdinalIgnoreCase))
-            { GpBase = b; GpEnd = e; }
+            { GpBase = b; GpEnd = e; GpPath = m.FileName; }
         }
         list.Sort((a, b) => a.Item1.CompareTo(b.Item1));
         _mods = list.ToArray();
@@ -245,6 +246,29 @@ internal sealed class MemScan
         if (n == 0) return null;
         var s = System.Text.Encoding.UTF8.GetString(buf, 0, n).Trim();
         return s.Length == 0 ? null : s;
+    }
+
+    /// <summary>
+    /// Zoekt in de gecachte game_plugin-image (statics + code) naar u32-waarden die exact
+    /// een FM-datum coderen: jaar in [yMin..yMax] in de bovenste 16 bits, dag-van-jaar 1..366
+    /// in de onderste 9 bits, en bits 9..15 exact 0. Die laatste eis filtert vrijwel alle
+    /// toevallige waarden (RVA's, immediates) weg. Voor het vinden van de in-game datum.
+    /// </summary>
+    public List<(ulong addr, uint val)> ScanGpDates(int yMin, int yMax)
+    {
+        var list = new List<(ulong addr, uint val)>();
+        if (_gp == null) return list;
+        for (int i = 0; i + 4 <= _gp.Length; i += 4)
+        {
+            uint v = BitConverter.ToUInt32(_gp, i);
+            int year = (int)(v >> 16);
+            if (year < yMin || year > yMax) continue;
+            if ((v & 0xFE00) != 0) continue;          // bits 9..15 moeten 0 zijn
+            int doy = (int)(v & 0x1FF);
+            if (doy is < 1 or > 366) continue;
+            list.Add((GpBase + (ulong)i, v));
+        }
+        return list;
     }
 
     /// <summary>

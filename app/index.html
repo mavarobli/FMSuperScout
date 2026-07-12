@@ -38,6 +38,7 @@
 </div>
 
 <div id="banner" class="hidden"></div>
+<div id="ver-warn" class="hidden"></div>
 <div id="main">
   <aside id="filters">
     <div class="fgroup">
@@ -45,6 +46,15 @@
         <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input type="text" id="f-name" data-i18n-ph="searchph" placeholder="Zoek naam of club">
       </div>
+    </div>
+
+    <div class="fsection" id="fg-presets" data-sec="presets">
+      <div class="fsec-head" data-i18n="presetsTitle">Opgeslagen filters</div>
+      <div id="preset-list"></div>
+      <button id="btn-preset-save">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span data-i18n="presetSave">Huidige filters opslaan</span>
+      </button>
     </div>
 
     <div class="fsection" id="fg-pitch" data-sec="pitch">
@@ -152,6 +162,7 @@
 </div>
 
 <div id="donate-nudge" class="hidden"></div>
+<div id="preset-modal" class="hidden"></div>
 <div id="compare-tray" class="hidden"></div>
 <div id="compare-modal" class="hidden"><div id="compare-inner"></div></div>
 <div id="toast" class="hidden"></div>

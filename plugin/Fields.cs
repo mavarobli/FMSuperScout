@@ -7,6 +7,13 @@ namespace FMSuperScout;
 /// </summary>
 internal static class Fields
 {
+    // Game-versie waarop deze offsets zijn gepind (major.minor van game_plugin.dll).
+    // Wijkt de geladen game hiervan af, dan waarschuwt de web-app dat de data
+    // mogelijk onbetrouwbaar is tot de offsets opnieuw geverifieerd zijn.
+    public const int SUPPORTED_MAJOR = 26;
+    public const int SUPPORTED_MINOR = 3;
+    public const string SUPPORTED_VERSION = "26.3";
+
     // --- Object-header (elk DB-object) ---
     public const int OBJ_DUNI = 0x0C;         // uint32 Unique ID (UID)
 

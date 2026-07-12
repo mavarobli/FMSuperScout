@@ -82,6 +82,14 @@ const I18N = {
     anRecSuccNp: 'Geen jong talent op niveau; zoek een groot U{age}-talent.',
     competition: 'Competitie', divLabel: 'Divisie', clubTier: 'Clubniveau',
     tierTop: 'Top (rep 7500+)', tierStrong: 'Sterk (6000+)', tierMid: 'Middel (4000+)', tierLow: 'Laag (<4000)',
+    presetsTitle: 'Opgeslagen filters', presetSave: 'Huidige filters opslaan', presetNamePrompt: 'Naam voor deze zoekopdracht',
+    presetSaved: 'Filter opgeslagen', presetNone: 'Nog geen opgeslagen filters.', presetDelConfirm: 'Weet je zeker dat je "{name}" wilt verwijderen?',
+    presetEmptyFilters: 'Geen actieve filters om op te slaan',
+    presetSaveTitle: 'Filters opslaan', presetDelTitle: 'Filter verwijderen',
+    saveBtn: 'Opslaan', deleteBtn: 'Verwijderen', cancelBtn: 'Annuleren',
+    c_meta: 'Meta', metaLabel: 'Meta-score',
+    metaHint: 'Meta-score (1–20, zelfde schaal als een attribuut): hoe sterk deze speler scoort op de attributen die volgens FM-Arena\'s grootschalige tests de meeste punten opleveren in de match engine — vooral Snelheid en Versnelling, daarna Sprongkracht en Dribbelen.\n\nRichtlijn: 15+ elite, 13–15 sterk, 11–13 degelijk, daaronder matig.\n\nGebruik het naast CA: hoge Meta bij gelijke CA = meer rendement op het veld; hoge CA maar lage Meta = speler leunt op attributen die de engine minder beloont. Zegt niets over positie of rol; keepers vallen buiten de test.',
+    verWarn: '⚠ FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x — data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -141,6 +149,14 @@ const I18N = {
     anRecSuccNp: 'No young talent at the level; find a top U{age} prospect.',
     competition: 'Competition', divLabel: 'Division', clubTier: 'Club level',
     tierTop: 'Top (rep 7500+)', tierStrong: 'Strong (6000+)', tierMid: 'Mid (4000+)', tierLow: 'Low (<4000)',
+    presetsTitle: 'Saved filters', presetSave: 'Save current filters', presetNamePrompt: 'Name for this search',
+    presetSaved: 'Filter saved', presetNone: 'No saved filters yet.', presetDelConfirm: 'Are you sure you want to delete "{name}"?',
+    presetEmptyFilters: 'No active filters to save',
+    presetSaveTitle: 'Save filters', presetDelTitle: 'Delete filter',
+    saveBtn: 'Save', deleteBtn: 'Delete', cancelBtn: 'Cancel',
+    c_meta: 'Meta', metaLabel: 'Meta score',
+    metaHint: 'Meta score (1–20, same scale as an attribute): how well this player scores on the attributes that FM-Arena\'s large-scale tests show yield the most points in the match engine — mainly Pace and Acceleration, then Jumping Reach and Dribbling.\n\nRule of thumb: 15+ elite, 13–15 strong, 11–13 decent, below that modest.\n\nUse it next to CA: higher Meta at equal CA = more on-pitch return; high CA but low Meta = player relies on attributes the engine rewards less. Says nothing about position or role; goalkeepers fall outside the test.',
+    verWarn: '⚠ FM version {v} detected; memory reading is calibrated for {s}.x — data may be unreliable until FMSuperScout is updated.',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
@@ -240,6 +256,7 @@ const PLAYER_COLS = [
   { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? '<span class="eu-yes">✓</span>' : '<span class="dim">–</span>' },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
+  { key: 'meta', label: 'c_meta', num: true, help: 'metaHint', get: p => metaScore(p), render: p => metaHtml(p) },
   { key: 'value', label: 'c_value', num: true, get: p => estValue(p).v, render: p => estHtml(p) },
   { key: 'fee', label: 'c_fee', num: true, get: p => { const f = feeEstimate(p); return f.v == null ? -1 : f.v; }, render: p => feeHtml(p) },
   { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney },
@@ -549,6 +566,32 @@ function bestRoles(p, n = 5) {
 }
 const roleClass = v => v == null ? '' : v >= 15 ? 'g5' : v >= 13 ? 'g4' : v >= 10.5 ? 'g3' : v >= 8 ? 'g2' : 'g1';
 
+// ---------- meta-score (FM-Arena attribute testing) ----------
+// Gewichten = de gemeten punten-impact per attribuut uit FM-Arena's attribute testing
+// (fm-arena.com/table/26-player-attributes-testing): per attribuut werd het effect op de
+// teamprestatie in de match engine gemeten. Snelheid/Versnelling domineren met afstand.
+// De score (1-20-schaal, key = zwaarder) zegt dus "hoe meta is deze speler", los van rol of CA.
+// Attributen zonder meetbaar positief effect tellen niet mee; keepers vallen buiten de test.
+const META_W = {
+  Pace: 20.5, Acceleration: 20.4, JumpingReach: 11.6, Dribbling: 9.8, Balance: 5.3,
+  Concentration: 4.5, Anticipation: 4.3, Determination: 2.7, Agility: 2.7, Stamina: 2.5,
+  Strength: 1.9, FirstTouch: 1.5, Composure: 1.2, WorkRate: 1.1, Finishing: 1.1, Flair: 1.1,
+  LongShots: 1.0, Aggression: 1.0, Heading: 0.6, OffTheBall: 0.5,
+};
+function metaScore(p) {
+  if (!p.attrs || (p.posArr || []).includes('GK')) return null;
+  let sum = 0, w = 0;
+  for (const k in META_W) {
+    const v = p.attrs[k];
+    if (v != null) { sum += v * META_W[k]; w += META_W[k]; }
+  }
+  return w ? sum / w : null;
+}
+function metaHtml(p) {
+  const s = metaScore(p);
+  return s == null ? '<span class="dim">·</span>' : `<span class="${roleClass(s)}" title="${t('metaLabel')}">${s.toFixed(1)}</span>`;
+}
+
 // ---------- posities & veld ----------
 const PITCH = [
   ['ST', 50, 9], ['AML', 17, 24], ['AMC', 50, 24], ['AMR', 83, 24],
@@ -610,6 +653,7 @@ async function loadDump() {
     state.dumpStamp = st.dumpTime;
     renderDumpInfo();
     renderClubBadge();
+    renderVerWarn();
     $('empty-state').classList.add('hidden');
     buildStaffRoles();
     applyFilters();
@@ -621,6 +665,16 @@ function renderDumpInfo() {
   const n = state.players.length.toLocaleString();
   $('dump-info').textContent = n;
   $('dump-info').title = `${state.players.length.toLocaleString()} ${t('playersWord')} · ${state.staff.length.toLocaleString()} ${t('staffWord')}\n${when.toLocaleString()}`;
+}
+// Waarschuwing als de dump uit een andere FM-versie komt dan waarop de offsets zijn gepind:
+// de geheugen-uitlezing kan dan stilletjes verkeerde waarden geven.
+function renderVerWarn() {
+  const el = $('ver-warn');
+  const m = state.meta;
+  if (m.gameVersion && m.versionOk === false) {
+    el.textContent = tf('verWarn', { v: m.gameVersion, s: m.supportedVersion || '26.3' });
+    el.classList.remove('hidden');
+  } else el.classList.add('hidden');
 }
 function renderClubBadge() {
   const mgr = state.meta.manager, club = state.meta.myClub, rep = state.meta.myClubRep;
@@ -781,6 +835,119 @@ function renderChips(chips) {
   const ca = bar.querySelector('.chip-clear');
   if (ca) ca.onclick = () => $('btn-clear').onclick();
 }
+// ---------- opgeslagen filterpresets ----------
+// Een preset is een momentopname van alle filtervelden (tekst, vinkjes, selects, posities
+// op het veld en de gekozen tactische rol). Bewaard in localStorage; zelfde naam = overschrijven.
+const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'];
+const PRESET_CHECK_IDS = ['f-eu', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-myclub', 'f-shortlist'];
+const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-div', 'f-tier', 'f-role'];
+function loadPresets() { try { return JSON.parse(localStorage.getItem('fmss_presets') || '[]'); } catch { return []; } }
+function storePresets(list) { localStorage.setItem('fmss_presets', JSON.stringify(list)); }
+function snapshotFilters() {
+  const s = { text: {}, check: {}, select: {}, pos: [...activePos] };
+  for (const id of PRESET_TEXT_IDS) { const v = $(id).value.trim(); if (v) s.text[id] = v; }
+  for (const id of PRESET_CHECK_IDS) if ($(id).checked) s.check[id] = true;
+  for (const id of PRESET_SELECT_IDS) { const v = $(id).value; if (v && v !== '0') s.select[id] = v; }
+  return s;
+}
+const presetIsEmpty = s => !s.pos.length && !Object.keys(s.text).length && !Object.keys(s.check).length && !Object.keys(s.select).length;
+function applyPreset(s) {
+  $('btn-clear').onclick();                       // schone lei
+  $('f-role').value = '';                         // rol hoort bij de preset, niet bij de vorige zoektocht
+  for (const [id, v] of Object.entries(s.text || {})) if ($(id)) $(id).value = v;
+  for (const id of Object.keys(s.check || {})) if ($(id)) $(id).checked = true;
+  for (const [id, v] of Object.entries(s.select || {})) if ($(id)) $(id).value = v;
+  const codes = new Set(s.pos || []);
+  activePos.clear();
+  document.querySelectorAll('.pos-node').forEach(n => {
+    const on = codes.has(n.dataset.pos);
+    n.classList.toggle('on', on);
+    if (on) activePos.add(n.dataset.pos);
+  });
+  // rol-keuze gedraagt zich zoals de gewone rol-selectie (incl. sorteren op rolscore)
+  state.role = $('f-role').value;
+  localStorage.setItem('fmss_role', state.role);
+  if (state.role) { state.sortKey = 'role'; state.sortDir = -1; }
+  else if (state.sortKey === 'role') { state.sortKey = 'ca'; state.sortDir = -1; }
+  applyFilters();
+}
+// Klein in-app dialoogje in de stijl van de app (geen system-popups zoals prompt/confirm).
+// opts: { title, body?, input? (placeholder → toont invoerveld), confirmLabel, danger?, onConfirm(value) }
+function presetDialog(opts) {
+  const m = $('preset-modal');
+  m.innerHTML = `<div class="pm-card">
+    <div class="pm-title">${opts.title}</div>
+    ${opts.body ? `<div class="pm-body">${opts.body}</div>` : ''}
+    ${opts.input != null ? `<input type="text" id="pm-input" maxlength="40" placeholder="${opts.input}">` : ''}
+    <div class="pm-actions">
+      <button class="pm-cancel">${t('cancelBtn')}</button>
+      <button class="pm-ok${opts.danger ? ' danger' : ''}">${opts.confirmLabel}</button>
+    </div>
+  </div>`;
+  m.classList.remove('hidden');
+  const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  const close = () => { m.classList.add('hidden'); document.removeEventListener('keydown', esc, true); };
+  const ok = () => {
+    const inp = $('pm-input');
+    const v = inp ? inp.value.trim() : null;
+    if (inp && !v) { inp.focus(); return; }   // lege naam: blijf staan
+    close();
+    opts.onConfirm(v);
+  };
+  document.addEventListener('keydown', esc, true);   // capture: vóór de globale Esc-handlers
+  m.querySelector('.pm-cancel').onclick = close;
+  m.querySelector('.pm-ok').onclick = ok;
+  m.onclick = e => { if (e.target === m) close(); };
+  const inp = $('pm-input');
+  if (inp) { inp.focus(); inp.onkeydown = e => { if (e.key === 'Enter') ok(); }; }
+}
+function renderPresets() {
+  const box = $('preset-list');
+  if (!box) return;
+  const list = loadPresets();
+  box.innerHTML = list.length
+    ? list.map((p, i) => `<span class="preset" data-i="${i}">${escHtml(p.name)}<span class="x" data-del="${i}">✕</span></span>`).join('')
+    : `<div class="preset-none">${t('presetNone')}</div>`;
+  box.querySelectorAll('.preset').forEach(el => el.onclick = e => {
+    if (e.target.dataset && e.target.dataset.del != null) return;   // ✕ heeft z'n eigen handler
+    const p = loadPresets()[+el.dataset.i];
+    if (p) { applyPreset(p.state); showToast('🔍 ' + p.name); }
+  });
+  box.querySelectorAll('[data-del]').forEach(x => x.onclick = e => {
+    e.stopPropagation();
+    const p = loadPresets()[+x.dataset.del];
+    if (!p) return;
+    presetDialog({
+      title: t('presetDelTitle'),
+      body: tf('presetDelConfirm', { name: escHtml(p.name) }),
+      confirmLabel: t('deleteBtn'),
+      danger: true,
+      onConfirm: () => {
+        const cur = loadPresets();
+        const idx = cur.findIndex(q => q.name === p.name);
+        if (idx >= 0) { cur.splice(idx, 1); storePresets(cur); }
+        renderPresets();
+      },
+    });
+  });
+}
+$('btn-preset-save').onclick = () => {
+  const snap = snapshotFilters();
+  if (presetIsEmpty(snap)) { showToast(t('presetEmptyFilters')); return; }
+  presetDialog({
+    title: t('presetSaveTitle'),
+    input: t('presetNamePrompt'),
+    confirmLabel: t('saveBtn'),
+    onConfirm: name => {
+      const list = loadPresets().filter(p => p.name !== name);   // zelfde naam = overschrijven
+      list.push({ name, state: snap });
+      storePresets(list);
+      renderPresets();
+      showToast('✓ ' + t('presetSaved'));
+    },
+  });
+};
+
 // ---------- kolomconfiguratie (volgorde + verbergen, per modus) ----------
 const modeKey = () => state.mode === 'staff' ? 'staff' : 'players';
 function baseCols() { return modeKey() === 'staff' ? STAFF_COLS : PLAYER_COLS; }
@@ -792,7 +959,9 @@ function colCfg() {
   let saved = state.colCfg[k];
   if (!saved || !Array.isArray(saved.order)) { saved = { order: [...keys], hidden: [...defHidden] }; state.colCfg[k] = saved; }
   for (const kk of keys) if (!saved.order.includes(kk)) {   // nieuwe kolommen erbij
-    saved.order.push(kk);
+    // op de standaardplek invoegen (na de dichtstbijzijnde bekende voorganger), niet achteraan
+    const prev = keys.slice(0, keys.indexOf(kk)).reverse().find(k2 => saved.order.includes(k2));
+    saved.order.splice(prev ? saved.order.indexOf(prev) + 1 : saved.order.length, 0, kk);
     if (defHidden.has(kk) && !saved.hidden.includes(kk)) saved.hidden.push(kk);   // standaard verborgen
   }
   saved.order = saved.order.filter(kk => keys.includes(kk));                    // verdwenen eruit
@@ -873,7 +1042,8 @@ function renderTable() {
     const stick = c.star ? 'c-sticky' : c.name ? 'c-sticky stick-end' : '';
     const w = W[c.key] ? ` style="width:${W[c.key]}px"` : '';
     const grip = c.star ? '' : '<span class="col-resize"></span>';   // sleepgreep rechts
-    return `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}"${w} class="${stick} ${c.key === state.sortKey ? 'sorted' : ''}">${colLabel(c)}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}${grip}</th>`;
+    const help = c.help ? `<span class="col-help" title="${t(c.help)}">?</span>` : '';
+    return `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}"${w} class="${stick} ${c.key === state.sortKey ? 'sorted' : ''}">${colLabel(c)}${help}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}${grip}</th>`;
   }).join('');
   $('grid-head').querySelectorAll('th').forEach(th => {
     const k = th.dataset.key;
@@ -893,8 +1063,9 @@ function renderTable() {
       grip.ondragstart = e => { e.preventDefault(); e.stopPropagation(); };
     }
     const col = cols.find(c => c.key === k);
-    th.onclick = () => {
+    th.onclick = e => {
       if (col?.star) return;
+      if (e.target.closest('.col-help')) return;             // ?-icoon is alleen uitleg, niet sorteren
       if (resizing) { resizing = false; return; }            // net een kolom versmald/verbreed: niet sorteren
       if (state.sortKey === k) state.sortDir *= -1;
       else { state.sortKey = k; state.sortDir = (k === 'pos' || k === 'name' || k === 'nat') ? 1 : -1; }
@@ -1130,6 +1301,7 @@ function showDetail(p) {
     ${p.worldRep ? `<div><b>${t('repLabel')}</b> ${p.worldRep}</div>` : ''}
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
     ${p.height ? `<div><b>${t('height')}</b> ${p.height} cm</div>` : ''}
+    ${isPlayer && metaScore(p) != null ? `<div title="${t('metaHint')}"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
   </div>`;
 
   const flags = [];
@@ -1584,9 +1756,11 @@ function applyLang() {
   $('btn-coffee').title = t('donateBtn');
   renderDumpInfo();
   renderClubBadge();
+  renderVerWarn();
   buildStaffRoles();
   buildRoleSelect();
   buildDivisions();
+  renderPresets();
   applyFilters();
   if (state.selected) showDetail(state.selected);
 }
