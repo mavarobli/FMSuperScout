@@ -997,48 +997,63 @@ function exportShortlist() {
 // FM-attribuutkleuren: 16-20 groen, 11-15 oranje, 1-10 witachtig. Ook voor potentie-projectie.
 const attrClass = v => v >= 16 ? 'at-hi' : v >= 11 ? 'at-mid' : 'at-lo';
 const abar = v => `<span class="abar"><i class="${attrClass(v)}" style="width:${Math.min(100, v * 5)}%"></i></span>`;
-// Fysieke attributen pieken vroeg en groeien nauwelijks; technisch/mentaal groeit langer door.
+// Attribuutfamilies voor de potentie-projectie.
 const PHYS_ATTRS = new Set(['Acceleration', 'Agility', 'Balance', 'JumpingReach', 'NaturalFitness', 'Pace', 'Stamina', 'Strength']);
-// Aandeel van de resterende groei dat op deze leeftijd nog realistisch is (grofweg de FM-groeicurve).
-function ageRemainFactor(age) {
-  if (age == null) return 0.5;
-  if (age <= 18) return 1.0;
-  if (age <= 21) return 0.85;
-  if (age <= 23) return 0.6;
-  if (age <= 25) return 0.4;
-  if (age <= 27) return 0.2;
-  if (age <= 29) return 0.08;
-  return 0.0;
-}
-// Positie-relevantie per attribuut voor de groeiprojectie: attributen die bij de rollen van de
-// speler horen groeien het hardst (key 1.0, preferable 0.6, rest 0.25). Zo krijgt een spits geen
-// 20 mandekking, ook niet met veel PA-ruimte.
-function growthRelevance(p) {
-  const rel = {};
-  for (const role of rolesForPos(p.posArr)) {
-    for (const k of role.pref) if ((rel[k] || 0) < 0.6) rel[k] = 0.6;
-    for (const k of role.key) rel[k] = 1.0;
-  }
-  return rel;
-}
-// Set-pieces groeien het minst (laagst gewogen in CA, zelden getraind).
+const MENTAL_ATTRS = new Set(['Aggression', 'Anticipation', 'Bravery', 'Composure', 'Concentration', 'Decisions', 'Determination', 'Flair', 'Leadership', 'OffTheBall', 'Positioning', 'Teamwork', 'Vision', 'WorkRate']);
 const SETPIECE_ATTRS = new Set(['Corners', 'FreeKicks', 'PenaltyTaking', 'LongThrows']);
-// Projecteer één attribuut naar het potentieel (PA): additieve, positie-gewogen groei uit de
-// CA-koppenruimte, gedempt door leeftijd, PROFESSIONALITEIT (blijkt in FM de sterkste
-// ontwikkelingsfactor, sterker dan Determination) en attribuuttype (fysiek groeit minder en
-// stopt na ~24; set-pieces groeien nauwelijks). Alleen positie-relevante attributen groeien echt door.
-function potAttr(p, v, key, rel) {
-  if (!p.pa || !p.ca || p.pa <= p.ca) return v;
-  const head = p.pa - p.ca;                               // CA-koppenruimte (0-200 schaal)
+// Fysieke groei is sterk leeftijdsgebonden: piekt jong, plateaut ~24, daalt na ~30.
+function physGrowthFactor(age) {
+  if (age == null) return 0.6;
+  if (age <= 20) return 1.0;
+  if (age <= 23) return 0.8;
+  if (age <= 26) return 0.55;
+  if (age <= 29) return 0.3;
+  if (age <= 32) return 0.12;
+  return 0.05;
+}
+// Mentale groei loopt juist dóór (en versnelt relatief) op latere leeftijd.
+function mentalGrowthFactor(age) {
+  if (age == null) return 1.0;
+  if (age >= 32) return 1.25;
+  if (age >= 28) return 1.15;
+  return 1.0;
+}
+// ----- Potentie-projectie (afgeleid, niet 1-op-1 GenieScout) -----
+// FM's CA is een lineaire, positie-gewogen som van de zichtbare attributen (bron: FM Scout CA-gids).
+// Daardoor is "elk attribuut × PA/CA" de profielbehoudende projectie die precies op PA uitkomt —
+// dat is waarom GenieScout proportioneel opschaalt. Twee reële effecten die dat negeert, corrigeren we:
+//  1) de cap op 20 (extreme headroom loopt vast), en
+//  2) groei is niet uniform: fysiek groeit jong en daalt met leeftijd, mentaal/techniek groeit langer door.
+// Aanpak: neem de proportionele groei g0 = attr·(PA/CA − 1) als magnitude-anker, tilt de VÓRM met
+// leeftijd-/type-factoren, en hernormaliseer zodat de totale groei gelijk blijft aan g0 (dus de
+// projectie blijft ~op PA uitkomen). Zo krijgt een oudere speler zijn groei in hoofd/techniek i.p.v.
+// snelheid, terwijl een tiener ~proportioneel opschaalt (GenieScout-achtig). Set-pieces groeien traag.
+function projectAttrs(p) {
+  if (!p.pa || !p.ca || p.pa <= p.ca || !p.attrs) return null;
+  const f = p.pa / p.ca;
   const age = getAge(p);
-  const ageF = ageRemainFactor(age);
-  const prof = p.professionalism || (p.attrs && p.attrs.Determination) || 10;
-  const profF = 0.55 + 0.45 * Math.min(1, prof / 18);     // professionaliteit benut de groei
-  const isPhys = key && PHYS_ATTRS.has(key);
-  const physF = isPhys ? (age != null && age >= 24 ? 0.15 : 0.6) : (SETPIECE_ATTRS.has(key) ? 0.4 : 1.0);
-  const r = rel ? (rel[key] ?? 0.25) : 0.5;               // positie-relevantie
-  const growth = r * ageF * profF * physF * 0.05 * head;
-  return Math.min(20, Math.round(v + growth));
+  const physF = physGrowthFactor(age);
+  const mentF = mentalGrowthFactor(age);
+  const techF = age != null && age >= 31 ? 0.8 : 1.0;   // techniek tapert heel licht bij oudere spelers
+  const keys = Object.keys(p.attrs).filter(k => PHYS_ATTRS.has(k) || MENTAL_ATTRS.has(k) || SETPIECE_ATTRS.has(k)
+    || !['Consistency', 'ImportantMatches', 'Versatility', 'InjuryProneness', 'Dirtiness'].includes(k));
+  let sumG0 = 0, sumGM = 0;
+  const g0 = {}, m = {};
+  for (const k of keys) {
+    const a = p.attrs[k];
+    if (a == null) continue;
+    g0[k] = a * (f - 1);
+    m[k] = PHYS_ATTRS.has(k) ? physF : SETPIECE_ATTRS.has(k) ? 0.55 : MENTAL_ATTRS.has(k) ? mentF : techF;
+    sumG0 += g0[k];
+    sumGM += g0[k] * m[k];
+  }
+  const norm = sumGM > 0 ? sumG0 / sumGM : 1;            // behoud totale groei-magnitude (≈ op PA)
+  const proj = {};
+  for (const k of keys) {
+    if (g0[k] == null) continue;
+    proj[k] = Math.min(20, Math.round(p.attrs[k] + g0[k] * m[k] * norm));
+  }
+  return proj;
 }
 function showDetail(p) {
   state.selected = p;
@@ -1102,13 +1117,13 @@ function showDetail(p) {
     html += `<label class="potswitch${canPot ? '' : ' off'}"><input type="checkbox" id="pot-toggle" ${state.showPot ? 'checked' : ''} ${canPot ? '' : 'disabled'}> ${t('showPot')}${state.showPot ? ` <span class="dim">(${t('potNote')})</span>` : ''}</label>`;
     const isGk = (p.posArr || []).includes('GK');
     const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
-    const rel = state.showPot ? growthRelevance(p) : null;
+    const proj = state.showPot ? projectAttrs(p) : null;
     const col = {};
     for (const [gk, keys] of groups) {
       const rows = keys.filter(k => p.attrs[k] != null);
       col[gk] = !rows.length ? '' : `<div class="attr-col"><h3>${t(gk)}</h3>` + rows.map((k, idx) => {
         const raw = p.attrs[k];
-        const shown = state.showPot ? potAttr(p, raw, k, rel) : raw;
+        const shown = proj ? (proj[k] ?? raw) : raw;
         const grew = state.showPot && shown > raw;
         return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span><span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
       }).join('') + '</div>';
