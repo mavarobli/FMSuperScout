@@ -263,14 +263,16 @@ const STAFF_COLS = [
 ];
 
 // ---------- geschatte marktwaarde (GBP) ----------
-// Log-lineair model, gekalibreerd op 43 spelers met een échte FM-waarde (dump-opgeslagen +
-// bekende sterren uit in-game screenshots). Mediane fout ~24% op volwassen spelers, 86% binnen 50%.
-// Kern: verzadigende CA (boven 150 vlakt af, zodat de top niet explodeert) + wereldreputatie
-// (faam) + clubreputatie + resterende contractduur (∝ √maanden). Jonge spelers krijgen een deel
-// van hun PA-koppenruimte als extra "ability". Leeftijd >29 geeft een aflopende korting.
-// Let op: waarde van tieners is in FM zeer grillig; behandel die als grove indicatie.
-const VAL_B = { c0: -1.1725, ca: 0.1065, wRep: 0.0875, cRep: 0.1289, lnC: 0.4878, HI: 0.15 };
-function caSaturated(ca) { return Math.min(ca, 150) + VAL_B.HI * Math.max(0, ca - 150); }
+// Gekalibreerd op ~45 spelers met een échte FM-waarde (dump + in-game screenshots, laag/mid/top).
+// Belangrijkste bevinding uit die data: FM-waarde volgt vooral de WERELDREPUTATIE (faam), niet CA.
+// Twee spelers met dezelfde reputatie zijn ~even veel waard, ongeacht CA; CA en reputatie zijn
+// bovendien zo gecorreleerd dat CA meenemen het model onstabiel maakt. Daarom: reputatie (met
+// verzadiging aan de top) + leeftijd + resterende contractduur, plus een lichte jeugd-correctie.
+// Gevolg/beperking: een sterke speler met lage faam (kleine club) wordt eerder onderschat.
+// De écht accurate route is de waarde rechtstreeks uit het geheugen lezen (zoals GenieScout);
+// zie docs/backlog.md.
+const VAL_B = { c0: 10.96, wRep: 0.997, age: -0.069, yhead: -0.041, lnC: 0.507 };
+function wSat(w) { return Math.min(w, 7500) + 0.30 * Math.max(0, w - 7500); }   // faam vlakt af aan de top
 // Écht clubloos = geen club én geen clubreputatie. (Club met wél rep maar zonder naam is een
 // niet-opgeloste clubverwijzing, geen transfervrije speler — zie clubLabel.)
 const isFree = p => !p.club && !(p.clubRep > 0);
@@ -288,18 +290,16 @@ function estValue(p) {
   const a = getAge(p) || 25;
   const m = monthsUntil(p.expires);
   const head = Math.max(0, (p.pa || p.ca) - p.ca);
-  const lift = a <= 20 ? 0.4 : a <= 23 ? 0.2 : 0;         // jonge spelers: deel van de potentie telt mee
-  const ability = p.ca + lift * Math.min(head, 45);
+  const yhead = a <= 21 ? head : a <= 24 ? head * 0.5 : 0;
   let ln = VAL_B.c0
-    + VAL_B.ca * caSaturated(ability)
-    + VAL_B.wRep * ((p.worldRep || 3000) / 1000)
-    + VAL_B.cRep * ((p.clubRep || 4000) / 1000)
+    + VAL_B.wRep * (wSat(p.worldRep || 3000) / 1000)
+    + VAL_B.age * a
+    + VAL_B.yhead * yhead
     + VAL_B.lnC * Math.log(Math.max(2, m == null ? 36 : m));
   let v = Math.exp(ln);
-  if (a > 29) v *= Math.exp(-0.08 * (a - 29));           // aflopende leeftijd
   if (m != null && m <= 4) v *= 0.7;                     // (bijna) transfervrij
   v = v >= 1e6 ? Math.round(v / 1e5) * 1e5 : Math.round(v / 1e4) * 1e4;
-  const band = a <= 20 ? 0.55 : 0.32;                    // tieners: bredere bandbreedte (grilliger)
+  const band = a <= 20 ? 0.5 : 0.35;
   return { v, est: true, lo: Math.round(v * (1 - band)), hi: Math.round(v * (1 + band)) };
 }
 function estHtml(p) {
