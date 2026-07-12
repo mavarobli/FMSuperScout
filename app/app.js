@@ -48,6 +48,8 @@ const I18N = {
     ambition: 'Ambitie', loyalty: 'Loyaliteit', professionalism: 'Professionaliteit', adaptability: 'Aanpassing',
     pressure: 'Druk', sportsmanship: 'Sportiviteit', temperament: 'Temperament', controversy: 'Controverse', determination: 'Vastberadenheid',
     personaTitle: 'Persoonlijkheid',
+    hiddenTitle: 'Verborgen kenmerken', a_Consistency: 'Constantheid', a_ImportantMatches: 'Grote wedstrijden',
+    a_InjuryProneness: 'Blessuregevoeligheid', a_Versatility: 'Veelzijdigheid', a_Dirtiness: 'Vals spel',
     showPot: 'Toon geschatte potentie', potNote: 'geschatte waarden op potentieel (PA)',
     clubless: 'clubloos', clubUnknown: 'onbekende club', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd, FM haalt de data op…',
     dumping: '⏳ FM haalt de database op…', dumpReady: '✓ Nieuwe data klaar, klik om te laden',
@@ -105,6 +107,8 @@ const I18N = {
     ambition: 'Ambition', loyalty: 'Loyalty', professionalism: 'Professionalism', adaptability: 'Adaptability',
     pressure: 'Pressure', sportsmanship: 'Sportsmanship', temperament: 'Temperament', controversy: 'Controversy', determination: 'Determination',
     personaTitle: 'Personality',
+    hiddenTitle: 'Hidden', a_Consistency: 'Consistency', a_ImportantMatches: 'Big matches',
+    a_InjuryProneness: 'Injury proneness', a_Versatility: 'Versatility', a_Dirtiness: 'Dirtiness',
     showPot: 'Show estimated potential', potNote: 'estimated values at potential (PA)',
     clubless: 'free agent', clubUnknown: 'unknown club', copied: 'Copied', reqSent: '⏳ Request sent, FM is fetching the data…',
     dumping: '⏳ FM is fetching the database…', dumpReady: '✓ New data ready, click to load',
@@ -1070,6 +1074,14 @@ function showDetail(p) {
       ['adaptability', p.adaptability], ['controversy', p.controversy]].filter(x => x[1] > 0);
     const persHtml = pd.length ? `<div class="attr-col"><h3>${t('personaTitle')}</h3>` + pd.map(([k, v], idx) =>
       `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span>${abar(v)}<span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
+    // Overige verborgen kenmerken. Bij InjuryProneness/Dirtiness is HOOG slecht → kleur omkeren.
+    const hd = [['Consistency', true], ['ImportantMatches', true], ['Versatility', true],
+      ['InjuryProneness', false], ['Dirtiness', false]]
+      .map(([k, good]) => [k, p.attrs ? p.attrs[k] : 0, good]).filter(x => x[1] > 0);
+    const hidHtml = hd.length ? `<div class="attr-col"><h3>${t('hiddenTitle')}</h3>` + hd.map(([k, v, good], idx) => {
+      const cls = good ? attrClass(v) : attrClass(21 - v);   // "slecht-hoog": omgekeerde kleur
+      return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t('a_' + k)}</span><span class="abar"><i class="${cls}" style="width:${Math.min(100, v * 5)}%"></i></span><span class="v ${cls}">${v}</span></div>`;
+    }).join('') + '</div>' : '';
     // Grid: links Technisch/Keepen + Standaardsituaties (Mentaal loopt ernaast over 2 rijen),
     // onderste rij Fysiek | Persoonlijkheid op gelijke hoogte.
     const techKey = isGk ? 'g_goalkeeping' : 'g_technical';
@@ -1078,7 +1090,7 @@ function showDetail(p) {
       <div style="grid-area:sp">${col['g_setpieces'] || ''}</div>
       <div style="grid-area:ment">${col['g_mental'] || ''}</div>
       <div style="grid-area:phys">${col['g_physical'] || ''}</div>
-      <div style="grid-area:pers">${persHtml}</div>
+      <div style="grid-area:pers">${persHtml}${hidHtml}</div>
     </div>`;
   } else if (p.staffAttrs) {
     html += `<div class="attr-cols"><div class="attr-col"><h3>${t('staffAttrs')}</h3>` +
