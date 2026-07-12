@@ -151,7 +151,20 @@ function gameNow() {
 
 // ---------- kolommen ----------
 const qClass = v => v == null ? '' : v >= 150 ? 'q5' : v >= 120 ? 'q4' : v >= 90 ? 'q3' : v >= 60 ? 'q2' : 'q1';
-const qHtml = v => v == null ? '–' : `<span class="${qClass(v)}">${v}</span>`;
+const qHtml = v => {
+  if (v == null) return '–';
+  const q = qClass(v), pct = Math.min(100, v / 2);
+  return `<span class="qcell"><span class="qnum ${q}">${v}</span><span class="qtrack"><span class="qfill ${q.replace('q', 'qb')}" style="width:${pct}%"></span></span></span>`;
+};
+// contract-cel: amber als het contract (bijna) afloopt — scouting-signaal
+function expiresHtml(p) {
+  const m = monthsUntil(p.expires);
+  if (m == null) return { cls: 'dim', txt: '–' };
+  const txt = fmtDate(p.expires);
+  if (m <= 6) return { cls: 'exp-soon', txt };
+  if (m <= 12) return { cls: 'exp-year', txt };
+  return { cls: '', txt };
+}
 
 const PLAYER_COLS = [
   { key: 'sl', label: '★', star: true },
@@ -165,7 +178,7 @@ const PLAYER_COLS = [
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
   { key: 'value', label: 'c_value', num: true, get: p => estValue(p).v, render: p => estHtml(p) },
   { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney },
-  { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate },
+  { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls },
   { key: 'interest', label: 'c_interest', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p) },
   { key: 'status', label: 'c_status', get: p => 0, render: p => statusHtml(p) },
 ];
@@ -179,7 +192,7 @@ const STAFF_COLS = [
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
   { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney },
-  { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate },
+  { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls },
 ];
 
 // ---------- geschatte marktwaarde (GBP) ----------
@@ -460,8 +473,10 @@ function measureRowH() {
 function colLabel(c) { return c.star ? '★' : (c.label.startsWith('c_') || I18N.nl[c.label] ? t(c.label) : c.label); }
 function renderTable() {
   const cols = activeCols();
-  $('grid-head').innerHTML = cols.map(c =>
-    `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}" class="${c.key === state.sortKey ? 'sorted' : ''}" title="${c.star ? '' : t('colHint')}">${colLabel(c)}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('');
+  $('grid-head').innerHTML = cols.map(c => {
+    const stick = c.star ? 'c-sticky' : c.name ? 'c-sticky stick-end' : '';
+    return `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}" class="${stick} ${c.key === state.sortKey ? 'sorted' : ''}" title="${c.star ? '' : t('colHint')}">${colLabel(c)}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`;
+  }).join('');
   $('grid-head').querySelectorAll('th').forEach(th => {
     const k = th.dataset.key;
     const col = cols.find(c => c.key === k);
@@ -524,19 +539,20 @@ function renderVisible() {
   body.innerHTML = slice.map((p, i) => {
     const idx = first + i;
     const tds = cols.map(c => {
+      const stick = c.star ? 'c-sticky' : c.name ? 'c-sticky stick-end' : '';
       if (c.star) {
         const on = state.shortlist.has(p.id);
-        return `<td class="star-cell ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</td>`;
+        return `<td class="star-cell ${stick} ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</td>`;
       }
       if (c.render) return `<td class="${c.num ? 'num' : ''}">${c.render(p)}</td>`;
       let v = c.get(p);
-      if (c.name) return `<td class="pname" title="Klik = kopieer naam">${v || '?'}</td>`;
+      if (c.name) return `<td class="pname ${stick}" title="Klik = kopieer naam">${v || '?'}</td>`;
       if (c.dimNull && !v) return `<td class="dim">–</td>`;
       if (c.fmt) v = c.fmt(v);
       if (v == null || v === '') v = '–';
-      return `<td class="${c.num ? 'num' : ''} ${c.cls || ''}">${v}</td>`;
+      return `<td class="${c.num ? 'num' : ''} ${c.cls || ''} ${c.tdCls ? c.tdCls(p) : ''}">${v}</td>`;
     }).join('');
-    return `<tr data-i="${idx}" class="${state.selected === p ? 'sel' : ''}" style="height:${ROW_H}px">${tds}</tr>`;
+    return `<tr data-i="${idx}" class="${state.selected === p ? 'sel' : ''}${idx % 2 ? ' even' : ''}" style="height:${ROW_H}px">${tds}</tr>`;
   }).join('');
   body.querySelectorAll('tr').forEach(tr => {
     tr.onclick = e => {
