@@ -41,6 +41,7 @@ const I18N = {
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Waarde', c_wage: 'Salaris p/w', c_expires: 'Contract tot', c_interest: 'Interesse',
     c_status: 'Status', c_role: 'Rol', foot: 'Voet', height: 'Lengte', repLabel: 'Reputatie',
+    c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
     int_big: 'Groot', int_ok: 'Redelijk', int_small: 'Klein', int_no: 'Nee', interestTitle: 'Interesse-inschatting',
     minorNote: 'Te jong voor een transfer.', minorIntlNote: 'Als niet-EU-minderjarige pas vanaf 18 haalbaar (FIFA-regel voor internationale transfers).',
@@ -97,6 +98,7 @@ const I18N = {
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Value', c_wage: 'Wage p/w', c_expires: 'Contract until', c_interest: 'Interest',
     c_status: 'Status', c_role: 'Role', foot: 'Foot', height: 'Height', repLabel: 'Reputation',
+    c_clubrep: 'Club rep', c_worldrep: 'World rep',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
     int_big: 'High', int_ok: 'Fair', int_small: 'Low', int_no: 'No', interestTitle: 'Interest estimate',
     minorNote: 'Too young for a transfer.', minorIntlNote: 'As a non-EU minor, only feasible from age 18 (FIFA rule on international transfers).',
@@ -239,6 +241,11 @@ const PLAYER_COLS = [
   { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls },
   { key: 'interest', label: 'c_interest', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p) },
   { key: 'status', label: 'c_status', get: p => 0, render: p => statusHtml(p) },
+  // Standaard verboren extra kolommen (via rechtsklik aan te zetten, sorteerbaar):
+  { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true },
+  { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true },
+  { key: 'height', label: 'height', num: true, get: p => p.height, fmt: v => v ? v + ' cm' : '–', defHidden: true },
+  { key: 'foot', label: 'foot', get: p => p.foot || '–', defHidden: true },
 ];
 const STAFF_COLS = [
   { key: 'sl', label: '★', star: true },
@@ -251,6 +258,8 @@ const STAFF_COLS = [
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
   { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney },
   { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls },
+  { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true },
+  { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true },
 ];
 
 // ---------- geschatte marktwaarde (GBP) ----------
@@ -684,10 +693,15 @@ const modeKey = () => state.mode === 'staff' ? 'staff' : 'players';
 function baseCols() { return modeKey() === 'staff' ? STAFF_COLS : PLAYER_COLS; }
 function colCfg() {
   const k = modeKey();
-  const keys = baseCols().filter(c => !c.star).map(c => c.key);
+  const cols = baseCols().filter(c => !c.star);
+  const keys = cols.map(c => c.key);
+  const defHidden = new Set(cols.filter(c => c.defHidden).map(c => c.key));
   let saved = state.colCfg[k];
-  if (!saved || !Array.isArray(saved.order)) { saved = { order: [...keys], hidden: [] }; state.colCfg[k] = saved; }
-  for (const kk of keys) if (!saved.order.includes(kk)) saved.order.push(kk);  // nieuwe kolommen erbij
+  if (!saved || !Array.isArray(saved.order)) { saved = { order: [...keys], hidden: [...defHidden] }; state.colCfg[k] = saved; }
+  for (const kk of keys) if (!saved.order.includes(kk)) {   // nieuwe kolommen erbij
+    saved.order.push(kk);
+    if (defHidden.has(kk) && !saved.hidden.includes(kk)) saved.hidden.push(kk);   // standaard verborgen
+  }
   saved.order = saved.order.filter(kk => keys.includes(kk));                    // verdwenen eruit
   return saved;
 }
