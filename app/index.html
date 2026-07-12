@@ -32,6 +32,9 @@
     <select id="sel-lang"><option value="nl">Nederlands</option><option value="en">English</option></select></div>
   <div class="set-row"><span data-i18n="curLabel">Valuta</span>
     <select id="sel-cur"><option value="£">£ GBP</option><option value="€">€ EUR</option></select></div>
+  <label class="set-row set-toggle"><span data-i18n="hideCapa">CA/PA verbergen</span>
+    <input type="checkbox" id="set-hidecapa"></label>
+  <div class="set-note" id="hidecapa-note" data-i18n="hideCapaNote">Verbergt current/potential ability, voor wie dat als spieken ziet.</div>
 </div>
 
 <div id="banner" class="hidden"></div>
@@ -62,8 +65,8 @@
     <div class="fsection" data-sec="quality">
       <div class="fsec-head" data-i18n="quality">Kwaliteit &amp; leeftijd</div>
       <div class="frow"><span data-i18n="age">Leeftijd</span><div class="range2"><input type="number" id="f-age-min" placeholder="–">–<input type="number" id="f-age-max" placeholder="–"></div></div>
-      <div class="frow"><span>CA</span><div class="range2"><input type="number" id="f-ca-min" placeholder="–">–<input type="number" id="f-ca-max" placeholder="–"></div></div>
-      <div class="frow"><span>PA</span><div class="range2"><input type="number" id="f-pa-min" placeholder="–">–<input type="number" id="f-pa-max" placeholder="–"></div></div>
+      <div class="frow capa-row"><span>CA</span><div class="range2"><input type="number" id="f-ca-min" placeholder="–">–<input type="number" id="f-ca-max" placeholder="–"></div></div>
+      <div class="frow capa-row"><span>PA</span><div class="range2"><input type="number" id="f-pa-min" placeholder="–">–<input type="number" id="f-pa-max" placeholder="–"></div></div>
       <div class="frow"><span data-i18n="refyear" title="Huidig in-game jaar">Peiljaar</span><input type="number" id="f-refyear" class="yr"></div>
     </div>
 

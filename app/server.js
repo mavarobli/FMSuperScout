@@ -8,7 +8,7 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 
-const PORT = 8765;
+const PORT = Number(process.env.PORT) || 8765;
 const APP_DIR = __dirname;
 // De plugin schrijft dumps hierheen:
 const DATA_DIR = path.join(os.homedir(), 'AppData', 'Local', 'FMSuperScout');
@@ -68,6 +68,7 @@ const server = http.createServer((req, res) => {
       dumpFile: dump ? path.basename(dump.full) : null,
       dumpTime: dump ? dump.mtime : null,
       dumpSize: dump ? fs.statSync(dump.full).size : null,
+      appMode: APP_MODE,
       plugin,
     }));
     return;

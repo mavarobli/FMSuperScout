@@ -11,6 +11,7 @@ const state = {
   cur: localStorage.getItem('fmss_cur') || '£',
   lang: localStorage.getItem('fmss_lang') || 'nl',
   showPot: false,
+  hideCapa: localStorage.getItem('fmss_hidecapa') === '1',
   role: localStorage.getItem('fmss_role') || '',
   compare: [],
   refYear: new Date().getFullYear(),
@@ -25,6 +26,7 @@ const I18N = {
   nl: {
     players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: 'Zoek naam of club',
     settings: 'Instellingen', langLabel: 'Taal', curLabel: 'Valuta',
+    hideCapa: 'CA/PA verbergen', hideCapaNote: 'Verbergt current/potential ability, voor wie dat als spieken ziet.',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', refyear: 'Peiljaar', financial: 'Financieel', maxvalue: 'Max. waarde', maxwage: 'Max. loon p/w',
     origin: 'Herkomst', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
@@ -53,24 +55,29 @@ const I18N = {
     step2: 'Druk in de game op <kbd>F9</kbd>, of klik hier op <b>⬇ Nieuwe data</b>',
     step3: 'Klik op de groene balk zodra de dump klaar is',
     playersWord: 'spelers', staffWord: 'staf', clickClubFilter: 'Klik = filter op jouw club', repWord: 'reputatie',
-    roleFit: 'Tactische rol', roleColHdr: 'Rol', roleAny: 'Geen rol gekozen', bestRoles: 'Beste rollen', roleScoreOf: 'Rolscore',
-    compare: 'Vergelijk', comparing: 'Vergelijken', addCompare: 'Vergelijk', inCompare: 'In vergelijking', compareFull: 'Max. 3 spelers',
+    roleFit: 'Tactische rol', roleColHdr: 'Rol', roleAny: 'Geen rol gekozen', bestRoles: 'Beste rollen',
+    compare: 'Vergelijk', comparing: 'Vergelijken', addCompare: 'Vergelijk', compareFull: 'Max. 3 spelers',
     cmpTitle: 'Spelervergelijking', cmpValue: 'Waarde', cmpTopRole: 'Beste rol',
     analysis: 'Analyse', anTitle: 'Squad-behoefteanalyse', anNoClub: 'Geen eigen club in de data gevonden.',
-    anPlayers: 'spelers', anAvgAge: 'gem. leeftijd', anAvgCa: 'gem. CA', anTopCa: 'beste CA', anDepth: 'diepte',
+    anPlayers: 'spelers', anAvgAge: 'gem. leeftijd', anAvgCa: 'gem. CA', anTopCa: 'beste CA',
     anOk: 'Op sterkte', anThin: 'Dunne bezetting', anShort: 'Tekort', anAging: 'Vergrijzing', anNoSucc: 'Geen opvolging',
     anScout: 'Scout spelers', anYoungTalent: 'jongste talent', anNone: 'geen',
-    anSummary: 'Samenvatting', anBiggestNeed: 'Grootste behoefte', anSquadSize: 'Selectie',
+    anBiggestNeed: 'Grootste behoefte', anSquadSize: 'Selectie',
     anRecAging: 'Vergrijst; zoek een opvolger jonger dan {age} met PA boven {pa}.',
     anRecShort: 'Te weinig spelers; werf minimaal {n} extra ({pa}+ PA).',
     anRecThin: 'Dunne cover; een aanvulling van {pa}+ PA versterkt de diepte.',
     anRecSucc: 'Geen jong talent dat het niveau haalt; zoek U{age} met PA boven {pa}.',
+    anRecAgingNp: 'Vergrijst; zoek een jongere opvolger.',
+    anRecShortNp: 'Te weinig spelers; werf {n} extra.',
+    anRecThinNp: 'Dunne cover; een aanvulling versterkt de diepte.',
+    anRecSuccNp: 'Geen jong talent op niveau; zoek een groot U{age}-talent.',
     competition: 'Competitie', divLabel: 'Divisie', clubTier: 'Clubniveau',
     tierTop: 'Top (rep 7500+)', tierStrong: 'Sterk (6000+)', tierMid: 'Middel (4000+)', tierLow: 'Laag (<4000)',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
     settings: 'Settings', langLabel: 'Language', curLabel: 'Currency',
+    hideCapa: 'Hide CA/PA', hideCapaNote: 'Hides current/potential ability, for those who consider it cheating.',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', refyear: 'Game year', financial: 'Financial', maxvalue: 'Max. value', maxwage: 'Max. wage p/w',
     origin: 'Origin', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
@@ -99,18 +106,22 @@ const I18N = {
     step2: 'Press <kbd>F9</kbd> in-game, or click <b>⬇ New data</b> here',
     step3: 'Click the green bar when the dump is ready',
     playersWord: 'players', staffWord: 'staff', clickClubFilter: 'Click = filter on your club', repWord: 'reputation',
-    roleFit: 'Tactical role', roleColHdr: 'Role', roleAny: 'No role selected', bestRoles: 'Best roles', roleScoreOf: 'Role score',
-    compare: 'Compare', comparing: 'Comparing', addCompare: 'Compare', inCompare: 'In comparison', compareFull: 'Max. 3 players',
+    roleFit: 'Tactical role', roleColHdr: 'Role', roleAny: 'No role selected', bestRoles: 'Best roles',
+    compare: 'Compare', comparing: 'Comparing', addCompare: 'Compare', compareFull: 'Max. 3 players',
     cmpTitle: 'Player comparison', cmpValue: 'Value', cmpTopRole: 'Best role',
     analysis: 'Analysis', anTitle: 'Squad needs analysis', anNoClub: 'No own club found in the data.',
-    anPlayers: 'players', anAvgAge: 'avg age', anAvgCa: 'avg CA', anTopCa: 'top CA', anDepth: 'depth',
+    anPlayers: 'players', anAvgAge: 'avg age', anAvgCa: 'avg CA', anTopCa: 'top CA',
     anOk: 'Well stocked', anThin: 'Thin cover', anShort: 'Shortage', anAging: 'Aging', anNoSucc: 'No succession',
     anScout: 'Scout players', anYoungTalent: 'youngest talent', anNone: 'none',
-    anSummary: 'Summary', anBiggestNeed: 'Biggest need', anSquadSize: 'Squad',
+    anBiggestNeed: 'Biggest need', anSquadSize: 'Squad',
     anRecAging: 'Aging; find a successor under {age} with PA above {pa}.',
     anRecShort: 'Too few players; sign at least {n} more ({pa}+ PA).',
     anRecThin: 'Thin cover; an addition of {pa}+ PA improves depth.',
     anRecSucc: 'No young talent reaching the level; look for U{age} with PA above {pa}.',
+    anRecAgingNp: 'Aging; find a younger successor.',
+    anRecShortNp: 'Too few players; sign {n} more.',
+    anRecThinNp: 'Thin cover; an addition improves depth.',
+    anRecSuccNp: 'No young talent at the level; find a top U{age} prospect.',
     competition: 'Competition', divLabel: 'Division', clubTier: 'Club level',
     tierTop: 'Top (rep 7500+)', tierStrong: 'Strong (6000+)', tierMid: 'Mid (4000+)', tierLow: 'Low (<4000)',
   },
@@ -654,7 +665,8 @@ function activeCols() {
   const sl = base.find(c => c.star);                     // ster-kolom altijd vooraan
   const name = base.find(c => c.name);
   const rc = state.mode !== 'staff' ? roleCol() : null;  // rol-kolom direct na naam
-  const rest = cf.order.filter(k => !hidden.has(k) && byKey[k] && !(rc && k === 'role')).map(k => byKey[k]);
+  const capaHidden = k => state.hideCapa && (k === 'ca' || k === 'pa');
+  const rest = cf.order.filter(k => !hidden.has(k) && byKey[k] && !(rc && k === 'role') && !capaHidden(k)).map(k => byKey[k]);
   const out = [];
   if (sl) out.push(sl);
   for (const c of rest) { out.push(c); if (rc && c === name) out.push(rc); }
@@ -832,13 +844,15 @@ function exportShortlist() {
   const ids = state.shortlist;
   const all = [...state.players, ...state.staff].filter(p => ids.has(p.id));
   if (!all.length) { showToast('Shortlist leeg'); return; }
-  const cols = ['Name', 'Position', 'Age', 'Club', 'Nationality', 'CA', 'PA', 'Value(GBP)', 'Wage(GBP)', 'Contract', 'Interest'];
+  const withCapa = !state.hideCapa;
+  const cols = ['Name', 'Position', 'Age', 'Club', 'Nationality',
+    ...(withCapa ? ['CA', 'PA'] : []), 'Value(GBP)', 'Wage(GBP)', 'Contract', 'Interest'];
   const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
   const lines = [cols.join(',')];
   for (const p of all) {
     const i = interestEstimate(p);
     lines.push([p.name, p.pos || p.job || '', getAge(p), p.club || '', (p.nat || []).join('/'),
-      p.ca, p.pa, estValue(p).v ?? '', p.wage ?? '', p.expires || '', i ? i.label : ''].map(esc).join(','));
+      ...(withCapa ? [p.ca, p.pa] : []), estValue(p).v ?? '', p.wage ?? '', p.expires || '', i ? i.label : ''].map(esc).join(','));
   }
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
@@ -888,7 +902,7 @@ function showDetail(p) {
   const ev = estValue(p);
   const valTxt = ev.v == null ? '–' : ev.v === 0 ? t('free_l') : ev.est ? `${fmtMoney(ev.lo)} – ${fmtMoney(ev.hi)}` : fmtMoney(ev.v);
 
-  const gauge = (p.ca != null || p.pa != null) ? `<div class="capa">
+  const gauge = (!state.hideCapa && (p.ca != null || p.pa != null)) ? `<div class="capa">
     <div class="capa-nums"><span><b>CA</b> <span class="ca-bar">${p.ca ?? '–'}</span></span><span><b>PA</b> <span class="pa-bar">${p.pa ?? '–'}</span></span></div>
     <div class="capa-track"><span class="capa-pa" style="width:${Math.min(100, (p.pa ?? 0) / 2)}%"></span><span class="capa-ca" style="width:${Math.min(100, (p.ca ?? 0) / 2)}%"></span></div>
   </div>` : '';
@@ -1034,8 +1048,10 @@ function openCompare() {
     return `<span class="${cls}">${fmt(vals[i])}</span>`;
   }
   let body = headRow;
-  body += statRow('CA', players.map(p => p.ca));
-  body += statRow('PA', players.map(p => p.pa));
+  if (!state.hideCapa) {
+    body += statRow('CA', players.map(p => p.ca));
+    body += statRow('PA', players.map(p => p.pa));
+  }
   body += statRow(t('cmpValue'), players.map(p => estValue(p).v), { fmt: fmtMoney });
   body += statRow(t('wageLabel'), players.map(p => p.wage), { fmt: fmtMoney, hi: false });
   body += statRow(t('c_age'), players.map(p => getAge(p)), { hi: false });
@@ -1100,15 +1116,16 @@ function analyseSquad() {
     // Aanbeveling + scout-parameters
     let rec = null, scout = null;
     const suggPa = Math.max(bestCa, Math.round(avg(cas) + 12) || 120);
+    const np = state.hideCapa ? 'Np' : '';   // number-free varianten als CA/PA verborgen is
     if (status === 'short') {
       const n = g.target - members.length;
-      rec = tf('anRecShort', { n, pa: suggPa }); scout = { pos: g.pos, minPa: Math.max(80, suggPa - 20) };
+      rec = tf('anRecShort' + np, { n, pa: suggPa }); scout = { pos: g.pos, minPa: Math.max(80, suggPa - 20) };
     } else if (aging) {
-      rec = tf('anRecAging', { age: 23, pa: bestCa }); scout = { pos: g.pos, maxAge: 23, minPa: bestCa };
+      rec = tf('anRecAging' + np, { age: 23, pa: bestCa }); scout = { pos: g.pos, maxAge: 23, minPa: bestCa };
     } else if (!succ && members.length) {
-      rec = tf('anRecSucc', { age: 23, pa: bestCa }); scout = { pos: g.pos, maxAge: 23, minPa: bestCa };
+      rec = tf('anRecSucc' + np, { age: 23, pa: bestCa }); scout = { pos: g.pos, maxAge: 23, minPa: bestCa };
     } else if (status === 'thin') {
-      rec = tf('anRecThin', { pa: suggPa }); scout = { pos: g.pos, minPa: suggPa };
+      rec = tf('anRecThin' + np, { pa: suggPa }); scout = { pos: g.pos, minPa: suggPa };
     }
     // prioriteit voor sortering/samenvatting
     const prio = status === 'short' ? 3 : aging ? 2.5 : (!succ && members.length) ? 1.5 : status === 'thin' ? 1 : 0;
@@ -1128,9 +1145,11 @@ function renderAnalysis() {
   const topNeed = needs[0];
   const statusLabel = { ok: t('anOk'), thin: t('anThin'), short: t('anShort') };
 
+  const caTile = state.hideCapa ? '' :
+    `<div class="an-sum-item"><span class="an-sum-n">${Math.round(avg(squad.map(p => p.ca || 0)))}</span><span class="an-sum-l">${t('anAvgCa')}</span></div>`;
   const summary = `<div class="an-summary">
     <div class="an-sum-item"><span class="an-sum-n">${squad.length}</span><span class="an-sum-l">${t('anSquadSize')}</span></div>
-    <div class="an-sum-item"><span class="an-sum-n">${Math.round(avg(squad.map(p => p.ca || 0)))}</span><span class="an-sum-l">${t('anAvgCa')}</span></div>
+    ${caTile}
     <div class="an-sum-item"><span class="an-sum-n">${avg(squad.map(p => getAge(p)).filter(Boolean)).toFixed(1)}</span><span class="an-sum-l">${t('anAvgAge')}</span></div>
     <div class="an-sum-item need"><span class="an-sum-l">${t('anBiggestNeed')}</span><span class="an-sum-need">${topNeed ? topNeed.g.label[state.lang] || topNeed.g.label.nl : '–'}</span></div>
   </div>`;
@@ -1151,11 +1170,11 @@ function renderAnalysis() {
       <div class="an-depth" title="${x.count}/${x.g.target}">${depthDots}</div>
       <div class="an-stats">
         <span><b>${x.count}</b> ${t('anPlayers')}</span>
-        <span><b>${Math.round(x.avgCa)}</b> ${t('anAvgCa')}</span>
-        <span><b>${x.bestCa}</b> ${t('anTopCa')}</span>
+        ${state.hideCapa ? '' : `<span><b>${Math.round(x.avgCa)}</b> ${t('anAvgCa')}</span>
+        <span><b>${x.bestCa}</b> ${t('anTopCa')}</span>`}
         <span><b>${x.avgAge ? x.avgAge.toFixed(0) : '–'}</b> ${t('anAvgAge')}</span>
       </div>
-      <div class="an-young">${t('anYoungTalent')}: ${yt ? `${yt.name} <span class="dim">(${getAge(yt)}, PA ${yt.pa || '·'})</span>` : t('anNone')}</div>
+      <div class="an-young">${t('anYoungTalent')}: ${yt ? `${yt.name} <span class="dim">(${getAge(yt)}${state.hideCapa ? '' : `, PA ${yt.pa || '·'}`})</span>` : t('anNone')}</div>
       ${x.rec ? `<div class="an-rec">${x.rec}</div>` : ''}
       ${x.scout ? `<button class="an-scout" data-grp="${x.g.id}">${t('anScout')} →</button>` : ''}
     </div>`;
@@ -1269,6 +1288,22 @@ $('sel-lang').addEventListener('change', () => {
   localStorage.setItem('fmss_lang', state.lang);
   applyLang();
 });
+// CA/PA verbergen (anti-"spieken"). Past de hele tool consistent aan.
+function applyHideCapa() {
+  document.body.classList.toggle('hide-capa', state.hideCapa);
+  if (state.hideCapa) {                       // CA/PA-filters leegmaken zodat ze niet stiekem filteren
+    ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max'].forEach(id => { $(id).value = ''; });
+    if (state.sortKey === 'ca' || state.sortKey === 'pa') { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
+  }
+  if (state.mode === 'analysis') renderAnalysis(); else applyFilters();
+  if (state.selected) showDetail(state.selected);
+}
+$('set-hidecapa').checked = state.hideCapa;
+$('set-hidecapa').addEventListener('change', () => {
+  state.hideCapa = $('set-hidecapa').checked;
+  localStorage.setItem('fmss_hidecapa', state.hideCapa ? '1' : '0');
+  applyHideCapa();
+});
 // instellingen-menu (tandwiel)
 $('btn-settings').onclick = e => {
   e.stopPropagation();
@@ -1361,12 +1396,21 @@ async function poll() {
   setTimeout(poll, 2000);
 }
 
-// Heartbeat: laat de standalone-server weten dat het venster nog open is (app-modus).
-function beat() { fetch('/api/heartbeat', { method: 'POST' }).catch(() => {}); }
-setInterval(beat, 4000); beat();
-window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch {} });
+// Heartbeat: alleen in de standalone app-modus, zodat de server stopt als het venster sluit.
+// In dev-modus (browser) niet nodig, dat scheelt onnodig netwerkverkeer.
+async function initHeartbeat() {
+  try {
+    const st = await (await fetch('/api/status')).json();
+    if (!st.appMode) return;
+    const beat = () => fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
+    setInterval(beat, 4000); beat();
+    window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch {} });
+  } catch { /* server weg */ }
+}
+initHeartbeat();
 
 buildPitch();
 applyLang();
+document.body.classList.toggle('hide-capa', state.hideCapa);
 $('sl-count').textContent = state.shortlist.size;
 loadDump().then(() => poll());

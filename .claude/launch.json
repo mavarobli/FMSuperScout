@@ -5,7 +5,8 @@
       "name": "fmsuperscout",
       "runtimeExecutable": "node",
       "runtimeArgs": ["app/server.js"],
-      "port": 8765
+      "port": 8765,
+      "autoPort": true
     }
   ]
 }
