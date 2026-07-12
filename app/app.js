@@ -668,6 +668,7 @@ function exportShortlist() {
 
 // ---------- detailpaneel ----------
 const attrClass = v => v >= 17 ? 'g5' : v >= 14 ? 'g4' : v >= 10 ? 'g3' : v >= 6 ? 'g2' : 'g1';
+const abar = v => `<span class="abar"><i class="ab-${attrClass(v)}" style="width:${Math.min(100, v * 5)}%"></i></span>`;
 // Geschatte potentie-waarde van een attribuut o.b.v. PA/CA-verhouding (ruwe projectie).
 function potAttr(p, v) {
   if (!p.pa || !p.ca || p.pa <= p.ca) return v;
@@ -682,12 +683,15 @@ function showDetail(p) {
   const ev = estValue(p);
   const valTxt = ev.v == null ? '–' : ev.v === 0 ? t('free_l') : ev.est ? `${fmtMoney(ev.lo)} – ${fmtMoney(ev.hi)}` : fmtMoney(ev.v);
 
+  const gauge = (p.ca != null || p.pa != null) ? `<div class="capa">
+    <div class="capa-nums"><span><b>CA</b> <span class="ca-bar">${p.ca ?? '–'}</span></span><span><b>PA</b> <span class="pa-bar">${p.pa ?? '–'}</span></span></div>
+    <div class="capa-track"><span class="capa-pa" style="width:${Math.min(100, (p.pa ?? 0) / 2)}%"></span><span class="capa-ca" style="width:${Math.min(100, (p.ca ?? 0) / 2)}%"></span></div>
+  </div>` : '';
   let html = `<h2>${p.name} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span>
     <button class="copybtn" title="Kopieer naam">📋</button></h2>
   <div class="sub">${getAge(p)} · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${p.club || t('clubless')}</div>
+  ${gauge}
   <div class="kv">
-    <div><b>CA</b> <span class="ca-bar">${p.ca ?? '–'}</span></div>
-    <div><b>PA</b> <span class="pa-bar">${p.pa ?? '–'}</span></div>
     ${isPlayer ? `<div><b>${t('c_pos')}</b> ${p.pos || '–'}</div><div><b>${t('foot')}</b> ${p.foot || '–'}</div>` : `<div><b>${t('c_role')}</b> ${p.job || '–'}</div>`}
     <div><b>${t('estval')}</b> ${valTxt}</div>
     <div><b>${t('wageLabel')}</b> ${fmtMoney(p.wage)}</div>
@@ -721,7 +725,7 @@ function showDetail(p) {
         const raw = p.attrs[k];
         const shown = state.showPot ? potAttr(p, raw) : raw;
         const grew = state.showPot && shown > raw;
-        return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span><span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
+        return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span>${abar(shown)}<span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
       }).join('') + '</div>';
     }
     // Persoonlijkheid (verborgen kenmerken) — net als een normale eigenschappengroep.
@@ -729,7 +733,7 @@ function showDetail(p) {
       ['pressure', p.pressure], ['temperament', p.temperament], ['sportsmanship', p.sportsmanship],
       ['adaptability', p.adaptability], ['controversy', p.controversy]].filter(x => x[1] > 0);
     const persHtml = pd.length ? `<div class="attr-col"><h3>${t('personaTitle')}</h3>` + pd.map(([k, v], idx) =>
-      `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
+      `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span>${abar(v)}<span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
     // Grid: links Technisch/Keepen + Standaardsituaties (Mentaal loopt ernaast over 2 rijen),
     // onderste rij Fysiek | Persoonlijkheid op gelijke hoogte.
     const techKey = isGk ? 'g_goalkeeping' : 'g_technical';
@@ -743,7 +747,7 @@ function showDetail(p) {
   } else if (p.staffAttrs) {
     html += `<div class="attr-cols"><div class="attr-col"><h3>${t('staffAttrs')}</h3>` +
       Object.entries(p.staffAttrs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v], idx) =>
-        `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${k.replace(/_/g, ' ')}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div></div>';
+        `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${k.replace(/_/g, ' ')}</span>${abar(v)}<span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div></div>';
   }
   $('detail-body').innerHTML = html;
   document.querySelector('.detail-star').onclick = () => toggleShortlist(p.id);

@@ -280,9 +280,22 @@ td.exp-year { color: #d8c88a; }
   .attr-grid { grid-template-columns: 1fr; grid-template-areas: "tech" "sp" "ment" "phys" "pers"; }
 }
 .attr-col h3 { font-size: 11px; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 3px; margin-bottom: 3px; font-weight: 700; }
-.attr-row { display: flex; justify-content: space-between; padding: 2px 6px; font-size: 12.5px; border-radius: 3px; }
+.attr-row { display: flex; align-items: center; gap: 7px; padding: 2px 6px; font-size: 12.5px; border-radius: 3px; }
+.attr-row > span:first-child { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attr-row.odd { background: rgba(255,255,255,.03); }
-.attr-row .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+.attr-row .v { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 18px; text-align: right; }
+/* attribuutbalkje (schaal 1–20) */
+.abar { flex: 0 0 auto; width: 42px; height: 4px; border-radius: 2px; background: #232d3a; overflow: hidden; }
+.abar i { display: block; height: 100%; border-radius: 2px; }
+.ab-g1 { background: #7f8ea0; } .ab-g2 { background: #c9d4df; } .ab-g3 { background: var(--warn); }
+.ab-g4 { background: #7ddc9e; } .ab-g5 { background: var(--accent); }
+/* CA/PA-gauge: CA gevuld, PA als lichte verlenging op dezelfde schaal (0–200) */
+.capa { margin: 10px 0 4px; }
+.capa-nums { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
+.capa-nums b { color: var(--muted); font-weight: 400; margin-right: 5px; }
+.capa-track { position: relative; height: 8px; border-radius: 4px; background: #232d3a; overflow: hidden; }
+.capa-pa { position: absolute; inset: 0 auto 0 0; background: rgba(56,178,106,.30); border-radius: 4px; }
+.capa-ca { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #2f7fd4, var(--accent2)); border-radius: 4px; }
 .attr-row .v.grew { position: relative; }
 .attr-row .v.grew::after { content: '▲'; font-size: 8px; color: var(--accent); margin-left: 2px; vertical-align: top; }
 .potswitch { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; font-size: 12.5px; color: var(--text); cursor: pointer; }
