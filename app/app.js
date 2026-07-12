@@ -41,12 +41,16 @@ const I18N = {
     showPot: 'Toon geschatte potentie', potNote: 'geschatte waarden op potentieel (PA)',
     clubless: 'clubloos', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd — FM haalt de data op…',
     dumping: '⏳ FM is de database aan het ophalen…', dumpReady: '✓ Nieuwe data klaar — klik om te laden',
-    started: 'Start FM26, laad je save en druk op F9 (of gebruik de knop "Nieuwe data").',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
     staffAttrs: 'Staf-attributen',
     clearAll: 'alles wissen', chipSearch: 'Zoek',
+    loading: '⏳ Data laden…',
+    step1: 'Start <b>FM26</b> en laad je save',
+    step2: 'Druk in de game op <kbd>F9</kbd> — of klik hier op <b>⬇ Nieuwe data</b>',
+    step3: 'Klik op de groene balk zodra de dump klaar is',
+    playersWord: 'spelers', staffWord: 'staf', clickClubFilter: 'Klik = filter op jouw club', repWord: 'reputatie',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -69,12 +73,16 @@ const I18N = {
     showPot: 'Show estimated potential', potNote: 'estimated values at potential (PA)',
     clubless: 'free agent', copied: 'Copied', reqSent: '⏳ Request sent — FM is fetching the data…',
     dumping: '⏳ FM is dumping the database…', dumpReady: '✓ New data ready — click to load',
-    started: 'Start FM26, load your save and press F9 (or use the "New data" button).',
     tag_free: 'free', tag_listed: 'listed', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
     staffAttrs: 'Staff attributes',
     clearAll: 'clear all', chipSearch: 'Search',
+    loading: '⏳ Loading data…',
+    step1: 'Start <b>FM26</b> and load your save',
+    step2: 'Press <kbd>F9</kbd> in-game — or click <b>⬇ New data</b> here',
+    step3: 'Click the green bar when the dump is ready',
+    playersWord: 'players', staffWord: 'staff', clickClubFilter: 'Click = filter on your club', repWord: 'reputation',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
@@ -313,10 +321,12 @@ async function loadDump() {
     const st = await (await fetch('/api/status')).json();
     if (!st.hasDump) {
       $('dump-info').textContent = '';
-      $('empty-msg').textContent = t('started');
       return;
     }
+    const b = $('banner');
+    b.className = 'scanning'; b.textContent = t('loading'); b.onclick = null;
     const data = await (await fetch('/api/dump')).json();
+    b.className = 'hidden';
     state.players = data.players || [];
     state.staff = data.staff || [];
     state.meta = data.meta || {};
@@ -330,8 +340,11 @@ async function loadDump() {
       state.refYear = state.meta.gameYear;
       $('f-refyear').value = state.refYear;
     }
-    const when = new Date(st.dumpTime).toLocaleString();
-    $('dump-info').textContent = `${state.players.length.toLocaleString()} · ${state.staff.length.toLocaleString()} · ${when}`;
+    const when = new Date(st.dumpTime);
+    const sameDay = when.toDateString() === new Date().toDateString();
+    const whenTxt = sameDay ? when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : when.toLocaleDateString();
+    $('dump-info').innerHTML = `<b>${state.players.length.toLocaleString()}</b> ${t('playersWord')} · <b>${state.staff.length.toLocaleString()}</b> ${t('staffWord')} · ${whenTxt}`;
+    $('dump-info').title = when.toLocaleString();
     renderClubBadge();
     $('empty-state').classList.add('hidden');
     buildStaffRoles();
@@ -340,8 +353,8 @@ async function loadDump() {
 }
 function renderClubBadge() {
   const mgr = state.meta.manager, club = state.meta.myClub, rep = state.meta.myClubRep;
-  $('club-badge').innerHTML = (mgr || club)
-    ? `${mgr ? mgr + ' · ' : ''}<b>${club || '?'}</b>${rep ? ` <span class="dim">(rep ${rep})</span>` : ''}` : '';
+  $('club-badge').innerHTML = (mgr || club) ? `${mgr ? mgr + ' · ' : ''}<b>${club || '?'}</b>` : '';
+  $('club-badge').title = t('clickClubFilter') + (rep ? ` · ${t('repWord')} ${rep}` : '');
 }
 function buildStaffRoles() {
   const cur = $('f-staffrole').value;
@@ -779,6 +792,24 @@ $('btn-clear').onclick = () => {
 $('btn-sidebar').onclick = () => document.body.classList.toggle('sidebar-collapsed');
 $('btn-export').onclick = exportShortlist;
 
+// inklapbare filtersecties (voorkeur onthouden)
+const collapsedSecs = new Set(JSON.parse(localStorage.getItem('fmss_secs') || '[]'));
+document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
+  const key = sec.dataset.sec;
+  if (collapsedSecs.has(key)) sec.classList.add('collapsed');
+  sec.querySelector('.fsec-head').addEventListener('click', e => {
+    if (e.target.closest('.mini')) return;
+    sec.classList.toggle('collapsed');
+    if (sec.classList.contains('collapsed')) collapsedSecs.add(key); else collapsedSecs.delete(key);
+    localStorage.setItem('fmss_secs', JSON.stringify([...collapsedSecs]));
+  });
+});
+
+// '/' focust het zoekveld
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && !e.target.closest?.('input, select, textarea')) { e.preventDefault(); $('f-name').focus(); }
+});
+
 // club-badge klik → filters wissen + mijn club aan
 $('club-badge').onclick = () => {
   if (!state.meta.myClub) return;
@@ -828,8 +859,8 @@ function applyLang() {
   document.documentElement.lang = state.lang;
   document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
   document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
+  document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
   $('f-name').placeholder = t('searchph');
-  if (!state.meta.gameDate) $('empty-msg').textContent = t('started');
   buildStaffRoles();
   applyFilters();
   if (state.selected) showDetail(state.selected);

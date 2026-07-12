@@ -39,10 +39,11 @@
       <div class="search-wrap">
         <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input type="text" id="f-name" data-i18n-ph="searchph" placeholder="Zoek naam of club">
+        <span class="search-key">/</span>
       </div>
     </div>
 
-    <div class="fsection" id="fg-pitch">
+    <div class="fsection" id="fg-pitch" data-sec="pitch">
       <div class="fsec-head"><span data-i18n="position">Positie</span> <button id="pos-clear" class="mini" data-i18n="clear">wis</button></div>
       <div id="pitch-wrap"></div>
     </div>
@@ -52,7 +53,7 @@
       <select id="f-staffrole"><option value="">–</option></select>
     </div>
 
-    <div class="fsection">
+    <div class="fsection" data-sec="quality">
       <div class="fsec-head" data-i18n="quality">Kwaliteit &amp; leeftijd</div>
       <div class="frow"><span data-i18n="age">Leeftijd</span><div class="range2"><input type="number" id="f-age-min" placeholder="–">–<input type="number" id="f-age-max" placeholder="–"></div></div>
       <div class="frow"><span>CA</span><div class="range2"><input type="number" id="f-ca-min" placeholder="–">–<input type="number" id="f-ca-max" placeholder="–"></div></div>
@@ -60,19 +61,19 @@
       <div class="frow"><span data-i18n="refyear" title="Huidig in-game jaar — bepaalt de leeftijd">Peiljaar</span><input type="number" id="f-refyear" class="yr"></div>
     </div>
 
-    <div class="fsection">
+    <div class="fsection" data-sec="financial">
       <div class="fsec-head" data-i18n="financial">Financieel</div>
       <div class="frow"><span data-i18n="maxvalue">Max. waarde</span><input type="text" id="f-price" placeholder="10M"></div>
       <div class="frow"><span data-i18n="maxwage">Max. loon p/w</span><input type="text" id="f-wage" placeholder="50K"></div>
     </div>
 
-    <div class="fsection">
+    <div class="fsection" data-sec="origin">
       <div class="fsec-head" data-i18n="origin">Herkomst</div>
       <div class="frow"><span data-i18n="nat">Nationaliteit</span><input type="text" id="f-nat" placeholder="Nederland"></div>
       <label class="chk"><input type="checkbox" id="f-eu"> <span data-i18n="euonly">Alleen EU/EEA</span></label>
     </div>
 
-    <div class="fsection">
+    <div class="fsection" data-sec="availability">
       <div class="fsec-head" data-i18n="availability">Beschikbaarheid</div>
       <div class="frow"><span data-i18n="interestmin">Interesse ≥</span>
         <select id="f-interest">
@@ -106,8 +107,13 @@
       <div id="grid-spacer"></div>
     </div>
     <div id="empty-state">
+      <div class="es-icon">⚽</div>
       <h2 data-i18n="nodata">Nog geen data geladen</h2>
-      <p id="empty-msg"></p>
+      <ol class="es-steps">
+        <li data-i18n-html="step1"></li>
+        <li data-i18n-html="step2"></li>
+        <li data-i18n-html="step3"></li>
+      </ol>
     </div>
   </section>
 
