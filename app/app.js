@@ -945,20 +945,32 @@ function ageRemainFactor(age) {
   if (age <= 29) return 0.08;
   return 0.0;
 }
-// Projecteer één attribuut naar het potentieel (PA), met leeftijd, Determination en attribuuttype.
-// Zwakke punten trekken sneller op naar 20; fysiek vlakt eerder af dan techniek/mentaliteit.
-function potAttr(p, v, key) {
+// Positie-relevantie per attribuut voor de groeiprojectie: attributen die bij de rollen van de
+// speler horen groeien het hardst (key 1.0, preferable 0.6, rest 0.25). Zo krijgt een spits geen
+// 20 mandekking, ook niet met veel PA-ruimte.
+function growthRelevance(p) {
+  const rel = {};
+  for (const role of rolesForPos(p.posArr)) {
+    for (const k of role.pref) if ((rel[k] || 0) < 0.6) rel[k] = 0.6;
+    for (const k of role.key) rel[k] = 1.0;
+  }
+  return rel;
+}
+// Projecteer één attribuut naar het potentieel (PA): additieve, positie-gewogen groei uit de
+// CA-koppenruimte, gedempt door leeftijd, Determination en attribuuttype (fysiek groeit minder
+// en stopt na ~24). Niet elk attribuut schiet naar 20; alleen wat relevant is groeit echt door.
+function potAttr(p, v, key, rel) {
   if (!p.pa || !p.ca || p.pa <= p.ca) return v;
-  const head = (p.pa - p.ca) / 100;                       // CA-koppenruimte, genormaliseerd
+  const head = p.pa - p.ca;                               // CA-koppenruimte (0-200 schaal)
   const age = getAge(p);
   const ageF = ageRemainFactor(age);
   const det = (p.attrs && p.attrs.Determination) || p.determination || 10;
-  const detF = 0.7 + 0.3 * (det / 15);                    // vastberadenheid → meer groei benut
+  const detF = 0.6 + 0.4 * Math.min(1, det / 18);         // vastberadenheid benut meer groei
   const isPhys = key && PHYS_ATTRS.has(key);
-  const typeF = isPhys ? 0.45 : 1.0;                      // fysiek groeit veel minder
-  const physAgeCap = isPhys && age != null && age >= 24 ? 0 : 1;
-  const g = Math.min(1, head * ageF * detF * typeF * physAgeCap);
-  return Math.min(20, Math.round(v + (20 - v) * g));      // uplift richting 20, geschaald
+  const physF = isPhys ? (age != null && age >= 24 ? 0.15 : 0.6) : 1.0;
+  const r = rel ? (rel[key] ?? 0.25) : 0.5;               // positie-relevantie
+  const growth = r * ageF * detF * physF * 0.05 * head;
+  return Math.min(20, Math.round(v + growth));
 }
 function showDetail(p) {
   state.selected = p;
@@ -1021,12 +1033,13 @@ function showDetail(p) {
     html += `<label class="potswitch${canPot ? '' : ' off'}"><input type="checkbox" id="pot-toggle" ${state.showPot ? 'checked' : ''} ${canPot ? '' : 'disabled'}> ${t('showPot')}${state.showPot ? ` <span class="dim">(${t('potNote')})</span>` : ''}</label>`;
     const isGk = (p.posArr || []).includes('GK');
     const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
+    const rel = state.showPot ? growthRelevance(p) : null;
     const col = {};
     for (const [gk, keys] of groups) {
       const rows = keys.filter(k => p.attrs[k] != null);
       col[gk] = !rows.length ? '' : `<div class="attr-col"><h3>${t(gk)}</h3>` + rows.map((k, idx) => {
         const raw = p.attrs[k];
-        const shown = state.showPot ? potAttr(p, raw, k) : raw;
+        const shown = state.showPot ? potAttr(p, raw, k, rel) : raw;
         const grew = state.showPot && shown > raw;
         return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span>${abar(shown)}<span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
       }).join('') + '</div>';
