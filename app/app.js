@@ -340,16 +340,21 @@ async function loadDump() {
       state.refYear = state.meta.gameYear;
       $('f-refyear').value = state.refYear;
     }
-    const when = new Date(st.dumpTime);
-    const sameDay = when.toDateString() === new Date().toDateString();
-    const whenTxt = sameDay ? when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : when.toLocaleDateString();
-    $('dump-info').innerHTML = `<b>${state.players.length.toLocaleString()}</b> ${t('playersWord')} · <b>${state.staff.length.toLocaleString()}</b> ${t('staffWord')} · ${whenTxt}`;
-    $('dump-info').title = when.toLocaleString();
+    state.dumpStamp = st.dumpTime;
+    renderDumpInfo();
     renderClubBadge();
     $('empty-state').classList.add('hidden');
     buildStaffRoles();
     applyFilters();
   } catch (e) { $('dump-info').textContent = 'fout'; console.error(e); }
+}
+function renderDumpInfo() {
+  if (!state.dumpStamp) return;
+  const when = new Date(state.dumpStamp);
+  const sameDay = when.toDateString() === new Date().toDateString();
+  const whenTxt = sameDay ? when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : when.toLocaleDateString();
+  $('dump-info').innerHTML = `<b>${state.players.length.toLocaleString()}</b> ${t('playersWord')} · <b>${state.staff.length.toLocaleString()}</b> ${t('staffWord')} · ${whenTxt}`;
+  $('dump-info').title = when.toLocaleString();
 }
 function renderClubBadge() {
   const mgr = state.meta.manager, club = state.meta.myClub, rep = state.meta.myClubRep;
@@ -810,6 +815,21 @@ document.addEventListener('keydown', e => {
   if (e.key === '/' && !e.target.closest?.('input, select, textarea')) { e.preventDefault(); $('f-name').focus(); }
 });
 
+// ↑/↓ bladert door de rijen; het detailpaneel volgt
+document.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  if (e.target.closest?.('input, select, textarea')) return;
+  if (!state.filtered.length) return;
+  e.preventDefault();
+  let i = state.selected ? state.filtered.indexOf(state.selected) : -1;
+  i = e.key === 'ArrowDown' ? Math.min(state.filtered.length - 1, i + 1) : Math.max(0, i - 1);
+  const wrap = $('table-wrap');
+  const y = i * ROW_H;
+  if (y < wrap.scrollTop) wrap.scrollTop = y;
+  else if (y + ROW_H * 2 > wrap.scrollTop + wrap.clientHeight) wrap.scrollTop = y - wrap.clientHeight + ROW_H * 2;
+  showDetail(state.filtered[i]);
+});
+
 // club-badge klik → filters wissen + mijn club aan
 $('club-badge').onclick = () => {
   if (!state.meta.myClub) return;
@@ -861,6 +881,8 @@ function applyLang() {
   document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
   document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
   $('f-name').placeholder = t('searchph');
+  renderDumpInfo();
+  renderClubBadge();
   buildStaffRoles();
   applyFilters();
   if (state.selected) showDetail(state.selected);
