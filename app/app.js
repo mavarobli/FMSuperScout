@@ -27,7 +27,7 @@ const I18N = {
   nl: {
     players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: 'Zoek naam of club',
     settings: 'Instellingen', langLabel: 'Taal', curLabel: 'Valuta',
-    hideCapa: 'CA/PA verbergen',
+    showHidden: 'Verborgen stats tonen',
     donateBtn: 'Steun FMSuperScout', donateTitle: 'Lekker aan het scouten?',
     donateBody: 'FMSuperScout is gratis en blijft gratis. Als het je een uur turen in traag menu bespaart, is een koffie welkom. Zo niet, draait ie ook gewoon door.',
     donateCta: '☕ Koffie', donateLater: 'Later',
@@ -86,7 +86,7 @@ const I18N = {
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
     settings: 'Settings', langLabel: 'Language', curLabel: 'Currency',
-    hideCapa: 'Hide CA/PA',
+    showHidden: 'Show hidden stats',
     donateBtn: 'Support FMSuperScout', donateTitle: 'Found your next signing?',
     donateBody: 'FMSuperScout is free and stays free. If it beat squinting at slow menus, a coffee helps. If not, it keeps working anyway.',
     donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
@@ -1090,7 +1090,7 @@ function showDetail(p) {
       <div style="grid-area:sp">${col['g_setpieces'] || ''}</div>
       <div style="grid-area:ment">${col['g_mental'] || ''}</div>
       <div style="grid-area:phys">${col['g_physical'] || ''}</div>
-      <div style="grid-area:pers">${persHtml}${hidHtml}</div>
+      <div style="grid-area:pers">${state.hideCapa ? '' : persHtml + hidHtml}</div>
     </div>`;
   } else if (p.staffAttrs) {
     html += `<div class="attr-cols"><div class="attr-col"><h3>${t('staffAttrs')}</h3>` +
@@ -1435,9 +1435,9 @@ function applyHideCapa() {
   if (state.mode === 'analysis') renderAnalysis(); else applyFilters();
   if (state.selected) showDetail(state.selected);
 }
-$('set-hidecapa').checked = state.hideCapa;
+$('set-hidecapa').checked = !state.hideCapa;   // "tonen" = niet verbergen (standaard aan)
 $('set-hidecapa').addEventListener('change', () => {
-  state.hideCapa = $('set-hidecapa').checked;
+  state.hideCapa = !$('set-hidecapa').checked;
   localStorage.setItem('fmss_hidecapa', state.hideCapa ? '1' : '0');
   applyHideCapa();
 });
