@@ -32,7 +32,7 @@ const I18N = {
     donateBody: 'FMSuperScout is gratis en blijft gratis. Als het je een uur turen in traag menu bespaart, is een koffie welkom. Zo niet, draait ie ook gewoon door.',
     donateCta: '☕ Koffie', donateLater: 'Later',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
-    age: 'Leeftijd', refyear: 'Peiljaar', financial: 'Financieel', maxvalue: 'Max. waarde', maxwage: 'Max. loon p/w',
+    age: 'Leeftijd', refyear: 'Peiljaar', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
     origin: 'Herkomst', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
     interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Haalbaar', listed: 'Op transferlijst',
     exp6: 'Contract < 6 mnd', exp12: 'Contract < 1 jaar', free: 'Clubloos', myclub: 'Mijn club',
@@ -91,7 +91,7 @@ const I18N = {
     donateBody: 'FMSuperScout is free and stays free. If it beat squinting at slow menus, a coffee helps. If not, it keeps working anyway.',
     donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
-    age: 'Age', refyear: 'Game year', financial: 'Financial', maxvalue: 'Max. value', maxwage: 'Max. wage p/w',
+    age: 'Age', refyear: 'Game year', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
     origin: 'Origin', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
     interestmin: 'Interest ≥', all: 'All', attainable: 'Attainable', listed: 'Transfer listed',
     exp6: 'Contract < 6 mo', exp12: 'Contract < 1 yr', free: 'Free agent', myclub: 'My club',
@@ -641,6 +641,7 @@ function applyFilters() {
   const caMin = +$('f-ca-min').value || 0, caMax = +$('f-ca-max').value || 999;
   const paMin = +$('f-pa-min').value || 0, paMax = +$('f-pa-max').value || 999;
   const price = parseMoney($('f-price').value);
+  const fee = parseMoney($('f-fee').value);
   const wage = parseMoney($('f-wage').value);
   const nat = $('f-nat').value.trim().toLowerCase();
   const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
@@ -663,6 +664,7 @@ function applyFilters() {
     if ((p.ca ?? 0) < caMin || (p.ca ?? 0) > caMax) return false;
     if ((p.pa ?? 0) < paMin || (p.pa ?? 0) > paMax) return false;
     if (price != null && (estValue(p).v ?? Infinity) > price) return false;
+    if (fee != null && (feeEstimate(p).v ?? Infinity) > fee) return false;
     if (wage != null && (p.wage ?? Infinity) > wage) return false;
     if (nat && !(p.nat || []).some(n => n.toLowerCase().includes(nat))) return false;
     if (onlyEu && !isEu(p)) return false;
@@ -707,6 +709,7 @@ function buildChips() {
   range('f-ca-min', 'f-ca-max', 'CA');
   range('f-pa-min', 'f-pa-max', 'PA');
   if (v('f-price')) add(`${t('maxvalue')} ${v('f-price')}`, clearInput('f-price'));
+  if (v('f-fee')) add(`${t('maxfee')} ${v('f-fee')}`, clearInput('f-fee'));
   if (v('f-wage')) add(`${t('maxwage')} ${v('f-wage')}`, clearInput('f-wage'));
   if (v('f-nat')) add(`${t('nat')}: ${v('f-nat')}`, clearInput('f-nat'));
   if ($('f-eu').checked) add(t('euonly'), uncheck('f-eu'));
@@ -1377,7 +1380,7 @@ $('detail-close').onclick = () => { $('detail').classList.add('hidden'); state.s
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-close').onclick(); });
 
 // ---------- UI-bediening ----------
-['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-price', 'f-wage', 'f-nat'].forEach(id => {
+['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
   let tm; $(id).addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(applyFilters, 150); });
 });
 ['f-eu', 'f-myclub', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
