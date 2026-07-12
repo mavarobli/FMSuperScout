@@ -39,7 +39,7 @@ const I18N = {
     onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: '⬇ Nieuwe data', reload: '⟳',
     nodata: 'Nog geen data geladen', exportcsv: '⬇ Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
-    c_value: 'Waarde', c_wage: 'Salaris p/w', c_expires: 'Contract tot', c_interest: 'Interesse',
+    c_value: 'Waarde', c_fee: 'Vraagprijs', c_wage: 'Salaris p/w', c_expires: 'Contract tot', c_interest: 'Interesse',
     c_status: 'Status', c_role: 'Rol', foot: 'Voet', height: 'Lengte', repLabel: 'Reputatie',
     c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
@@ -98,7 +98,7 @@ const I18N = {
     onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: '⬇ New data', reload: '⟳',
     nodata: 'No data loaded yet', exportcsv: '⬇ Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
-    c_value: 'Value', c_wage: 'Wage p/w', c_expires: 'Contract until', c_interest: 'Interest',
+    c_value: 'Value', c_fee: 'Asking price', c_wage: 'Wage p/w', c_expires: 'Contract until', c_interest: 'Interest',
     c_status: 'Status', c_role: 'Role', foot: 'Foot', height: 'Height', repLabel: 'Reputation',
     c_clubrep: 'Club rep', c_worldrep: 'World rep',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
@@ -241,6 +241,7 @@ const PLAYER_COLS = [
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
   { key: 'value', label: 'c_value', num: true, get: p => estValue(p).v, render: p => estHtml(p) },
+  { key: 'fee', label: 'c_fee', num: true, get: p => { const f = feeEstimate(p); return f.v == null ? -1 : f.v; }, render: p => feeHtml(p) },
   { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney },
   { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls },
   { key: 'interest', label: 'c_interest', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p) },
@@ -311,6 +312,43 @@ function estHtml(p) {
   if (e.v == null) return '<span class="dim">–</span>';
   if (e.v === 0) return '<span class="dim">' + t('free_l') + '</span>';
   return (e.est ? '<span class="dim">~</span>' : '') + fmtMoney(e.v);
+}
+
+// ---------- geschatte vraagprijs / transfersom ----------
+// De prijs die je waarschijnlijk betaalt ligt boven de marktwaarde. Opslag gedreven door de
+// betrouwbaarste, beschikbare factoren: resterende contractduur (grootste), verkoopbereidheid
+// (listed/niet-te-koop/vrijgegeven), leeftijd+potentie en de grootte van de verkopende club.
+// Niet te vangen uit de data: exacte squad-status, concurrerende clubs, jouw budget — dus schatting.
+function feeMultiplier(p) {
+  const m = monthsUntil(p.expires);
+  const mm = m == null ? 30 : m;
+  let f = Math.min(2.2, Math.max(0.5, 0.5 + 0.038 * mm));   // contractduur: lang → duur, aflopend → goedkoop
+  if (p.notForSale) f *= 1.9;                               // niet te koop: fors duurder
+  else if (p.listed) f *= 0.85;                             // op transferlijst: goedkoper
+  else if (p.setForRelease) f *= 0.95;
+  const a = getAge(p) || 25;
+  const head = Math.max(0, (p.pa || p.ca) - p.ca);
+  if (a <= 21 && head >= 15) f *= 1 + Math.min(0.45, head * 0.013);   // wonderkind-premie
+  else if (a <= 23) f *= 1.08;
+  else if (a >= 31) f *= 0.8;
+  else if (a >= 29) f *= 0.9;
+  const crep = p.clubRep || 5000;
+  f *= Math.min(1.2, Math.max(0.9, 1 + (crep - 6000) / 25000));       // grote/kleine verkopende club
+  return Math.min(3.0, Math.max(0.4, f));
+}
+function feeEstimate(p) {
+  const ev = estValue(p);
+  if (ev.v == null) return { v: null };
+  if (ev.v === 0) return { v: 0 };
+  let v = ev.v * feeMultiplier(p);
+  v = v >= 1e6 ? Math.round(v / 1e5) * 1e5 : Math.round(v / 1e4) * 1e4;
+  return { v, valueEst: ev.est };   // valueEst: onderliggende waarde was zelf al een schatting
+}
+function feeHtml(p) {
+  const f = feeEstimate(p);
+  if (f.v == null) return '<span class="dim">–</span>';
+  if (f.v === 0) return '<span class="dim">' + t('free_l') + '</span>';
+  return '<span class="dim">~</span>' + fmtMoney(f.v);
 }
 
 // ---------- interesse-inschatting (heuristiek) ----------
@@ -936,13 +974,13 @@ function exportShortlist() {
   if (!all.length) { showToast('Shortlist leeg'); return; }
   const withCapa = !state.hideCapa;
   const cols = ['Name', 'Position', 'Age', 'Club', 'Nationality',
-    ...(withCapa ? ['CA', 'PA'] : []), 'Value(GBP)', 'Wage(GBP)', 'Contract', 'Interest'];
+    ...(withCapa ? ['CA', 'PA'] : []), 'Value(GBP)', 'AskingPrice(GBP)', 'Wage(GBP)', 'Contract', 'Interest'];
   const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
   const lines = [cols.join(',')];
   for (const p of all) {
     const i = interestEstimate(p);
     lines.push([p.name, p.pos || p.job || '', getAge(p), p.club || '', (p.nat || []).join('/'),
-      ...(withCapa ? [p.ca, p.pa] : []), estValue(p).v ?? '', p.wage ?? '', p.expires || '', i ? i.label : ''].map(esc).join(','));
+      ...(withCapa ? [p.ca, p.pa] : []), estValue(p).v ?? '', feeEstimate(p).v ?? '', p.wage ?? '', p.expires || '', i ? i.label : ''].map(esc).join(','));
   }
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
@@ -1018,6 +1056,7 @@ function showDetail(p) {
   <div class="kv">
     ${isPlayer ? `<div><b>${t('c_pos')}</b> ${p.pos || '–'}</div><div><b>${t('foot')}</b> ${p.foot || '–'}</div>` : `<div><b>${t('c_role')}</b> ${p.job || '–'}</div>`}
     <div><b>${t('estval')}</b> ${valTxt}</div>
+    ${feeEstimate(p).v > 0 ? `<div><b>${t('c_fee')}</b> ${fmtMoney(feeEstimate(p).v * 0.85)} – ${fmtMoney(feeEstimate(p).v * 1.15)}</div>` : ''}
     <div><b>${t('wageLabel')}</b> ${fmtMoney(p.wage)}</div>
     ${p.worldRep ? `<div><b>${t('repLabel')}</b> ${p.worldRep}</div>` : ''}
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
