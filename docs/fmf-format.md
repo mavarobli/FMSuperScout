@@ -32,12 +32,24 @@ de meegeleverde **Football Manager Resource Archiver** (Steam-tool) kunt openen/
 Zonder die codec + het interne `.slf`-schema kunnen we geen bestand maken dat FM accepteert,
 en we kunnen het resultaat hier ook niet in de game verifiëren.
 
-## Wat dit zou deblokkeren
+## Definitieve conclusie (na 3 extra samples: test1=1 speler, test2=2, test3=3)
 
-1. **Meerdere sample-shortlists** uit FM (bv. 1, 3 en 10 spelers, en dezelfde 3 spelers in
-   twee volgordes). Door de payloads te diffen is het `.slf`-schema (waarschijnlijk een lijst
-   van unieke speler-ID's) en de codec te reverse-engineeren. Onze dump bevat de echte
-   FM-unieke ID's (`player.id`), dus als het schema bekend is, kunnen we ID's schrijven.
-2. Of: de payload-codec identificeren via de Resource Archiver / GameAssembly-symbolen.
+Met samples van oplopende grootte is het formaat nu vér genoeg ontleed om een harde
+conclusie te trekken:
 
-Tot die tijd blijft CSV-export beschikbaar. Zie [[dump-fields]] en het projectgeheugen.
+- **`.slf` = kop + 4 bytes per speler.** De index-groottes groeien exact +4 bytes per
+  extra speler (uncompressed 84→88→92, compressed 31→35→39 voor 1→2→3 spelers). Dat is
+  één `uint32` speler-ID per shortlist-item. Het schema is dus opgelost.
+- **De index is publieke zstd** (98% identiek tussen bestanden), daarom leest die wél.
+- **De payloads zijn versleuteld met een per-bestand willekeurige nonce.** Bewijs: alle drie
+  de shortlists bevatten dezelfde standaard-afbeelding (`image.img`), maar die bytes zijn in
+  elk bestand totaal verschillend; slechts 15% van de dataregio komt overeen en dat is enkel
+  de framing/lengte-kop. Identieke input → verschillende output = versleuteling, geen compressie.
+
+**Gevolg: een geldige `.fmf` schrijven is niet haalbaar.** Meer samples helpen niet meer —
+de sleutel zit in `GameAssembly.dll` en is niet uit ciphertext af te leiden. De enige echte
+route zou zijn: de encryptie-routine + sleutel uit de game-binary halen (grote, aparte RE-klus,
+niet te verifiëren zonder de game), of SI's eigen Resource Archiver aanroepen.
+
+Praktisch alternatief om spelers te delen: de leesbare export (naam/club/positie) waarmee je
+ze via FM-zoeken weer toevoegt. Zie [[dump-fields]] en het projectgeheugen.
