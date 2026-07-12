@@ -280,6 +280,7 @@ internal static class Dumper
         e.Temperament = ClampAttr(m.U8(person + Fields.PERO_TEMPERAMENT));
         e.Controversy = ClampAttr(m.U8(person + Fields.PERO_CONTROVERSY));
         e.PersonAddr = person;
+        e.PlAddr = pl;
         var (cname, crep) = ResolveClub(m, person);
         e.Club = cname; e.ClubRep = crep;
         if (DiagPersons.Count < 60) DiagPersons.Add((person, e.Name, e.Club));
@@ -592,6 +593,27 @@ internal static class Dumper
             w.WriteLine("Sample staf (eerste 8):");
             foreach (var p in staff.Values.Take(8))
                 w.WriteLine($"  uid={p.Uid} {p.Name} lft={p.Age} CA={p.Ca} PA={p.Pa} rol={p.Job} club={p.Club}");
+            w.WriteLine();
+
+            // === WAARDE-OFFSET DISCOVERY ===
+            // Doel: het geheugenveld vinden dat FM's echte transferwaarde bevat (zoals GenieScout leest).
+            // Voor bekende spelers loggen we alle "geld-achtige" u32-waarden in een venster op het
+            // player-data-object. Zoek in GenieScout de echte waarde van deze spelers op; de offset
+            // waarvan de waarde (in £; €-bedrag ÷ 1,16) klopt over meerdere spelers is de juiste.
+            w.WriteLine("=== WAARDE-OFFSET DISCOVERY ===");
+            w.WriteLine("(Zoek onderstaande spelers in GenieScout; geef mij hun exacte waarde. Money-achtige u32 op pl+offset:)");
+            bool Moneyish(uint v) => v >= 50_000u && v <= 600_000_000u && v != 0xFFFFFFFFu;
+            foreach (var p in players.Values.Where(x => x.PlAddr != 0).OrderByDescending(x => x.Ca).Take(20))
+            {
+                var hits = new List<string>();
+                for (int off = 0x160; off <= 0x320; off += 4)
+                {
+                    uint v = m.U32(p.PlAddr + (ulong)off);
+                    if (Moneyish(v)) hits.Add($"0x{off:X}={v:N0}");
+                }
+                w.WriteLine($"  {p.Name,-22} CA{p.Ca} lft{p.Age} wage={p.Wage} val0x238={p.Value} clubRep={p.ClubRep}");
+                w.WriteLine($"      {string.Join("  ", hits)}");
+            }
         }
         catch (Exception e) { Plugin.Log.LogWarning("Diag schrijven mislukt: " + e.Message); }
     }
@@ -631,6 +653,7 @@ internal sealed class Person
     public int Temperament;
     public int Controversy;
     public ulong PersonAddr;
+    public ulong PlAddr;      // player-data object (basePtr), voor de waarde-offset-diagnose
     public string Job;
     public Dictionary<string, int> Attrs = new();
     public Dictionary<string, int> StaffAttrs = new();
