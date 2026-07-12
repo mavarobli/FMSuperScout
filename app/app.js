@@ -12,6 +12,7 @@ const state = {
   lang: localStorage.getItem('fmss_lang') || 'nl',
   showPot: false,
   role: localStorage.getItem('fmss_role') || '',
+  compare: [],
   refYear: new Date().getFullYear(),
   refDoy: 183,
   shortlist: new Set(JSON.parse(localStorage.getItem('fmss_shortlist') || '[]')),
@@ -53,6 +54,8 @@ const I18N = {
     step3: 'Klik op de groene balk zodra de dump klaar is',
     playersWord: 'spelers', staffWord: 'staf', clickClubFilter: 'Klik = filter op jouw club', repWord: 'reputatie',
     roleFit: 'Tactische rol', roleColHdr: 'Rol', roleAny: 'Geen rol gekozen', bestRoles: 'Beste rollen', roleScoreOf: 'Rolscore',
+    compare: 'Vergelijk', comparing: 'Vergelijken', addCompare: 'Vergelijk', inCompare: 'In vergelijking', compareFull: 'Max. 3 spelers',
+    cmpTitle: 'Spelervergelijking', cmpValue: 'Waarde', cmpTopRole: 'Beste rol',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -86,6 +89,8 @@ const I18N = {
     step3: 'Click the green bar when the dump is ready',
     playersWord: 'players', staffWord: 'staff', clickClubFilter: 'Click = filter on your club', repWord: 'reputation',
     roleFit: 'Tactical role', roleColHdr: 'Role', roleAny: 'No role selected', bestRoles: 'Best roles', roleScoreOf: 'Role score',
+    compare: 'Compare', comparing: 'Comparing', addCompare: 'Compare', inCompare: 'In comparison', compareFull: 'Max. 3 players',
+    cmpTitle: 'Player comparison', cmpValue: 'Value', cmpTopRole: 'Best role',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
@@ -845,8 +850,10 @@ function showDetail(p) {
     <div class="capa-nums"><span><b>CA</b> <span class="ca-bar">${p.ca ?? '–'}</span></span><span><b>PA</b> <span class="pa-bar">${p.pa ?? '–'}</span></span></div>
     <div class="capa-track"><span class="capa-pa" style="width:${Math.min(100, (p.pa ?? 0) / 2)}%"></span><span class="capa-ca" style="width:${Math.min(100, (p.ca ?? 0) / 2)}%"></span></div>
   </div>` : '';
+  const inCmp = state.compare.includes(p.id);
   let html = `<h2>${p.name} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span>
-    <button class="copybtn" title="Kopieer naam">📋</button></h2>
+    <button class="copybtn" title="Kopieer naam">📋</button>
+    <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">⚖</button></h2>
   <div class="sub">${getAge(p)} · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${p.club || t('clubless')}</div>
   ${gauge}
   <div class="kv">
@@ -925,9 +932,97 @@ function showDetail(p) {
   $('detail-body').innerHTML = html;
   document.querySelector('.detail-star').onclick = () => toggleShortlist(p.id);
   document.querySelector('.copybtn').onclick = () => copyName(p.name);
+  const cmp = document.querySelector('.cmpbtn');
+  if (cmp) cmp.onclick = () => { toggleCompare(p.id); cmp.classList.toggle('on', state.compare.includes(p.id)); };
   const pt = $('pot-toggle');
   if (pt) pt.onchange = () => { state.showPot = pt.checked; showDetail(p); };
 }
+
+// ---------- spelervergelijking ----------
+const findPlayer = id => state.players.find(p => p.id === id) || state.staff.find(p => p.id === id);
+function toggleCompare(id) {
+  const i = state.compare.indexOf(id);
+  if (i >= 0) state.compare.splice(i, 1);
+  else { if (state.compare.length >= 3) { showToast(t('compareFull')); return; } state.compare.push(id); }
+  renderCompareTray();
+}
+function renderCompareTray() {
+  const tray = $('compare-tray');
+  if (!state.compare.length) { tray.classList.add('hidden'); return; }
+  tray.classList.remove('hidden');
+  const chips = state.compare.map(id => {
+    const p = findPlayer(id);
+    return `<span class="ct-chip" data-id="${id}">${p ? p.name : '?'}<span class="x" data-rm="${id}">✕</span></span>`;
+  }).join('');
+  tray.innerHTML = `<div class="ct-label">${t('comparing')}</div>${chips}` +
+    `<button class="ct-go" ${state.compare.length < 2 ? 'disabled' : ''}>${t('compare')} (${state.compare.length})</button>` +
+    `<button class="ct-clear" title="${t('clear')}">✕</button>`;
+  tray.querySelectorAll('[data-rm]').forEach(x => x.onclick = e => { e.stopPropagation(); toggleCompare(+x.dataset.rm); });
+  tray.querySelectorAll('.ct-chip').forEach(c => c.onclick = () => { const p = findPlayer(+c.dataset.id); if (p) showDetail(p); });
+  tray.querySelector('.ct-go').onclick = openCompare;
+  tray.querySelector('.ct-clear').onclick = () => { state.compare = []; renderCompareTray(); };
+}
+function bestRoleScore(p) {
+  const b = bestRoles(p, 1)[0];
+  return b ? { name: roleName(b.id), score: b.score } : null;
+}
+function openCompare() {
+  const players = state.compare.map(findPlayer).filter(Boolean);
+  if (players.length < 2) return;
+  const cell = (vals, i, hi) => {
+    const v = vals[i];
+    if (v == null) return '<span class="dim">·</span>';
+    const nums = vals.filter(x => x != null);
+    const best = hi ? Math.max(...nums) : Math.min(...nums);
+    const worst = hi ? Math.min(...nums) : Math.max(...nums);
+    const cls = nums.length > 1 && v === best ? 'cmp-best' : (nums.length > 1 && v === worst ? 'cmp-worst' : '');
+    return `<span class="${cls}">${v}</span>`;
+  };
+  const headRow = `<div class="cmp-row cmp-head"><div class="cmp-lbl"></div>` +
+    players.map(p => `<div class="cmp-cell"><div class="cmp-name">${p.name}</div><div class="cmp-meta">${getAge(p)} · ${p.pos || p.job || ''}<br>${p.club || t('clubless')}</div></div>`).join('') + '</div>';
+  const statRow = (label, vals, opts = {}) => {
+    const hi = opts.hi !== false;
+    return `<div class="cmp-row"><div class="cmp-lbl">${label}</div>` +
+      vals.map((_, i) => `<div class="cmp-cell">${opts.fmt ? (vals[i] == null ? '<span class="dim">·</span>' : cellFmt(vals, i, hi, opts.fmt)) : cell(vals, i, hi)}</div>`).join('') + '</div>';
+  };
+  function cellFmt(vals, i, hi, fmt) {
+    const nums = vals.filter(x => x != null);
+    const best = hi ? Math.max(...nums) : Math.min(...nums);
+    const cls = nums.length > 1 && vals[i] === best ? 'cmp-best' : '';
+    return `<span class="${cls}">${fmt(vals[i])}</span>`;
+  }
+  let body = headRow;
+  body += statRow('CA', players.map(p => p.ca));
+  body += statRow('PA', players.map(p => p.pa));
+  body += statRow(t('cmpValue'), players.map(p => estValue(p).v), { fmt: fmtMoney });
+  body += statRow(t('wageLabel'), players.map(p => p.wage), { fmt: fmtMoney, hi: false });
+  body += statRow(t('c_age'), players.map(p => getAge(p)), { hi: false });
+  const roles = players.map(bestRoleScore);
+  body += `<div class="cmp-row"><div class="cmp-lbl">${t('cmpTopRole')}</div>` +
+    roles.map(r => `<div class="cmp-cell">${r ? `${r.name}<br><b class="${roleClass(r.score)}">${r.score.toFixed(1)}</b>` : '<span class="dim">·</span>'}</div>`).join('') + '</div>';
+
+  // Attributen (alleen spelers; per rij winnaar groen). Groepeer met de bestaande groepen.
+  const anyPlayer = players.some(p => p.attrs);
+  if (anyPlayer) {
+    const isGk = players.every(p => (p.posArr || []).includes('GK'));
+    const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
+    for (const [gk, keys] of groups) {
+      const present = keys.filter(k => players.some(p => p.attrs && p.attrs[k] != null));
+      if (!present.length) continue;
+      body += `<div class="cmp-group">${t(gk)}</div>`;
+      for (const k of present) body += statRow(attrName(k), players.map(p => p.attrs ? p.attrs[k] : null));
+    }
+  }
+  const cols = `120px repeat(${players.length}, 1fr)`;
+  $('compare-inner').innerHTML =
+    `<div class="cmp-top"><h2>${t('cmpTitle')}</h2><button id="cmp-close">✕</button></div>` +
+    `<div class="cmp-grid" style="grid-template-columns:${cols}">${body}</div>`;
+  $('compare-modal').classList.remove('hidden');
+  $('cmp-close').onclick = closeCompare;
+}
+function closeCompare() { $('compare-modal').classList.add('hidden'); }
+$('compare-modal').addEventListener('click', e => { if (e.target.id === 'compare-modal') closeCompare(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('compare-modal').classList.contains('hidden')) closeCompare(); });
 $('detail-close').onclick = () => { $('detail').classList.add('hidden'); state.selected = null; renderVisible(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-close').onclick(); });
 

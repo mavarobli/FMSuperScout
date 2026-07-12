@@ -221,6 +221,51 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #grid td.pname:hover { color: var(--accent2); text-decoration: underline; text-underline-offset: 2px; }
 .copybtn { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; font-size: 13px; padding: 2px 7px; margin-left: 4px; }
 .copybtn:hover { border-color: var(--accent2); }
+/* profielknoppen (kopieer / vergelijk) */
+.cmpbtn { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; font-size: 13px; padding: 2px 7px; margin-left: 4px; }
+.cmpbtn:hover { border-color: var(--accent2); }
+.cmpbtn.on { background: var(--accent2); border-color: var(--accent2); color: #04203d; }
+
+/* ---------- vergelijk-lade ---------- */
+#compare-tray {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; z-index: 120;
+  background: var(--bg2); border: 1px solid var(--accent2); border-radius: 10px;
+  padding: 8px 10px; box-shadow: 0 8px 28px rgba(0,0,0,.5); max-width: calc(100vw - 40px); flex-wrap: wrap;
+}
+#compare-tray.hidden { display: none; }
+.ct-label { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.ct-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 3px 9px; font-size: 12.5px; cursor: pointer; }
+.ct-chip:hover { border-color: var(--accent2); }
+.ct-chip .x { color: var(--muted); font-size: 10px; }
+.ct-chip .x:hover { color: var(--bad); }
+.ct-go { background: var(--accent2); color: #04203d; border: 0; border-radius: 6px; padding: 6px 12px; font-weight: 700; cursor: pointer; }
+.ct-go:disabled { background: var(--bg3); color: var(--muted); cursor: default; }
+.ct-clear { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; }
+.ct-clear:hover { color: var(--bad); }
+
+/* ---------- vergelijk-modal ---------- */
+#compare-modal { position: fixed; inset: 0; z-index: 300; background: rgba(6,9,13,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
+#compare-modal.hidden { display: none; }
+#compare-inner { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; width: min(760px, 100%); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,.6); }
+.cmp-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.cmp-top h2 { font-size: 16px; }
+#cmp-close { background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; }
+#cmp-close:hover { color: var(--text); }
+.cmp-grid { display: grid; overflow-y: auto; padding: 4px 0 10px; }
+.cmp-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; }
+.cmp-row:nth-child(even of .cmp-row) { background: rgba(255,255,255,.02); }
+.cmp-lbl, .cmp-cell { padding: 4px 12px; font-size: 12.5px; min-width: 0; }
+.cmp-lbl { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-cell { text-align: center; font-variant-numeric: tabular-nums; }
+.cmp-head { position: sticky; top: 0; background: var(--bg3); z-index: 1; border-bottom: 1px solid var(--border); padding: 4px 0; }
+.cmp-head .cmp-cell { padding-top: 8px; padding-bottom: 8px; }
+.cmp-name { font-weight: 700; font-size: 13px; }
+.cmp-meta { color: var(--muted); font-size: 11px; line-height: 1.35; margin-top: 2px; }
+.cmp-group { grid-column: 1 / -1; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); font-weight: 700; padding: 8px 12px 3px; border-bottom: 1px solid var(--border); margin-top: 4px; }
+.cmp-best { color: var(--accent); font-weight: 700; }
+.cmp-worst { color: #6d7c8d; }
+
 #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: #06220f; padding: 9px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.4); opacity: 0; transition: opacity .15s, transform .15s; pointer-events: none; z-index: 100; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 #toast.hidden { opacity: 0; }
