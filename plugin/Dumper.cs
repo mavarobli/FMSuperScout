@@ -21,16 +21,23 @@ internal static class Dumper
     internal static int GameYear;        // afgeleid huidig seizoensjaar
 
     // Statusbestand dat de web-app pollt (betrouwbare F9-feedback, ook zonder console).
-    private static void WriteStatus(string state, int players, int staff)
+    private static void WriteStatus(string state, int players, int staff, string error = null)
     {
         try
         {
             Directory.CreateDirectory(OutDir);
+            string errField = error == null ? "" : $",\"error\":\"{JsonEscape(error)}\"";
             File.WriteAllText(Path.Combine(OutDir, "status.json"),
-                $"{{\"state\":\"{state}\",\"players\":{players},\"staff\":{staff},\"at\":\"{DateTime.Now:s}\"}}");
+                $"{{\"state\":\"{state}\",\"players\":{players},\"staff\":{staff},\"at\":\"{DateTime.Now:s}\"{errField}}}");
         }
         catch { }
     }
+
+    // Foutstatus wegschrijven zodat de web-app niet eeuwig op "scanning" blijft hangen.
+    public static void WriteError(string message) => WriteStatus("error", 0, 0, message);
+
+    private static string JsonEscape(string s) =>
+        (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", " ").Replace("\r", " ").Replace("\t", " ");
 
     // 0xFFFFFFFF is FM's "niet ingesteld"-sentinel → onbekend (-1). Anders de waarde.
     private static long Money(uint v) => v == 0xFFFFFFFF ? -1 : v;
@@ -50,6 +57,7 @@ internal static class Dumper
         if (mem.GaBase == 0)
         {
             Plugin.Log.LogError("GameAssembly.dll niet gevonden — kan niet dumpen.");
+            WriteError("GameAssembly.dll niet gevonden. Is FM26 goed geladen?");
             return;
         }
         Plugin.Log.LogInfo($"Scanregio's: {mem.ScanRegions.Count}, GameAssembly {mem.GaBase:X}-{mem.GaEnd:X}, " +

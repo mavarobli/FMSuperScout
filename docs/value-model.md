@@ -1,5 +1,13 @@
 # Marktwaarde- en interesse-inschatting
 
+## Groeiende ijkset (automatisch)
+
+De server bewaart bij elke geladen dump de spelers met een échte in-game waarde in
+`%LOCALAPPDATA%\FMSuperScout\value-history.json` (dedup op speler-id, laatste waarneming wint,
+mét speeldatum). Zo groeit de kalibratieset vanzelf over saves/seizoenen/competities heen, zonder
+handwerk. Uitlezen kan via `GET /api/value-history?full=1`. Dit is de bron om het reputatie-
+schatmodel later te herijken (en om exacte fixtures voor de tests te maken — zie `test/README.md`).
+
 ## Update: reputatie-gedreven model
 
 Na meer echte bedragen (o.a. mid-range spelers zoals Bidstrup €17M, Beukema €14M) bleek het
@@ -47,6 +55,29 @@ De schatting voor ≤20-jarigen is daarom grof en krijgt een bredere bandbreedte
 
 Coëfficiënten staan in `VAL_B` in app.js. Nog meer ijkpunten (vooral echte tienerwaarden en
 lagere competities) zouden de randen verder aanscherpen.
+
+## Vraagprijs / transfersom (feeMultiplier in app/app.js)
+
+Schat wat **jouw club** waarschijnlijk betaalt (waarde × opslag). Kernprincipes:
+
+- **Verkoopbereidheid domineert, stapelt niet.** Een gelist(t)e speler gaat rond of onder de
+  waarde weg (×0.35–1.0, korter contract → lager), óók met een lang contract; de contractpremie
+  vervalt dan. Vrijgegeven (set for release) ≈ weggeefprijs (×0.2). Eerder werd ×0.85 bovenop
+  de contractpremie gezet, waardoor gelist(t)e spelers alsnog ~1.6× de waarde "kostten".
+- **Contractpremie vlakker** (max ×1.9 i.p.v. ×2.2) — de schatting was structureel te hoog.
+- **Koper-afhankelijk ("big club tax").** Verkopers vragen meer aan een grotere club en nemen
+  genoegen met minder van een kleinere: factor ×0.85–1.35 op basis van het reputatieverschil
+  tussen mijn club (`meta.myClubRep`) en de verkopende club. De vraagprijs verschilt dus per
+  save/club waarmee je speelt.
+- **Squad-status-proxy via loonrang.** Exacte squad-status zit niet in de dump, maar de
+  loonrang binnen de verkopende club wel af te leiden: top-2-verdiener ≈ sterspeler (×1.2),
+  onderste 40% ≈ randspeler (×0.9). Alleen bij clubs met ≥8 spelers met bekend loon.
+- **Niet te koop** blijft fors duurder (×1.7, plafond ×3.5); leeftijd/wonderkind-correcties
+  ongewijzigd.
+
+IJkpunt: Cho Wi-Je (waarde £1M, betaald £1.8M) komt met een gemiddeld contract en een grotere
+kopende club op ~×1.6–1.9 uit. Niet te vangen blijft: concurrerende biedingen, budgetten en
+onderhandelingsdynamiek — het blijft een indicatie, het profiel toont daarom een bandbreedte.
 
 ## Interesse (interestEstimate in app/app.js)
 

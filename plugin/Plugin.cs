@@ -64,7 +64,11 @@ public class HotkeyBehaviour : MonoBehaviour
             System.Threading.Tasks.Task.Run(() =>
             {
                 try { Dumper.DumpAll(); }
-                catch (System.Exception e) { Plugin.Log.LogError($"Dump mislukt: {e}"); }
+                catch (System.Exception e)
+                {
+                    Plugin.Log.LogError($"Dump mislukt: {e}");
+                    Dumper.WriteError("Dump mislukt: " + e.Message);   // web-app toont dit i.p.v. eeuwig "scanning"
+                }
                 finally { _busy = false; }
             });
         }

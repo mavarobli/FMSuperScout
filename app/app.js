@@ -53,7 +53,7 @@ const I18N = {
     showPot: 'Toon geschatte potentie', potNote: 'geschatte waarden op potentieel (PA)',
     clubless: 'clubloos', clubUnknown: 'onbekende club', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd, FM haalt de data op…',
     dumping: '⏳ FM haalt de database op…', dumpReady: '✓ Nieuwe data klaar, klik om te laden',
-    fmNotRunning: '⚠ Start eerst Football Manager 26 en laad je save.',
+    dumpError: '⚠ Uitlezen mislukt', fmNotRunning: '⚠ Start eerst Football Manager 26 en laad je save.',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
@@ -112,7 +112,7 @@ const I18N = {
     showPot: 'Show estimated potential', potNote: 'estimated values at potential (PA)',
     clubless: 'free agent', clubUnknown: 'unknown club', copied: 'Copied', reqSent: '⏳ Request sent, FM is fetching the data…',
     dumping: '⏳ FM is fetching the database…', dumpReady: '✓ New data ready, click to load',
-    fmNotRunning: '⚠ Start Football Manager 26 and load your save first.',
+    dumpError: '⚠ Read failed', fmNotRunning: '⚠ Start Football Manager 26 and load your save first.',
     tag_free: 'free', tag_listed: 'listed', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
@@ -315,26 +315,70 @@ function estHtml(p) {
 }
 
 // ---------- geschatte vraagprijs / transfersom ----------
-// De prijs die je waarschijnlijk betaalt ligt boven de marktwaarde. Opslag gedreven door de
-// betrouwbaarste, beschikbare factoren: resterende contractduur (grootste), verkoopbereidheid
-// (listed/niet-te-koop/vrijgegeven), leeftijd+potentie en de grootte van de verkopende club.
+// Doel: wat betaal IK (mijn club) waarschijnlijk voor deze speler. Verkoopbereidheid domineert:
+// een gelist(t)e of vrijgegeven speler gaat rond of onder de waarde weg, ongeacht contractduur —
+// de contractpremie geldt alleen voor spelers die de club wil houden. Daarbovenop: een
+// koper-afhankelijke opslag (verkopers vragen meer aan een grotere club, FM's "big club tax")
+// en een squad-status-proxy via de loonrang binnen de verkopende club.
 // Niet te vangen uit de data: exacte squad-status, concurrerende clubs, jouw budget — dus schatting.
+
+// Loonrang binnen de verkopende club als proxy voor squad-status: de topverdiener is
+// waarschijnlijk een sterspeler (club vraagt meer), een laagbetaalde randspeler is
+// makkelijker op te halen. Cache per dump (state._clubWages).
+function wageRankInClub(p) {
+  if (!p.club || !(p.wage > 0)) return null;
+  if (!state._clubWages) {
+    const map = new Map();
+    for (const q of state.players) {
+      if (!q.club || !(q.wage > 0)) continue;
+      const k = q.club.toLowerCase();
+      let arr = map.get(k);
+      if (!arr) map.set(k, arr = []);
+      arr.push(q.wage);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => b - a);
+    state._clubWages = map;
+  }
+  const arr = state._clubWages.get(p.club.toLowerCase());
+  if (!arr || arr.length < 8) return null;   // te weinig spelers van deze club in de dump
+  return { rank: arr.findIndex(w => w <= p.wage) + 1, n: arr.length };
+}
+
 function feeMultiplier(p) {
   const m = monthsUntil(p.expires);
   const mm = m == null ? 30 : m;
-  let f = Math.min(2.2, Math.max(0.5, 0.5 + 0.038 * mm));   // contractduur: lang → duur, aflopend → goedkoop
-  if (p.notForSale) f *= 1.9;                               // niet te koop: fors duurder
-  else if (p.listed) f *= 0.85;                             // op transferlijst: goedkoper
-  else if (p.setForRelease) f *= 0.95;
+
+  // Club wil van de speler af → vraagprijs rond of onder de waarde, contractpremie vervalt.
+  if (p.setForRelease) return 0.2;                                     // vrijwel weggeefprijs
+  if (p.listed) return Math.min(1.0, Math.max(0.35, 0.55 + 0.012 * mm));
+
+  // Club wil (in principe) houden: resterende contractduur is de basisopslag.
+  let f = Math.min(1.9, Math.max(0.5, 0.55 + 0.028 * mm));
+  if (p.notForSale) f *= 1.7;                               // niet te koop: alleen los te weken met een fors bod
+
   const a = getAge(p) || 25;
   const head = Math.max(0, (p.pa || p.ca) - p.ca);
   if (a <= 21 && head >= 15) f *= 1 + Math.min(0.45, head * 0.013);   // wonderkind-premie
   else if (a <= 23) f *= 1.08;
   else if (a >= 31) f *= 0.8;
   else if (a >= 29) f *= 0.9;
-  const crep = p.clubRep || 5000;
-  f *= Math.min(1.2, Math.max(0.9, 1 + (crep - 6000) / 25000));       // grote/kleine verkopende club
-  return Math.min(3.0, Math.max(0.4, f));
+
+  const r = wageRankInClub(p);
+  if (r) {
+    if (r.rank <= 2) f *= 1.2;                              // topverdiener: waarschijnlijk sterspeler
+    else if (r.rank <= 5) f *= 1.08;
+    else if (r.rank / r.n > 0.6) f *= 0.9;                  // randspeler: makkelijker op te halen
+  }
+
+  // Koper-afhankelijk: verkopers vragen meer aan een grotere/rijkere club ("big club tax")
+  // en nemen genoegen met minder van een kleinere club.
+  const myRep = state.meta.myClubRep || 0;
+  if (myRep && p.clubRep > 0) {
+    const gap = myRep - p.clubRep;
+    f *= Math.min(1.35, Math.max(0.85, 1 + gap / 12000));
+  }
+
+  return Math.min(p.notForSale ? 3.5 : 2.4, Math.max(0.4, f));
 }
 function feeEstimate(p) {
   const ev = estValue(p);
@@ -374,10 +418,11 @@ function interestEstimate(p) {
   // Bij jonge spelers weegt de clubkloof zwaarder: hun lage wereldreputatie is vooral leeftijd,
   // geen "klein spelertje", dus statuskloof zou de interesse anders kunstmatig opblazen.
   const age = getAge(p);
+  const known = age != null && age > 0;   // geboortejaar kan ontbreken → leeftijd onbekend, niet "0 jaar"
   const eu = isEu(p);
   const clubGap = myRep - (p.clubRep || 0);
   const statGap = myRep - (p.worldRep || 0);
-  const blend = age <= 19 ? (0.9 * clubGap + 0.15 * statGap) : (0.55 * clubGap + 0.45 * statGap);
+  const blend = known && age <= 19 ? (0.9 * clubGap + 0.15 * statGap) : (0.55 * clubGap + 0.45 * statGap);
   let score = 100 / (1 + Math.exp(-blend / 1400));   // 0 kloof → 50; +1400 → ~73; -1400 → ~27
 
   // Beschikbaarheidssignalen
@@ -402,13 +447,15 @@ function interestEstimate(p) {
   if (p.loyalty && !isFree(p)) score *= (1 - 0.45 * (p.loyalty / 20));
 
   // Leeftijd: jonge spelers verhuizen minder makkelijk (settelen, ontwikkelen bij eigen club).
-  if (age <= 16) score *= 0.7;
-  else if (age <= 17) score *= 0.85;
+  if (known && age <= 16) score *= 0.7;
+  else if (known && age <= 17) score *= 0.85;
 
   // FIFA Art. 19: non-EU-speler onder de 18 kan internationaal pas komen vanaf z'n 18e.
+  // Bij onbekende leeftijd géén minderjarigen-cap: dan zou een speler zonder geboortejaar
+  // onterecht als "te jong" worden weggezet.
   let note = null;
-  if (age <= 15) { score = Math.min(score, 6); note = 'minor'; }
-  else if (age <= 17 && !eu) { score = Math.min(score, 8); note = 'minorIntl'; }
+  if (known && age <= 15) { score = Math.min(score, 6); note = 'minor'; }
+  else if (known && age <= 17 && !eu) { score = Math.min(score, 8); note = 'minorIntl'; }
 
   score = Math.max(0, Math.min(100, Math.round(score)));
   const label = score >= 70 ? t('int_big') : score >= 45 ? t('int_ok') : score >= 25 ? t('int_small') : t('int_no');
@@ -549,6 +596,7 @@ async function loadDump() {
     state.staff = data.staff || [];
     state.meta = data.meta || {};
     state._wageCeil = undefined;   // loonplafond opnieuw berekenen voor deze dump
+    state._clubWages = null;       // loonrang-cache (vraagprijs) opnieuw opbouwen
     // peiljaar: automatisch uit het afgeleide seizoensjaar (of game-datum)
     if (state.meta.gameDate) {
       const g = new Date(state.meta.gameDate);
@@ -620,7 +668,7 @@ function buildRoleSelect() {
 const parseMoney = s => {
   if (!s) return null;
   s = s.trim().toUpperCase().replace(',', '.');
-  const m = s.match(/^([\d.]+)\s*(K|M|MLD|B)?/);
+  const m = s.match(/^([\d.]+)\s*(K|MLD|M|B)?/);   // MLD vóór M, anders "matcht" M al op de M van MLD
   if (!m) return null;
   let v = parseFloat(m[1]);
   if (m[2] === 'K') v *= 1e3; else if (m[2] === 'M') v *= 1e6; else if (m[2] === 'MLD' || m[2] === 'B') v *= 1e9;
@@ -918,7 +966,7 @@ function renderVisible() {
       }
       if (c.render) return `<td class="${c.num ? 'num' : ''}">${c.render(p)}</td>`;
       let v = c.get(p);
-      if (c.name) return `<td class="pname ${stick}" title="Klik = kopieer naam">${v || '?'}</td>`;
+      if (c.name) return `<td class="pname ${stick}" title="Klik = kopieer naam">${v ? escHtml(v) : '?'}</td>`;
       if (c.dimNull && !v) return `<td class="dim">–</td>`;
       if (c.fmt) v = c.fmt(v);
       if (v == null || v === '') v = '–';
@@ -1069,7 +1117,7 @@ function showDetail(p) {
     <div class="capa-track"><span class="capa-pa" style="width:${Math.min(100, (p.pa ?? 0) / 2)}%"></span><span class="capa-ca" style="width:${Math.min(100, (p.ca ?? 0) / 2)}%"></span></div>
   </div>` : '';
   const inCmp = state.compare.includes(p.id);
-  let html = `<h2>${p.name} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span>
+  let html = `<h2>${escHtml(p.name)} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span>
     <button class="copybtn" title="Kopieer naam">📋</button>
     <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">⚖</button></h2>
   <div class="sub">${getAge(p)} · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}</div>
@@ -1204,7 +1252,7 @@ function renderCompareTray() {
   tray.classList.remove('hidden');
   const chips = state.compare.map(id => {
     const p = findPlayer(id);
-    return `<span class="ct-chip" data-id="${id}">${p ? p.name : '?'}<span class="x" data-rm="${id}">✕</span></span>`;
+    return `<span class="ct-chip" data-id="${id}">${p ? escHtml(p.name) : '?'}<span class="x" data-rm="${id}">✕</span></span>`;
   }).join('');
   tray.innerHTML = `<div class="ct-label">${t('comparing')}</div>${chips}` +
     `<button class="ct-go" ${state.compare.length < 2 ? 'disabled' : ''}>${t('compare')} (${state.compare.length})</button>` +
@@ -1231,7 +1279,7 @@ function openCompare() {
     return `<span class="${cls}">${v}</span>`;
   };
   const headRow = `<div class="cmp-row cmp-head"><div class="cmp-lbl"></div>` +
-    players.map(p => `<div class="cmp-cell"><div class="cmp-name">${p.name}</div><div class="cmp-meta">${getAge(p)} · ${p.pos || p.job || ''}<br>${p.club || t('clubless')}</div></div>`).join('') + '</div>';
+    players.map(p => `<div class="cmp-cell"><div class="cmp-name">${escHtml(p.name)}</div><div class="cmp-meta">${getAge(p)} · ${p.pos || p.job || ''}<br>${p.club ? escHtml(p.club) : t('clubless')}</div></div>`).join('') + '</div>';
   const statRow = (label, vals, opts = {}) => {
     const hi = opts.hi !== false;
     return `<div class="cmp-row"><div class="cmp-lbl">${label}</div>` +
@@ -1370,7 +1418,7 @@ function renderAnalysis() {
         <span><b>${x.bestCa}</b> ${t('anTopCa')}</span>`}
         <span><b>${x.avgAge ? x.avgAge.toFixed(0) : '–'}</b> ${t('anAvgAge')}</span>
       </div>
-      <div class="an-young">${t('anYoungTalent')}: ${yt ? `${yt.name} <span class="dim">(${getAge(yt)}${state.hideCapa ? '' : `, PA ${yt.pa || '·'}`})</span>` : t('anNone')}</div>
+      <div class="an-young">${t('anYoungTalent')}: ${yt ? `${escHtml(yt.name)} <span class="dim">(${getAge(yt)}${state.hideCapa ? '' : `, PA ${yt.pa || '·'}`})</span>` : t('anNone')}</div>
       ${x.rec ? `<div class="an-rec">${x.rec}</div>` : ''}
       ${x.scout ? `<button class="an-scout" data-grp="${x.g.id}">${t('anScout')} →</button>` : ''}
     </div>`;
@@ -1584,6 +1632,11 @@ async function poll() {
     const b = $('banner');
     const pl = st.plugin;
     if (pl && pl.state === 'scanning') { b.className = 'scanning'; b.textContent = t('dumping'); }
+    else if (pl && pl.state === 'error') {
+      b.className = 'scanning error';
+      b.textContent = t('dumpError') + (pl.error ? ': ' + pl.error : '');
+      b.onclick = null;
+    }
     else if (pl && pl.state === 'done') {
       if ((st.dumpTime && st.dumpTime !== lastDumpTime && lastDumpTime !== null) || lastPluginState === 'scanning') {
         b.className = 'done';

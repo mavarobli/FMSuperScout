@@ -55,7 +55,28 @@ Getest tegen echte data (wie wil wel/niet naar Feyenoord): van "iedereen wil kom
 label "Redelijk") die op de data niet te onderscheiden zijn van de echte gevallen — niet verder
 overfitten. Verdere winst zou een FM-"interesse"-veld vergen als dat ergens is uit te lezen.
 
+## Robuustheid & tests — GEDAAN (juli)
+
+- **Foutstatus i.p.v. eeuwig "scanning"**: de plugin schrijft nu `state:"error"` (met reden) naar
+  `status.json` als de scan faalt (geen GameAssembly, of een exception); de web-app toont dan een
+  rode banner i.p.v. eindeloos "⏳ FM haalt de database op…". Plugin moet herbouwd + herinstalleerd
+  (game dicht) om dit actief te krijgen.
+- **XSS-hardening**: speler-/clubnamen uit het geheugen gaan nu overal via `escHtml` de DOM in
+  (detail, tabel, vergelijking, analyse) — een corrupte string met `<` breekt de opmaak niet meer.
+- **Onbekende leeftijd ≠ minderjarige**: `interestEstimate` behandelt leeftijd 0/onbekend niet
+  langer als <15 (geen valse "te jong"-afwijzing).
+- **parseMoney**: "mld" (miljard) werkte niet (regex matchte al op de M) — opgelost.
+- **Modeltests** (`npm test`, zero-dep `node:test`): de echte reken-functies uit `app.js` worden via
+  een testharnas in Node geladen en getoetst op invarianten (waarde/vraagprijs/interesse/potentie/rol).
+  Vangt regressies bij het bijstellen van de modellen. Zie `test/README.md`.
+
 ## 5. Marktwaarde — OPGELOST (echte waarde uit geheugen)
+
+**Ijkset groeit nu automatisch**: de server bewaart bij elke geladen dump de spelers met een echte
+in-game waarde in `%LOCALAPPDATA%\FMSuperScout\value-history.json` (dedup op id, laatste wint),
+op te vragen via `GET /api/value-history?full=1`. Zo groeit de kalibratieset gratis over
+seizoenen/competities heen voor een latere herijking. Zie `docs/value-model.md`.
+
 
 De plugin leest FM's echte transferwaarde nu uit `pl+0x234` (geverifieerd via offset-discovery
 tegen in-game bedragen). ~74% van de spelers krijgt de exacte FM-waarde; de rest (sentinel

@@ -12,6 +12,11 @@ const PORT = Number(process.env.PORT) || 8765;
 const APP_DIR = __dirname;
 // De plugin schrijft dumps hierheen:
 const DATA_DIR = path.join(os.homedir(), 'AppData', 'Local', 'FMSuperScout');
+// Groeiende ijkset: elke dump bevat spelers met een échte in-game waarde; die bewaren we hier
+// (dedup op speler-id, laatste waarneming wint) zodat de kalibratieset vanzelf groeit over
+// saves/seizoenen/competities heen. Blijft volledig lokaal. Zie docs/value-model.md.
+const VALUE_HISTORY = path.join(DATA_DIR, 'value-history.json');
+let archivedDumpTime = null;
 
 // App-modus (standalone venster): server sluit zichzelf af zodra het venster dicht is.
 // De pagina stuurt elke paar seconden een heartbeat; blijft die te lang uit, dan stoppen we.
@@ -45,6 +50,36 @@ function latestDump() {
     return files[0] || null;
   } catch {
     return null;
+  }
+}
+
+// Werk de ijkset bij met de spelers uit deze dump die een echte waarde hebben.
+// Draait op de achtergrond (setImmediate) zodat het de /api/dump-respons niet ophoudt.
+function archiveValues(dumpPath) {
+  try {
+    const dump = JSON.parse(fs.readFileSync(dumpPath, 'utf8'));
+    const players = dump.players || [];
+    const gd = (dump.meta && dump.meta.gameDate) || null;
+    // Bestaande historie inladen en op id indexeren (laatste waarneming wint).
+    let byId = new Map();
+    try {
+      const prev = JSON.parse(fs.readFileSync(VALUE_HISTORY, 'utf8'));
+      for (const r of (prev.rows || [])) byId.set(r.id, r);
+    } catch { /* nog geen historie */ }
+    let added = 0;
+    for (const p of players) {
+      if (!(p.value > 0) || p.id == null) continue;   // alleen échte in-game waardes
+      if (!byId.has(p.id)) added++;
+      byId.set(p.id, {
+        id: p.id, name: p.name, gd, age: p.age,
+        ca: p.ca, pa: p.pa, wrep: p.worldRep, crep: p.clubRep, val: p.value,
+      });
+    }
+    const rows = [...byId.values()];
+    fs.writeFileSync(VALUE_HISTORY, JSON.stringify({ updated: new Date().toISOString(), count: rows.length, rows }));
+    console.log(`IJkset bijgewerkt: ${rows.length} spelers (${added} nieuw).`);
+  } catch (e) {
+    console.error('IJkset bijwerken mislukt:', e.message);
   }
 }
 
@@ -126,6 +161,26 @@ const server = http.createServer((req, res) => {
       'Cache-Control': 'no-store',
     });
     fs.createReadStream(dump.full).pipe(res);
+    // Ijkset bijwerken zodra een nieuwe dump wordt geladen (één keer per dump, op de achtergrond).
+    if (dump.mtime !== archivedDumpTime) {
+      archivedDumpTime = dump.mtime;
+      setImmediate(() => archiveValues(dump.full));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/value-history') {
+    // Groeiende ijkset uitlezen (voor herijking van het waardemodel). ?full=1 geeft alle rijen.
+    try {
+      const hist = JSON.parse(fs.readFileSync(VALUE_HISTORY, 'utf8'));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(url.searchParams.get('full') === '1'
+        ? JSON.stringify(hist)
+        : JSON.stringify({ updated: hist.updated, count: hist.count }));
+    } catch {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ updated: null, count: 0 }));
+    }
     return;
   }
 
