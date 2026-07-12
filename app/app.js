@@ -235,28 +235,55 @@ function estHtml(p) {
 }
 
 // ---------- interesse-inschatting (heuristiek) ----------
+// Loonplafond van mijn club: geschat uit de hoogste salarissen in mijn eigen selectie.
+// Een doelwit dat véél meer verdient dan mijn topverdieners is lastig te verleiden.
+function myWageCeiling() {
+  if (state._wageCeil !== undefined) return state._wageCeil;
+  const club = (state.meta.myClub || '').toLowerCase();
+  const wages = state.players.filter(p => (p.club || '').toLowerCase() === club && p.wage > 0)
+    .map(p => p.wage).sort((a, b) => b - a);
+  // referentie = op één na hoogste loon (voorkomt dat één uitschieter het plafond bepaalt)
+  const ref = wages.length >= 2 ? wages[1] : wages[0];
+  state._wageCeil = ref ? Math.round(ref * 1.3) : null;   // ~30% rek boven de huidige top
+  return state._wageCeil;
+}
+// Logistische kans (0-100) dat een speler een overstap naar mijn club ziet zitten.
 function interestEstimate(p) {
   const myRep = state.meta.myClubRep || 0;
   if (!myRep) return null;
-  const their = p.clubRep || 0;
-  const bigger = myRep - their;
-  let score = 50;
-  if (isFree(p)) score = 76;
-  else if (bigger >= 500) score = 80;
-  else if (bigger >= -500) score = 62;
-  else if (bigger >= -2000) score = 42;
-  else if (bigger >= -4000) score = 24;
-  else score = 10;
-  if (p.ambition) score += (bigger >= 0 ? 1.6 : -1.6) * (p.ambition - 10);
-  if (p.listed || p.setForRelease) score += 18;
+  if (p.club && (p.club || '').toLowerCase() === (state.meta.myClub || '').toLowerCase()) return null; // eigen speler
+
+  // Reputatie: mijn club versus (a) huidige club en (b) de persoonlijke status van de speler.
+  const clubGap = myRep - (p.clubRep || 0);
+  const statGap = myRep - (p.worldRep || 0);
+  const blend = 0.55 * clubGap + 0.45 * statGap;
+  let score = 100 / (1 + Math.exp(-blend / 1400));   // 0 kloof → 50; +1400 → ~73; -1400 → ~27
+
+  // Beschikbaarheidssignalen
+  if (isFree(p)) score = Math.max(score, 72);                     // clubloos: alleen loon nodig
+  if (p.listed || p.setForRelease) score += 15;                  // club wil verkopen
+  if (p.notForSale) score *= 0.4;                                // niet te koop: fors omlaag
   const m = monthsUntil(p.expires);
-  if (m != null && m <= 6) score += 14;
-  if (p.notForSale) score -= 26;
-  if (p.worldRep && p.worldRep > myRep + 1500 && !isFree(p)) score -= 16;
+  if (m != null && m <= 6) score += 14;                          // (bijna) transfervrij
+  else if (m != null && m <= 12) score += 7;
+
+  // Loon-haalbaarheid: past de speler in mijn loonstructuur?
+  const ceil = myWageCeiling();
+  if (ceil && p.wage > 0 && !isFree(p)) {
+    const ratio = p.wage / ceil;
+    if (ratio > 1) score -= Math.min(38, (ratio - 1) * 46);      // boven budget: moeilijk
+    else score += Math.min(6, (1 - ratio) * 8);                  // ruim betaalbaar: klein duwtje
+  }
+
+  // Leeftijd: heel jonge spelers verhuizen zelden (werkvergunning, ontwikkeling bij eigen club)
   const age = getAge(p);
-  if (age <= 15) score = Math.min(score, 8);
+  if (age <= 15) score = Math.min(score, 10);
   else if (age <= 17 && !isFree(p)) score -= 8;
-  if (p.loyalty && !isFree(p)) score *= (1 - 0.40 * (p.loyalty / 20));
+
+  // Optionele persoonlijkheid (alleen als de dump ze bevat; nu meestal afwezig)
+  if (p.ambition) score += (clubGap >= 0 ? 1.4 : -1.4) * (p.ambition - 10);
+  if (p.loyalty && !isFree(p)) score *= (1 - 0.35 * (p.loyalty / 20));
+
   score = Math.max(0, Math.min(100, Math.round(score)));
   const label = score >= 70 ? t('int_big') : score >= 45 ? t('int_ok') : score >= 25 ? t('int_small') : t('int_no');
   const cls = score >= 70 ? 'int-g' : score >= 45 ? 'int-r' : score >= 25 ? 'int-k' : 'int-n';
@@ -388,6 +415,7 @@ async function loadDump() {
     state.players = data.players || [];
     state.staff = data.staff || [];
     state.meta = data.meta || {};
+    state._wageCeil = undefined;   // loonplafond opnieuw berekenen voor deze dump
     // peiljaar: automatisch uit het afgeleide seizoensjaar (of game-datum)
     if (state.meta.gameDate) {
       const g = new Date(state.meta.gameDate);
@@ -776,10 +804,33 @@ function exportShortlist() {
 // ---------- detailpaneel ----------
 const attrClass = v => v >= 17 ? 'g5' : v >= 14 ? 'g4' : v >= 10 ? 'g3' : v >= 6 ? 'g2' : 'g1';
 const abar = v => `<span class="abar"><i class="ab-${attrClass(v)}" style="width:${Math.min(100, v * 5)}%"></i></span>`;
-// Geschatte potentie-waarde van een attribuut o.b.v. PA/CA-verhouding (ruwe projectie).
-function potAttr(p, v) {
+// Fysieke attributen pieken vroeg en groeien nauwelijks; technisch/mentaal groeit langer door.
+const PHYS_ATTRS = new Set(['Acceleration', 'Agility', 'Balance', 'JumpingReach', 'NaturalFitness', 'Pace', 'Stamina', 'Strength']);
+// Aandeel van de resterende groei dat op deze leeftijd nog realistisch is (grofweg de FM-groeicurve).
+function ageRemainFactor(age) {
+  if (age == null) return 0.5;
+  if (age <= 18) return 1.0;
+  if (age <= 21) return 0.85;
+  if (age <= 23) return 0.6;
+  if (age <= 25) return 0.4;
+  if (age <= 27) return 0.2;
+  if (age <= 29) return 0.08;
+  return 0.0;
+}
+// Projecteer één attribuut naar het potentieel (PA), met leeftijd, Determination en attribuuttype.
+// Zwakke punten trekken sneller op naar 20; fysiek vlakt eerder af dan techniek/mentaliteit.
+function potAttr(p, v, key) {
   if (!p.pa || !p.ca || p.pa <= p.ca) return v;
-  return Math.min(20, Math.round(v * (p.pa / p.ca)));
+  const head = (p.pa - p.ca) / 100;                       // CA-koppenruimte, genormaliseerd
+  const age = getAge(p);
+  const ageF = ageRemainFactor(age);
+  const det = (p.attrs && p.attrs.Determination) || p.determination || 10;
+  const detF = 0.7 + 0.3 * (det / 15);                    // vastberadenheid → meer groei benut
+  const isPhys = key && PHYS_ATTRS.has(key);
+  const typeF = isPhys ? 0.45 : 1.0;                      // fysiek groeit veel minder
+  const physAgeCap = isPhys && age != null && age >= 24 ? 0 : 1;
+  const g = Math.min(1, head * ageF * detF * typeF * physAgeCap);
+  return Math.min(20, Math.round(v + (20 - v) * g));      // uplift richting 20, geschaald
 }
 function showDetail(p) {
   state.selected = p;
@@ -845,7 +896,7 @@ function showDetail(p) {
       const rows = keys.filter(k => p.attrs[k] != null);
       col[gk] = !rows.length ? '' : `<div class="attr-col"><h3>${t(gk)}</h3>` + rows.map((k, idx) => {
         const raw = p.attrs[k];
-        const shown = state.showPot ? potAttr(p, raw) : raw;
+        const shown = state.showPot ? potAttr(p, raw, k) : raw;
         const grew = state.showPot && shown > raw;
         return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span>${abar(shown)}<span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
       }).join('') + '</div>';
