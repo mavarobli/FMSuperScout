@@ -24,6 +24,25 @@ internal static class Dumper
     internal static ulong DiagMyTeam;
     // Datum-stemmen van alle teams ([team+0xA0]+0x94), als kruischeck op de team-schema-lezing.
     internal static Dictionary<uint, int> DateVotes = new();
+    // Fase-timing (ms per stap) — om te zien waar de scan-tijd heen gaat.
+    internal static List<string> PhaseLog = new();
+
+    private const int ChunkSize = 32 * 1024 * 1024; // 32 MB leesblokken
+
+    // Thread-lokale verzameling voor de parallelle scan: elke worker vult zijn eigen
+    // buffer + collecties zonder locks; aan het eind mergen we ze samen.
+    private sealed class ScanLocal
+    {
+        public readonly byte[] Buf = new byte[ChunkSize];
+        public readonly Dictionary<uint, Person> Players = new();
+        public readonly Dictionary<uint, Person> Staff = new();
+        public readonly Dictionary<int, int> OffsetHist = new();
+        public readonly Dictionary<int, long> AllOffHist = new();
+        public readonly List<(ulong person, string name, string club, int rep)> Managers = new();
+        public readonly Dictionary<ulong, uint> PersonToUid = new();
+        public readonly List<ulong> ClubObjs = new();
+        public long Candidates, VtGp, Women;
+    }
 
     // Statusbestand dat de web-app pollt (betrouwbare F9-feedback, ook zonder console).
     // progress (0..1) is échte scanvoortgang: gescande bytes / totaal; de app toont er
@@ -62,8 +81,13 @@ internal static class Dumper
         Directory.CreateDirectory(OutDir);
         WriteStatus("scanning", 0, 0);
         GameDate = null;   // niet de datum van een vorige dump/save laten doorwerken in AgeFrom
+        // Fase-timing: waar gaat de tijd heen? Elke Phase() logt de duur sinds de vorige.
+        PhaseLog = new List<string>();
+        long tPrev = 0;
+        void Phase(string name) { long now = sw.ElapsedMilliseconds; PhaseLog.Add($"{name}: {now - tPrev} ms"); tPrev = now; }
 
         var mem = new MemScan();
+        Phase("MemScan-ctor (image-reads)");
         if (mem.GaBase == 0)
         {
             Plugin.Log.LogError("GameAssembly.dll niet gevonden — kan niet dumpen.");
@@ -85,101 +109,135 @@ internal static class Dumper
         var clubObjs = new List<ulong>();                        // gedetecteerde club-objecten
         long candidates = 0, vtGp = 0, women = 0;
 
-        const int ChunkSize = 32 * 1024 * 1024; // 32 MB blokken
-        var buf = new byte[ChunkSize];
-
-        // Echte scanvoortgang voor de web-app: verwerkte bytes / totaal. De scan is
-        // veruit de langste fase → die krijgt 0..0.85; koppelen/JSON de rest.
+        // Voortgang + parallellisatie. De geheugenregio's zijn onafhankelijk, dus verdeel ze
+        // over de cores (ReadProcessMemory is thread-safe en de IL2CPP-GC verplaatst niets).
+        // Elke thread werkt in eigen buffer + eigen verzamelingen; aan het eind mergen we onder
+        // een lock. De hoofdscan is veruit de langste fase → die krijgt 0..0.85 van de balk.
         ulong totalBytes = 0;
         foreach (var r in mem.ScanRegions) totalBytes += r.size;
-        ulong doneBytes = 0;
-        long lastProgMs = 0;
+        long doneBytes = 0, lastProgMs = 0;
+        ulong modLo = mem.ModLo, modHi = mem.ModHi;   // snelle inline-afwijzing in de hotloop
+        object progLock = new();
+        var regions = mem.ScanRegions.Where(r => r.size >= 0x40).ToList();
+        int maxDop = System.Math.Max(1, Environment.ProcessorCount - 1);
 
-        foreach (var (start, size) in mem.ScanRegions)
+        // N workers, elk een round-robin-deel van de regio's (regio's variëren sterk in
+        // grootte → interleaven balanceert de last). Task.Run i.p.v. Parallel.ForEach:
+        // de Il2Cpp-referenties bevatten een uitgeklede NullableAttribute waardoor de
+        // compiler struikelt over Parallel's geannoteerde delegate; een parameterloze
+        // Task-lambda omzeilt dat volledig.
+        var locals = new ScanLocal[maxDop];
+        var tasks = new System.Threading.Tasks.Task[maxDop];
+        for (int t = 0; t < maxDop; t++)
         {
-            if (size < 0x40) { doneBytes += size; continue; }
-            ulong scanned = 0;
-            while (scanned < size)
+            int worker = t;
+            var L = locals[worker] = new ScanLocal();
+            tasks[worker] = System.Threading.Tasks.Task.Run(() =>
             {
-                int want = (int)System.Math.Min((ulong)ChunkSize, size - scanned);
-                ulong chunkBase = start + scanned;
-                if (!mem.ReadBlock(chunkBase, buf, want)) { scanned += (ulong)want; doneBytes += (ulong)want; continue; }
-
-                for (int i = 0; i + 0x10 <= want; i += 8)
+                var buf = L.Buf;
+                for (int ri = worker; ri < regions.Count; ri += maxDop)
                 {
-                    ulong vt = BitConverter.ToUInt64(buf, i);
-                    // vtable moet in game_plugin.dll (native DB) of GameAssembly liggen
-                    if (!mem.IsVtable(vt)) continue;
-                    candidates++;
-                    if (mem.InGp(vt)) vtGp++;
-
-                    ulong p = chunkBase + (ulong)i; // kandidaat person-object
-                    int off = mem.DynamicOffsetFromVtable(vt);
-                    if (off == 0) continue;
-
-                    // Diagnose: registreer élk class-offset dat een plausibele UID heeft,
-                    // zodat we de echte speler/staf-offsets kunnen zien als er 0 matchen.
-                    uint uid = mem.U32(p + Fields.OBJ_DUNI);
-                    if (uid == 0 || uid == 0xFFFFFFFF) continue;
-                    if (off is > 0 and < 0x2000)
-                        allOffHist[off] = allOffHist.GetValueOrDefault(off) + 1;
-
-                    bool isPlayer = off == Fields.PLAYER_OFFSET || off == Fields.PLAYER_STAFF_OFFSET;
-                    bool isStaff = off == Fields.STAFF_OFFSET || off == Fields.HUMAN_MANAGER_OFFSET;
-                    if (!isPlayer && !isStaff)
+                    var (start, size) = regions[ri];
+                    ulong scanned = 0;
+                    while (scanned < size)
                     {
-                        // Club-detectie: object met teams-vector op +0x18/+0x20 en naam op +0xC0.
-                        ulong tb = mem.Ptr(p + 0x18), te = mem.Ptr(p + 0x20);
-                        if (tb != 0 && te > tb && (te - tb) % 8 == 0 && (te - tb) / 8 is >= 1 and <= 64
-                            && ClubNameOf(mem, p) != null)
-                            clubObjs.Add(p);
-                        continue;
-                    }
-
-                    ulong basePtr = p - (ulong)off;
-                    if (isPlayer)
-                    {
-                        ushort ca = mem.U16(basePtr + Fields.PLAO_CA);
-                        ushort pa = mem.U16(basePtr + Fields.PLAO_PA);
-                        if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
-                        // Vrouwenvoetbal niet inladen (Marks keuze: kost tijd/ruimte, niet gebruikt).
-                        // Geslacht = person+0x19 bit 0x10; vrouw → overslaan.
-                        if ((mem.U8(p + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0) { women++; continue; }
-                        offsetHist[off] = offsetHist.GetValueOrDefault(off) + 1;
-                        if (!players.ContainsKey(uid))
+                        int want = (int)System.Math.Min((ulong)ChunkSize, size - scanned);
+                        ulong chunkBase = start + scanned;
+                        if (!mem.ReadBlock(chunkBase, buf, want))
                         {
-                            players[uid] = ReadPlayer(mem, p, basePtr, uid, ca, pa);
-                            personToUid[p] = uid;
-                            personToUid[basePtr] = uid;
+                            scanned += (ulong)want;
+                            Interlocked.Add(ref doneBytes, want);
+                            continue;
                         }
-                    }
-                    else
-                    {
-                        ushort ca = mem.U16(basePtr + Fields.NPLO_CA);
-                        ushort pa = mem.U16(basePtr + Fields.NPLO_PA);
-                        if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
-                        offsetHist[off] = offsetHist.GetValueOrDefault(off) + 1;
-                        if (!staff.ContainsKey(uid))
+                        for (int i = 0; i + 0x10 <= want; i += 8)
                         {
-                            var st = ReadStaff(mem, p, basePtr, uid, ca, pa);
-                            staff[uid] = st;
-                            if (off == Fields.HUMAN_MANAGER_OFFSET)
+                            ulong vt = BitConverter.ToUInt64(buf, i);
+                            if (vt < modLo || vt >= modHi) continue;      // snelle afwijzing
+                            bool inGp = mem.InGp(vt);
+                            if (!inGp && !mem.InGa(vt)) continue;         // alleen DB/managed-vtables
+                            L.Candidates++;
+                            if (inGp) L.VtGp++;
+
+                            ulong p = chunkBase + (ulong)i;
+                            int off = mem.DynamicOffsetFromVtable(vt);    // gecachte image → geen syscall
+                            if (off == 0) continue;
+                            uint uid = BitConverter.ToUInt32(buf, i + Fields.OBJ_DUNI);   // uit de buffer
+                            if (uid == 0 || uid == 0xFFFFFFFF) continue;
+                            if (off is > 0 and < 0x2000)
+                                L.AllOffHist[off] = L.AllOffHist.GetValueOrDefault(off) + 1;
+
+                            bool isPlayer = off == Fields.PLAYER_OFFSET || off == Fields.PLAYER_STAFF_OFFSET;
+                            bool isStaff = off == Fields.STAFF_OFFSET || off == Fields.HUMAN_MANAGER_OFFSET;
+                            if (!isPlayer && !isStaff)
                             {
-                                var (mc, mrep, _) = ResolveClub(mem, p);
-                                managers.Add((p, st.Name, mc ?? st.Club, mrep));
+                                ulong tb = mem.Ptr(p + 0x18), te = mem.Ptr(p + 0x20);
+                                if (tb != 0 && te > tb && (te - tb) % 8 == 0 && (te - tb) / 8 is >= 1 and <= 64
+                                    && ClubNameOf(mem, p) != null)
+                                    L.ClubObjs.Add(p);
+                                continue;
+                            }
+
+                            ulong basePtr = p - (ulong)off;
+                            if (isPlayer)
+                            {
+                                ushort ca = mem.U16(basePtr + Fields.PLAO_CA);
+                                ushort pa = mem.U16(basePtr + Fields.PLAO_PA);
+                                if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
+                                // Vrouwenvoetbal niet inladen (person+0x19 bit 0x10 = vrouw → overslaan).
+                                if ((mem.U8(p + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0) { L.Women++; continue; }
+                                L.OffsetHist[off] = L.OffsetHist.GetValueOrDefault(off) + 1;
+                                if (!L.Players.ContainsKey(uid))
+                                {
+                                    L.Players[uid] = ReadPlayer(mem, p, basePtr, uid, ca, pa);
+                                    L.PersonToUid[p] = uid;
+                                    L.PersonToUid[basePtr] = uid;
+                                }
+                            }
+                            else
+                            {
+                                ushort ca = mem.U16(basePtr + Fields.NPLO_CA);
+                                ushort pa = mem.U16(basePtr + Fields.NPLO_PA);
+                                if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
+                                L.OffsetHist[off] = L.OffsetHist.GetValueOrDefault(off) + 1;
+                                if (!L.Staff.ContainsKey(uid))
+                                {
+                                    var st = ReadStaff(mem, p, basePtr, uid, ca, pa);
+                                    L.Staff[uid] = st;
+                                    if (off == Fields.HUMAN_MANAGER_OFFSET)
+                                    {
+                                        var (mc, mrep, _) = ResolveClub(mem, p);
+                                        L.Managers.Add((p, st.Name, mc ?? st.Club, mrep));
+                                    }
+                                }
                             }
                         }
+                        scanned += (ulong)want;
+                        long done = Interlocked.Add(ref doneBytes, want);
+                        long now = sw.ElapsedMilliseconds;
+                        if (now - Interlocked.Read(ref lastProgMs) >= 500 && totalBytes > 0 && Monitor.TryEnter(progLock))
+                        {
+                            try { lastProgMs = now; WriteStatus("scanning", 0, 0, null, 0.85 * done / totalBytes); }
+                            finally { Monitor.Exit(progLock); }
+                        }
                     }
                 }
-                scanned += (ulong)want;
-                doneBytes += (ulong)want;
-                if (sw.ElapsedMilliseconds - lastProgMs >= 500 && totalBytes > 0)
-                {
-                    lastProgMs = sw.ElapsedMilliseconds;
-                    WriteStatus("scanning", players.Count, staff.Count, null, 0.85 * doneBytes / totalBytes);
-                }
-            }
+            });
         }
+        System.Threading.Tasks.Task.WaitAll(tasks);
+
+        // Merge alle worker-resultaten in de gedeelde verzamelingen (single-threaded, geen lock nodig).
+        foreach (var L in locals)
+        {
+            foreach (var kv in L.Players) players.TryAdd(kv.Key, kv.Value);
+            foreach (var kv in L.Staff) staff.TryAdd(kv.Key, kv.Value);
+            foreach (var kv in L.PersonToUid) personToUid[kv.Key] = kv.Value;
+            foreach (var kv in L.OffsetHist) offsetHist[kv.Key] = offsetHist.GetValueOrDefault(kv.Key) + kv.Value;
+            foreach (var kv in L.AllOffHist) allOffHist[kv.Key] = allOffHist.GetValueOrDefault(kv.Key) + kv.Value;
+            clubObjs.AddRange(L.ClubObjs);
+            managers.AddRange(L.Managers);
+            candidates += L.Candidates; vtGp += L.VtGp; women += L.Women;
+        }
+        Phase("hoofdscan (parallel, geheugen doorlopen)");
         Plugin.Log.LogInfo($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten · {women:N0} vrouwen overgeslagen");
         Dumper.AllOffHist = allOffHist;
         Dumper.VtGp = vtGp;
@@ -225,6 +283,7 @@ internal static class Dumper
                 }
             }
         }
+        Phase("squad-walk 1 (gedetecteerde clubs)");
         // ---- Squad-walk v2 (15-07): clubs uit de bewezen contract-keten, en lijst-entries
         // opgelost door te PROBEN tegen de bekende person-adressen (de entries bleken geen
         // person-pointers; naamresolutie gaf rommel, maar een pointerveld erin wijst wél
@@ -295,6 +354,7 @@ internal static class Dumper
                 }
             }
         }
+        Phase("squad-walk 2 (contract-keten-clubs)");
         Plugin.Log.LogInfo($"Squad-walk v2: {squadClub.Count} spelers gekoppeld over {clubAddrs.Count} keten-clubs.");
 
         // Koppel clubs aan spelers (squad wint; anders blijft contract-keten-fallback staan).
@@ -343,12 +403,14 @@ internal static class Dumper
         // exact dezelfde waarde en geven we voorrang aan het cohort-jaar. Vinden we niets
         // betrouwbaars, dan blijft de oude fallback (systeemmaand/-dag) gewoon staan.
         FindGameDate(mem, players.Values, staff.Values);
+        Phase("koppeling + datum + seizoensjaar");
 
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
         WriteStatus("scanning", players.Count, staff.Count, null, 0.90);
 
         WriteJson(players.Values, staff.Values);
+        Phase("JSON schrijven");
         WriteDiag(mem, players, staff, offsetHist, candidates, sw.ElapsedMilliseconds);
 
         Plugin.Log.LogInfo($"Klaar in {sw.ElapsedMilliseconds} ms. Bestand in {OutDir}. " +
@@ -767,6 +829,7 @@ internal static class Dumper
             w.WriteLine($"game_plugin.dll:  {m.GpBase:X}-{m.GpEnd:X}");
             w.WriteLine($"Kandidaten: {candidates:N0}  (vtable in game_plugin: {VtGp:N0})");
             w.WriteLine($"Spelers: {players.Count}  Staf: {staff.Count}  Tijd: {ms} ms");
+            w.WriteLine("Fasen: " + string.Join(" · ", PhaseLog));
             w.WriteLine();
             // Health-check: de grote pieken horen speler=0x288 en staf=0x100 te zijn. Wijkt dit
             // af na een FM-patch, dan zijn de class-offsets verschoven en moeten ze opnieuw gepind.

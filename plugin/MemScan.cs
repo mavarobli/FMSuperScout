@@ -141,42 +141,36 @@ internal sealed class MemScan
         }
     }
 
-    // Alle geladen module-ranges (voor de vtable-check), gesorteerd op start.
-    private (ulong start, ulong end)[] _mods = System.Array.Empty<(ulong, ulong)>();
+    // Snelle onder-/bovengrens die precies de twee modules omspant waar person-/DB-objecten
+    // hun vtable hebben (game_plugin + GameAssembly). Verreweg de meeste 8-byte-woorden in de
+    // heap zijn kleine getallen (nullen, tellers) die ver onder _loMod liggen → in de scan-
+    // hotloop in één vergelijking weg, vóór de precieze InGp/InGa-check.
+    private ulong _loMod, _hiMod;
 
     private void FindModules()
     {
-        var list = new List<(ulong, ulong)>();
         foreach (ProcessModule m in Process.GetCurrentProcess().Modules)
         {
             ulong b = (ulong)m.BaseAddress.ToInt64();
             ulong e = b + (ulong)m.ModuleMemorySize;
-            list.Add((b, e));
             if (string.Equals(m.ModuleName, "GameAssembly.dll", StringComparison.OrdinalIgnoreCase))
             { GaBase = b; GaEnd = e; }
             else if (string.Equals(m.ModuleName, "game_plugin.dll", StringComparison.OrdinalIgnoreCase))
             { GpBase = b; GpEnd = e; GpPath = m.FileName; }
         }
-        list.Sort((a, b) => a.Item1.CompareTo(b.Item1));
-        _mods = list.ToArray();
+        // Grenzen over {game_plugin, GameAssembly}; de niet-gevonden module telt niet mee.
+        ulong lo = ulong.MaxValue, hi = 0;
+        if (GpBase != 0) { lo = System.Math.Min(lo, GpBase); hi = System.Math.Max(hi, GpEnd); }
+        if (GaBase != 0) { lo = System.Math.Min(lo, GaBase); hi = System.Math.Max(hi, GaEnd); }
+        _loMod = lo == ulong.MaxValue ? 0 : lo;
+        _hiMod = hi;
     }
 
     public bool InGa(ulong addr) => addr >= GaBase && addr < GaEnd;
     public bool InGp(ulong addr) => GpBase != 0 && addr >= GpBase && addr < GpEnd;
-
-    /// <summary>Ligt dit adres in een geladen module (mogelijke vtable)?</summary>
-    public bool IsVtable(ulong addr)
-    {
-        int lo = 0, hi = _mods.Length - 1;
-        while (lo <= hi)
-        {
-            int mid = (lo + hi) >> 1;
-            if (addr < _mods[mid].start) hi = mid - 1;
-            else if (addr >= _mods[mid].end) lo = mid + 1;
-            else return true;
-        }
-        return false;
-    }
+    // Grenzen voor de inline snelle afwijzing in de scan-hotloop.
+    public ulong ModLo => _loMod;
+    public ulong ModHi => _hiMod;
 
     /// <summary>Leest een heel blok. Geeft false bij ongeldig adres (crasht nooit).</summary>
     public bool ReadBlock(ulong addr, byte[] buf, int len)

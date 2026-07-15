@@ -2079,6 +2079,7 @@ $('club-badge').onclick = () => {
   if (!state.meta.myClub) return;
   $('btn-clear').onclick();
   $('f-myclub').checked = true;
+  renderMyTeamChips();   // programmatisch aanvinken vuurt geen change-event → chips zelf tonen
   applyFilters();
 };
 
