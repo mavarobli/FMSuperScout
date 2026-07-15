@@ -13,6 +13,14 @@
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ---------- SVG-iconen (vervangen de emoji; koffie ☕ blijft bewust) ---------- */
+.ic { vertical-align: -2px; flex: 0 0 auto; }
+/* shortlist-ster: outline standaard, gevuld bij .on */
+.star-ic path { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.star-cell.on .star-ic path, .detail-star.on .star-ic path { fill: currentColor; }
+#tab-shortlist .star-ic { color: var(--star); }
+#tab-shortlist .star-ic path { fill: currentColor; stroke: none; }
+
 /* subtiele, thema-passende scrollbalken */
 * { scrollbar-width: thin; scrollbar-color: #2f3a49 transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -49,6 +57,9 @@ body {
 #topbar h1 span { color: var(--accent); }
 #topbar nav { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
 .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: transparent;
   border: 0;
   color: var(--muted);
@@ -61,19 +72,24 @@ body {
 .tab.active { background: var(--bg3); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
 #sl-count { color: var(--star); font-weight: 700; }
 #btn-sidebar {
+  display: inline-flex; align-items: center; justify-content: center;
   background: var(--bg3); border: 1px solid var(--border); color: var(--text);
-  width: 32px; height: 30px; border-radius: 6px; cursor: pointer; font-size: 15px;
+  width: 32px; height: 30px; border-radius: 6px; cursor: pointer;
 }
 #club-badge { color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; padding: 3px 6px; border-radius: 5px; }
 #club-badge:hover { background: var(--bg3); }
 #club-badge b { color: var(--accent); }
 #dump-info { margin-left: auto; color: #5c6b7d; font-size: 11px; font-variant-numeric: tabular-nums; cursor: default; padding-right: 2px; }
 #dump-info::before { content: '▦'; margin-right: 4px; opacity: .7; }
+#game-date { display: inline-flex; align-items: center; gap: 4px; color: #5c6b7d; font-size: 11px; font-variant-numeric: tabular-nums; cursor: default; padding-right: 4px; white-space: nowrap; }
+#game-date:empty { display: none; }
+#game-date .ic { opacity: .8; }
 #btn-fetch, #btn-reload, #btn-settings {
   border: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600;
 }
-#btn-fetch { background: var(--accent); color: #06220f; }
+#btn-fetch { display: inline-flex; align-items: center; gap: 7px; background: var(--accent); color: #06220f; }
 #btn-reload, #btn-settings { background: var(--bg3); color: var(--muted); border: 1px solid var(--border); font-size: 15px; }
+#btn-reload { display: inline-flex; align-items: center; justify-content: center; padding: 6px 9px; }
 #btn-settings { display: inline-flex; align-items: center; justify-content: center; padding: 6px 9px; }
 #btn-fetch:hover, #btn-reload:hover { filter: brightness(1.12); }
 #btn-settings:hover { color: var(--text); border-color: var(--accent2); }
@@ -87,7 +103,8 @@ body {
   box-shadow: 0 12px 36px rgba(0,0,0,.55);
 }
 #donate-nudge.hidden { display: none; }
-#donate-nudge .dn-x { position: absolute; top: 8px; right: 10px; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; }
+#donate-nudge .dn-x { position: absolute; top: 8px; right: 10px; display: inline-flex; background: none; border: 0; color: var(--muted); cursor: pointer; }
+#donate-nudge .dn-x svg { display: block; }
 #donate-nudge .dn-x:hover { color: var(--text); }
 #donate-nudge .dn-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; padding-right: 16px; }
 #donate-nudge .dn-text { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-bottom: 12px; }
@@ -124,6 +141,11 @@ body.hide-capa .capa-row { display: none; }
 #banner.scanning { background: #443a14; color: var(--warn); }
 #banner.error { background: #3a1414; color: #e08080; }
 #banner.done { background: #16412a; color: #6fe0a0; }
+
+/* voortgangsbalk in de banner (plugin-scan / dump-download, echte voortgang) */
+#banner .pbar { display: inline-block; vertical-align: middle; width: 160px; height: 8px; margin: 0 6px 0 10px; border-radius: 4px; background: rgba(0, 0, 0, 0.35); overflow: hidden; }
+#banner .pfill { display: block; height: 100%; border-radius: 4px; background: currentColor; opacity: 0.85; transition: width 0.4s ease; }
+#banner .ppct { font-variant-numeric: tabular-nums; opacity: 0.85; }
 
 /* versie-waarschuwing: dump komt uit een andere FM-versie dan waarop de offsets zijn gepind */
 #ver-warn { flex: 0 0 auto; padding: 7px 14px; font-size: 12.5px; font-weight: 600; text-align: center; background: #443a14; color: var(--warn); border-bottom: 1px solid var(--border); }
@@ -164,7 +186,14 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .fsection { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .fsec-head { display: flex; align-items: center; gap: 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--accent); margin-bottom: 8px; font-weight: 700; cursor: pointer; user-select: none; }
 .fsec-head .mini { margin-left: auto; }
-.fsec-head::after { content: '▾'; margin-left: auto; color: var(--muted); font-size: 9px; }
+.fsec-head::after { content: '▾'; margin-left: auto; color: var(--muted); font-size: 10px; }
+/* teamchips onder "Mijn club" (1e / 2e / jeugd) */
+#myteam-chips { display: flex; gap: 4px; flex-wrap: wrap; margin: 2px 0 6px 22px; }
+.mt-chip { background: var(--bg3); border: 1px solid var(--border); color: var(--muted); font-size: 11px; padding: 2px 8px; border-radius: 10px; cursor: pointer; }
+.mt-chip:hover { color: var(--text); }
+.mt-chip.on { background: var(--accent); border-color: var(--accent); color: #0c1117; font-weight: 700; }
+.fsec-head:hover { color: var(--accent2); }
+.fsec-head:hover::after { color: var(--accent2); }
 .fsec-head:has(.mini)::after { margin-left: 0; }
 .fsection.collapsed .fsec-head::after { content: '▸'; }
 .fsection.collapsed .fsec-head { margin-bottom: 0; }
@@ -190,7 +219,8 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
   background: var(--bg3); border: 1px solid var(--border); color: var(--text);
   font-size: 12px; padding: 3px 8px; border-radius: 20px; cursor: pointer; line-height: 1.3;
 }
-.chip .x { color: var(--muted); font-size: 10px; }
+.chip .x { display: inline-flex; color: var(--muted); }
+.chip .x svg { display: block; }
 .chip:hover { border-color: var(--bad); }
 .chip:hover .x { color: var(--bad); }
 .chip-clear {
@@ -208,17 +238,33 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 }
 .col-help:hover { color: var(--text); border-color: var(--accent2); }
 
-/* ---------- opgeslagen filterpresets ---------- */
-#preset-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.preset {
-  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
-  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
-  font-size: 12px; padding: 3px 8px; border-radius: 20px; cursor: pointer; line-height: 1.3;
+/* ---------- opgeslagen filterpresets (dropdown) ---------- */
+#preset-dd { position: relative; margin-bottom: 8px; }
+#preset-dd-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 6px 8px; border-radius: 5px; font-size: 12.5px; cursor: pointer; text-align: left;
 }
-.preset:hover { border-color: var(--accent); }
-.preset .x { color: var(--muted); font-size: 10px; }
-.preset .x:hover { color: var(--bad); }
-.preset-none { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
+#preset-dd-btn:disabled { color: var(--muted); cursor: default; }
+#preset-dd-btn:not(:disabled):hover { border-color: var(--accent2); }
+#preset-dd-btn .chev { flex: 0 0 auto; color: var(--muted); transition: transform .12s; }
+#preset-dd-btn.open .chev { transform: rotate(180deg); }
+#preset-dd-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#preset-dd-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 150;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 4px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.5); max-height: 240px; overflow-y: auto;
+}
+#preset-dd-menu.hidden { display: none; }
+.pd-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 8px; border-radius: 5px; font-size: 12.5px; cursor: pointer;
+}
+.pd-item:hover { background: var(--bg3); }
+.pd-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd-del { display: inline-flex; flex: 0 0 auto; background: none; border: 0; color: var(--muted); cursor: pointer; padding: 2px; border-radius: 4px; }
+.pd-del:hover { color: var(--bad); }
+.pd-del svg { display: block; }
 #btn-preset-save {
   display: flex; align-items: center; justify-content: center; gap: 7px;
   width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--muted);
@@ -257,7 +303,9 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 /* ---------- tabel ---------- */
 #content { flex: 1 1 auto; min-width: 0; position: relative; display: flex; flex-direction: column; }
 #table-wrap { flex: 1 1 auto; overflow: auto; position: relative; }
-#grid { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+/* Vaste lay-out: breedtes komen uit de kolomdefinities/gebruikersinstelling (JS zet de
+   tabelbreedte inline), niet uit de inhoud — anders verspringen kolommen bij sorteren. */
+#grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; min-width: 100%; }
 #grid th {
   position: sticky; top: 0; background: var(--bg3); color: var(--muted);
   font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
@@ -299,10 +347,14 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #grid td.dim { color: var(--muted); }
 #grid td.pname { font-weight: 600; }
 #grid td.pname:hover { color: var(--accent2); text-decoration: underline; text-underline-offset: 2px; }
-.copybtn { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; font-size: 13px; padding: 2px 7px; margin-left: 4px; }
+/* huurstatus onder "Mijn club": verhuurd = rood, gehuurd = blauw (FM-conventie) */
+#grid td.pname.loan-out { color: #e08080; }
+#grid td.pname.loan-in { color: #5a9fe8; }
+.copybtn { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; color: var(--text); padding: 3px 7px; margin-left: 4px; vertical-align: middle; }
 .copybtn:hover { border-color: var(--accent2); }
+.copybtn svg, .cmpbtn svg { display: block; }
 /* profielknoppen (kopieer / vergelijk) */
-.cmpbtn { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; font-size: 13px; padding: 2px 7px; margin-left: 4px; }
+.cmpbtn { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; color: var(--text); padding: 3px 7px; margin-left: 4px; vertical-align: middle; }
 .cmpbtn:hover { border-color: var(--accent2); }
 .cmpbtn.on { background: var(--accent2); border-color: var(--accent2); color: #04203d; }
 
@@ -317,22 +369,26 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .ct-label { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
 .ct-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 3px 9px; font-size: 12.5px; cursor: pointer; }
 .ct-chip:hover { border-color: var(--accent2); }
-.ct-chip .x { color: var(--muted); font-size: 10px; }
+.ct-chip .x { display: inline-flex; color: var(--muted); }
+.ct-chip .x svg { display: block; }
 .ct-chip .x:hover { color: var(--bad); }
 .ct-go { background: var(--accent2); color: #04203d; border: 0; border-radius: 6px; padding: 6px 12px; font-weight: 700; cursor: pointer; }
 .ct-go:disabled { background: var(--bg3); color: var(--muted); cursor: default; }
-.ct-clear { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; }
+.ct-clear { display: inline-flex; align-items: center; background: none; border: 0; color: var(--muted); cursor: pointer; }
 .ct-clear:hover { color: var(--bad); }
 
 /* ---------- vergelijk-modal ---------- */
 #compare-modal { position: fixed; inset: 0; z-index: 300; background: rgba(6,9,13,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
 #compare-modal.hidden { display: none; }
-#compare-inner { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; width: min(760px, 100%); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,.6); }
+#compare-inner { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; width: min(880px, 100%); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,.6); }
 .cmp-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .cmp-top h2 { font-size: 16px; }
-#cmp-close { background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; }
+#cmp-close { display: inline-flex; align-items: center; background: none; border: 0; color: var(--muted); cursor: pointer; }
 #cmp-close:hover { color: var(--text); }
-.cmp-grid { display: grid; overflow-y: auto; padding: 4px 0 10px; }
+.cmp-scroll { overflow-y: auto; }
+.cmp-grid { display: grid; padding: 4px 0 6px; }
+/* kop als eigen sticky grid: namen + stamdata blijven boven de héle scroll staan */
+.cmp-headgrid { position: sticky; top: 0; z-index: 3; padding: 0; background: var(--bg3); box-shadow: 0 4px 10px -6px rgba(0,0,0,.7); }
 .cmp-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; }
 .cmp-row:nth-child(even of .cmp-row) { background: rgba(255,255,255,.02); }
 .cmp-lbl, .cmp-cell { padding: 4px 12px; font-size: 12.5px; min-width: 0; }
@@ -345,6 +401,39 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .cmp-group { grid-column: 1 / -1; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); font-weight: 700; padding: 8px 12px 3px; border-bottom: 1px solid var(--border); margin-top: 4px; }
 .cmp-best { color: var(--accent); font-weight: 700; }
 .cmp-worst { color: #6d7c8d; }
+/* attributen in FM-kleuren: winnaar krijgt een accent-streep i.p.v. kleur-override */
+.cmp-grid .v { font-weight: 600; }
+.cmp-grid .v.at-hi { color: #46c46e; }
+.cmp-grid .v.at-mid { color: #e8a13c; }
+.cmp-grid .v.at-lo { color: #aeb9c6; }
+.cmp-grid .v.cmp-best { text-decoration: underline 2px var(--accent); text-underline-offset: 3px; font-weight: 800; }
+.cmp-grid .v.cmp-worst { opacity: .55; }
+/* Δ-kolom (alleen bij 2 spelers) */
+.cmp-delta { border-left: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.cmp-head .cmp-delta { color: var(--muted); font-weight: 700; cursor: help; }
+.cmp-dpos { color: #46c46e; font-weight: 700; }
+.cmp-dneg { color: #e08080; font-weight: 700; }
+.cmp-dzero { color: var(--muted); }
+.cmp-winsb { color: var(--accent); font-weight: 600; }
+/* attribuutpanelen: twee kolommen met kaartjes (FM-stijl: waarde | naam | waarde | Δ) */
+.cmp-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 12px; padding: 8px 12px 12px; align-items: start; }
+.cmpg { background: rgba(255,255,255,.025); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px 8px; margin-bottom: 10px; }
+.cmpg h3 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); font-weight: 700; padding: 2px 0 5px; }
+.cpr { display: grid; grid-template-columns: 1fr 32px 68px 32px; align-items: center; padding: 2px 0; font-size: 12.5px; border-radius: 4px; }
+.cpr.cpr3 { grid-template-columns: 1fr 34px 34px 34px; }
+.cpr:nth-child(even of .cpr:not(.cpr-foot)) { background: rgba(255,255,255,.025); }
+.cpr-foot { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; font-weight: 600; }
+.cpr-foot .cpl { color: var(--text); }
+.cpl { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
+.cpv { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+/* vergelijkbalkje (FM-stijl): kleur + lengte wijzen naar wie beter is */
+.cbar { position: relative; display: block; height: 9px; margin: 0 6px; border-radius: 5px; background: rgba(0,0,0,.35); overflow: hidden; }
+.cbar .cb-tick { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.22); }
+.cbar .cb-l { position: absolute; right: 50%; top: 0; bottom: 0; background: #46c46e; border-radius: 5px 0 0 5px; }
+.cbar .cb-r { position: absolute; left: 50%; top: 0; bottom: 0; background: #5a9fe8; border-radius: 0 5px 5px 0; }
+.cpr .v.at-hi { color: #46c46e; } .cpr .v.at-mid { color: #e8a13c; } .cpr .v.at-lo { color: #aeb9c6; }
+.cpr .v.cmp-best { text-decoration: underline 2px var(--accent); text-underline-offset: 3px; font-weight: 800; }
+.cpr .v.cmp-worst { opacity: .55; }
 
 #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: #06220f; padding: 9px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.4); opacity: 0; transition: opacity .15s, transform .15s; pointer-events: none; z-index: 100; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -375,8 +464,14 @@ td.exp-year { color: #d8c88a; }
 .int-note { margin-top: 5px; color: var(--warn); font-size: 11.5px; line-height: 1.35; }
 /* rol-selector in de sidebar */
 #fg-role select { width: 100%; }
-#fg-div select, #f-tier { width: 100%; }
-#fg-div, #fg-div + .fgroup { margin-bottom: 10px; }
+#fg-div input { width: 100%; }
+#fg-div { margin-bottom: 10px; }
+/* eigen suggestie-dropdown voor de divisie-zoekbalk (app-stijl, donker) */
+#div-search { position: relative; }
+#div-suggest { position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 30; max-height: 260px; overflow-y: auto; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+#div-suggest.hidden { display: none; }
+.ds-item { padding: 6px 10px; font-size: 12.5px; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-item:hover, .ds-item.sel { background: var(--bg3); color: var(--accent2); }
 #fg-div label, [data-sec=competition] label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 4px; }
 /* beste-rollen-blok in het profiel */
 .roles-box { margin: 12px 0 4px; }
@@ -387,8 +482,9 @@ td.exp-year { color: #d8c88a; }
 .role-row .v { min-width: 26px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 .role-row.sel { background: #21314a; }
 .role-row.sel .rn { color: var(--accent2); font-weight: 600; }
-.star-cell { cursor: pointer; color: #3a4658; font-size: 15px; text-align: center; }
+.star-cell { cursor: pointer; color: #3a4658; text-align: center; }
 .star-cell.on { color: var(--star); }
+.star-cell .star-ic { vertical-align: middle; }
 
 /* ---------- squad-behoefteanalyse ---------- */
 #analysis { flex: 1 1 auto; overflow-y: auto; padding: 16px 20px 40px; }
@@ -428,7 +524,8 @@ td.exp-year { color: #d8c88a; }
 #empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); text-align: center; background: var(--bg); }
 #empty-state.hidden { display: none; }
 #empty-state h2 { color: var(--text); font-size: 18px; }
-.es-icon { font-size: 44px; opacity: .35; filter: grayscale(.4); }
+.es-icon { opacity: .35; }
+.es-icon svg { display: block; }
 .es-steps { text-align: left; font-size: 13px; line-height: 2; color: var(--muted); margin: 4px 0 0; padding-left: 22px; }
 .es-steps kbd {
   background: var(--bg3); border: 1px solid var(--border); border-bottom-width: 2px;
@@ -442,23 +539,27 @@ td.exp-year { color: #d8c88a; }
   border-left: 1px solid var(--border); overflow-y: auto; padding: 14px; position: relative;
 }
 #detail.hidden { display: none; }
-#detail-close { position: absolute; top: 8px; right: 10px; background: none; border: 0; color: var(--muted); font-size: 15px; cursor: pointer; }
+#detail-close { position: absolute; top: 8px; right: 10px; display: inline-flex; background: none; border: 0; color: var(--muted); cursor: pointer; }
+#detail-close svg { display: block; }
 #detail-close:hover { color: var(--text); }
 #detail h2 { font-size: 18px; margin-bottom: 2px; padding-right: 40px; }
 #detail .sub { color: var(--muted); margin-bottom: 8px; font-size: 12px; }
-.detail-star { cursor: pointer; color: #3a4658; font-size: 20px; }
+.detail-star { cursor: pointer; color: #3a4658; }
 .detail-star.on { color: var(--star); }
+.detail-star .star-ic { vertical-align: -2px; }
 .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; margin: 10px 0; font-size: 12.5px; }
 .kv div b { color: var(--muted); font-weight: 400; margin-right: 6px; }
 .attr-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 10px; align-items: start; }
 @media (max-width: 420px) { .attr-cols { grid-template-columns: 1fr; } }
-/* attributen-grid: Mentaal loopt over 2 rijen; Fysiek|Persoonlijkheid delen de onderste rij */
+/* attributen-grid: Mentaal loopt over 2 rijen; onderste rij links Fysiek + Verborgen, rechts Persoonlijkheid */
 .attr-grid {
   display: grid; margin-top: 10px; gap: 8px 16px; align-items: start;
   grid-template-columns: 1fr 1fr;
   grid-template-areas: "tech ment" "sp ment" "phys pers";
 }
 .attr-grid > div { min-width: 0; }
+/* gestapelde groepen binnen één grid-cel (bv. Fysiek + Verborgen kenmerken) */
+.attr-grid > div > .attr-col + .attr-col { margin-top: 10px; }
 @media (max-width: 420px) {
   .attr-grid { grid-template-columns: 1fr; grid-template-areas: "tech" "sp" "ment" "phys" "pers"; }
 }
@@ -488,7 +589,7 @@ td.exp-year { color: #d8c88a; }
 .potswitch input { accent-color: var(--accent); }
 #sl-bar { flex: 0 0 auto; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg2); }
 #sl-bar.hidden { display: none; }
-#btn-export { background: var(--accent); color: #06220f; border: 0; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+#btn-export { display: inline-flex; align-items: center; gap: 7px; background: var(--accent); color: #06220f; border: 0; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
 #btn-export:hover { filter: brightness(1.1); }
 .v.g1 { color: #7f8ea0; }
 .v.g2 { color: #c9d4df; }

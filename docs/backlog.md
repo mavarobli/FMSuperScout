@@ -39,11 +39,36 @@ echte draaiende game (correcte detectie).
 
 - **Persoonlijkheid uitlezen: GEDAAN** - de plugin vult nu Ambitie/Loyaliteit/Professionaliteit
   e.a. (100% in de huidige dump). Meegenomen in het interesse-model (punt 4).
-- **Clubnaam-offset - OPEN**: sommige clubs geven wel clubreputatie maar geen naam
-  ("onbekende club", bv. Filip Wisłocki / Lech). Indirecte-string-offset nog niet gepind.
-  Vereist Marks F9-testloop met `diagnostics.txt`.
-- **Divisie/competitie-offset - OPEN**: `div` is overal leeg → echte divisiefilter kan pas als dit
-  is uitgelezen. Filter staat klaar en verschijnt automatisch zodra data aanwezig is.
+- **Clubnaam - GEDAAN (14-07, end-to-end geverifieerd)**: oorzaak was `PlausibleClub` die
+  niet-westerse Latijnse letters afkeurde (Pools ł/ń/ś, Turks ğ/ş/ı), waardoor bv. "Lech Poznań"
+  wegviel terwijl de clubreputatie wél gelezen werd. Accepteert nu het hele Latijnse Unicode-blok
+  (t/m Latin Extended). Geverifieerd tegen de echte F9-dump én in de app: Filip Wisłocki toont
+  "Lech Poznań"; ook Beşiktaş A.Ş., Śląsk Wrocław en Górnik Zabrze bestaan nu.
+- **Competitie-UI (15-07)**: clubniveau-filter (reputatiedrempels) verwijderd — de echte
+  divisie maakt het overbodig. Divisiefilter is nu een **slimme zoekbalk met eigen dropdown**
+  (app-stijl, verving de native datalist die als lichte "wolk" uit de donkere UI viel):
+  suggesties gerangschikt op competitiesterkte (proxy = mediane clubreputatie van de spelers
+  erin, want competitiereputatie dumpen we nog niet), met typo-tolerantie (Levenshtein per
+  woord) en substring/subsequence-matching. "premeir" → Premier League bovenaan. Eigen
+  competitie(s) van je club krijgen voorrang (typ "eredivisie" → jouw VriendenLoterij
+  Eredivisie bovenaan, niet de buitenlandse naamgenoten), maar positie weegt zwaar zodat een
+  prefix-match als "Premier League" nooit verliest van je eigen reserve-"Premier Divisie".
+  Sterkte-proxy = 80e-percentiel clubreputatie (top-clubs bepalen aanzien). Peiljaar-
+  veld weg; in-game datum staat in de header naast het spelersaantal met een SVG-kalender
+  (app-stijl), tilde + tooltip bij afgeleid, exact bij "memory".
+- **In-game datum — bug in v0.1.11 gevonden (15-07, gefixt in v0.1.12)**: de "schone"
+  stemfilter `& 0xFE00` gooide álle team-stemmen weg (het `+0x94`-veld draagt vlagbits in
+  9-15). Fix: stemmen normaliseren op de gedecodeerde datum, én de datum rechtstreeks lezen
+  van het schema-object van MÍJN team (`[myTeam+0xA0]+0x94`, met +0x18 als fallback) — dat
+  gaf in elke meting exact "vandaag" (19-09 geverifieerd). Teamstemmen nog als kruischeck.
+- **Divisie/competitie - GEPIND + landprefix-fix (15-07, v0.1.10)**: `[team+0x50/0x60]` →
+  competitie-object; eerste F9 (v0.1.7) gaf 94,9% dekking en per club consistente divisies
+  (jeugd kreeg zelfs correct de U19-competitie), maar de kórte naam (`comp+0x48`) mist bij
+  niet-gelicentieerde competities het land — heel Spanje werd "Eerste Divisie", Oostenrijk
+  "Eredivisie". De comp-namenkaart (v0.1.8-watchlist) toonde dat de vólledige naam op
+  `comp+0x40` het land wél draagt ("Oostenrijkse Eredivisie"), dus v0.1.10 gebruikt die
+  eerst (NL wordt dan "VriendenLoterij Eredivisie" — sponsornamen, net als FM zelf toont).
+  Check na F9: Vallecano-spelers op "Spaanse Eerste Divisie" (of LALIGA-naam)?
 
 ## 4. Interesse-model - GEDAAN (persoonlijkheid meegenomen)
 
@@ -59,29 +84,58 @@ overfitten. Verdere winst zou een FM-"interesse"-veld vergen als dat ergens is u
 
 - **Foutstatus i.p.v. eeuwig "scanning"**: de plugin schrijft nu `state:"error"` (met reden) naar
   `status.json` als de scan faalt (geen GameAssembly, of een exception); de web-app toont dan een
-  rode banner i.p.v. eindeloos "⏳ FM haalt de database op…". Plugin moet herbouwd + herinstalleerd
-  (game dicht) om dit actief te krijgen.
+  rode banner i.p.v. eindeloos "⏳ FM haalt de database op…". Zit in de geïnstalleerde plugin
+  (12-07-build en nieuwer; hash gamemap = repo-dist geverifieerd 14-07).
 - **XSS-hardening**: speler-/clubnamen uit het geheugen gaan nu overal via `escHtml` de DOM in
   (detail, tabel, vergelijking, analyse) - een corrupte string met `<` breekt de opmaak niet meer.
 - **Onbekende leeftijd ≠ minderjarige**: `interestEstimate` behandelt leeftijd 0/onbekend niet
   langer als <15 (geen valse "te jong"-afwijzing).
 - **parseMoney**: "mld" (miljard) werkte niet (regex matchte al op de M) - opgelost.
+- **Verspringende kolommen bij sorteren (14-07) - opgelost**: de tabel gebruikte automatische
+  kolombreedtes, dus de inhoud van de ~45 zichtbare (gevirtualiseerde) rijen bepaalde de
+  breedte en bij elke sortering verschoof alles. Nu `table-layout: fixed` met een
+  standaardbreedte per kolom (`w` in de kolomdefinities); zelf gesleepte breedtes gaan vóór
+  en de tabelbreedte beweegt mee met de versmalgreep. Geverifieerd: posities byte-identiek
+  over meerdere sorteringen; resize-greep werkt nog.
 - **Modeltests** (`npm test`, zero-dep `node:test`): de echte reken-functies uit `app.js` worden via
   een testharnas in Node geladen en getoetst op invarianten (waarde/vraagprijs/interesse/potentie/rol).
   Vangt regressies bij het bijstellen van de modellen. Zie `test/README.md`.
 
 ## 5. Marktwaarde - OPGELOST (echte waarde uit geheugen)
 
-**Ijkset groeit nu automatisch**: de server bewaart bij elke geladen dump de spelers met een echte
-in-game waarde in `%LOCALAPPDATA%\FMSuperScout\value-history.json` (dedup op id, laatste wint),
-op te vragen via `GET /api/value-history?full=1`. Zo groeit de kalibratieset gratis over
-seizoenen/competities heen voor een latere herijking. Zie `docs/value-model.md`.
+**Kalibratieset verwijderd (15-07)**: er liep een automatische ijkset (`value-history.json` +
+`/api/value-history`). Nu de echte waarde uit het geheugen komt en het schatmodel on point is,
+was dat overbodig — verwijderd (archivering, endpoint, bestand). Tijdelijk weer aan te zetten
+als het schatmodel ooit herijkt moet worden. Zie `docs/value-model.md`.
 
 
 De plugin leest FM's echte transferwaarde nu uit `pl+0x234` (geverifieerd via offset-discovery
 tegen in-game bedragen). ~74% van de spelers krijgt de exacte FM-waarde; de rest (sentinel
 0xFFFFFFFF/300000000) valt terug op het reputatie-schatmodel hieronder. Bidstrup: €62M-gok →
 echte €15.8M. Dit maakt de aparte schatting grotendeels overbodig, maar die blijft als fallback.
+
+**Grote ijking 14-07** (`tools/value-calib.js`, 55 spelers van Telstar-€28K tot Mbappé-€300M,
+in-game bandbreedtes door mavarobli aangeleverd): **54/55 kloppen** — onze waarde (×1,16 £→€) valt
+binnen FM's getoonde transferwaarde-bandbreedte, op afrondingsranden na. Bonus-ontdekking:
+bij `listed`-spelers met een door de club gezette vaste vraagprijs is het waardeveld daar
+**exact** aan gelijk (4/4, ±1%) → de app toont die nu zonder "~" en zonder afronding, en
+`feeMultiplier` doet er geen op-/afslag meer op. Vraagprijsmodel v2: premies gematigd
+(contract-opslag cap 1,35; wonderkid ≤ ×1,2; totaal cap 1,7 / 2,2 bij niet-te-koop; v1 ging
+tot ×2,4 — niet gesteund door de ijking). Verdere aanscherping vergt échte "betaald vs.
+waarde"-datapoints. **Open uitschieters: Nobel Mendy en Jozhua Vertrouwd** (veld €39,1M vs
+in-game €17,5-21M resp. €13,5M vs €0,95-8,4M) — beide 21-jarigen bij Rayo; de 28+'ers van
+dezelfde club kloppen wél (De Frutos binnen band, Singh exact = clausule €25M). Mendy is
+niet gelijst, speelt alles, is tevreden, clausule €55M (verklaart de lage prijs dus niet).
+**OPGELOST (14-07, watchlist-gelddump)**: geen uitleesfout — FM's opgeslagen waarde is
+dynamisch en kan dagen achterlopen op de weergave. Bij de herhaalmeting stond Mendy's veld
+op £15,77M (€18,3M, midden in de in-game 17,5-21M) en Vertrouwd op £4,9M (€5,7M, binnen
+0,95-8,4M); FM had ze tussen de dumps geherberekend. Conclusie: waarde-uitlezing volledig
+gevalideerd; een dump is een momentopname, vaker F9'en houdt waardes vers.
+Bijvangst uit de gelddump: `pl+0x244` lijkt de laatste transfersom (Haaland £51M),
+`pl+0x248` = weekloon; een afkoopclausule-veld (Mendy €55M) is in het speler-/contract-
+venster níét gevonden — clausules leven vermoedelijk in een aparte lijst (nice-to-have).
+Praktische les: bestanden die van buitenaf in de datamap worden gezet zijn voor fm.exe
+onzichtbaar (virtualisatie); de plugin maakt/vult `watchlist.txt` daarom zelf (v0.1.5+).
 
 ### Historie: reputatie-schatmodel (fallback)
 
@@ -114,18 +168,211 @@ De plugin leest de bestandsversie van `game_plugin.dll` en zet `gameVersion` /
 Wijkt de versie af, dan toont de app een ambergele balk "data mogelijk onbetrouwbaar". Bij een
 nieuwe FM-patch: offsets verifiëren en `SUPPORTED_*` in `Fields.cs` ophogen.
 
-## 9. In-game datum - discovery gebouwd (verifiëren met F9-loop)
+## 9. In-game datum - GEPIND via team-stemmen (15-07, plugin v0.1.10; verifiëren met F9)
 
-`MemScan.ScanGpDates` zoekt in de game_plugin-image naar u32's die exact een FM-datum coderen
-(jaar<<16 | dag, bits 9-15 leeg) rond het afgeleide seizoensjaar. De dump kiest de waarde met
-≥2 hits (voorkeur cohort-jaar), herberekent alle leeftijden ermee en zet
-`gameDate`/`gameDateSource:"memory"` in de meta; lukt het niet, dan blijft de oude fallback
-(seizoensjaar + systeemmaand/-dag, `"derived"`) staan. `diagnostics.txt` krijgt een sectie
-"GAME-DATUM DISCOVERY" met de top-kandidaten incl. `gp+0x…`-offsets: klopt de gekozen datum
-niet met in-game, pin dan de juiste offset uit die lijst. **Nog niet tegen de echte game
-getest — plugin herbouwen + F9 + diagnostics checken.**
+**Doorbraak 15-07**: de fixture-jacht toonde dat `[team+0xA0]+0x94` exact de huidige
+in-game datum draagt (2027-09-05 op meerdere onafhankelijke teams, bevestigd door mavarobli).
+v0.1.10 laat álle teams uit de squad-walk stemmen; bij ≥10 stemmen en ≥60% eensgezindheid
+wordt de datum gezet (`gameDateSource:"memory"`, leeftijden herberekend), anders eerlijk
+terug naar "derived". De app verbergt het peiljaar-veld zodra de bron "memory" is (Marks
+wens). Historie van de zoektocht hieronder.
 
-## 10. UX-ideeën (nice-to-have)
+### Historie: vals-positief + discovery-rondes (14-07)
+
+**Les uit de F9-loop (12-07 vs 14-07)**: de game_plugin-image-scan vond bij twee dumps met
+verschillende in-game datums exact dezelfde kandidatenlijst (zelfde waardes én offsets) — dat
+zijn dus constantes in de binary, geen live datum. De "gekozen" 2027-09-13 was fout; echt was
+15-08-2027 (0x07EB00E3), en die waarde stond niet eens in de lijst → de echte datum leeft op
+de heap of in GameAssembly-statics.
+
+**v2 (plugin v0.1.2)**: kiest níéts meer automatisch (`gameDateSource` blijft `"derived"`) en
+verzamelt drie sporen in `diagnostics.txt`: (1) gp-image (referentie/constantes), (2)
+GameAssembly-image-statics (een `ga+offset` zou stabiel zijn binnen een versie), (3) een
+heap-histogram van alle FM-datum-gecodeerde u32's uit de hoofdscan. Werkwijze: mavarobli meldt bij
+elke F9 de in-game datum; de kandidaat met die waarde over twee dumps (met verschillende
+datums!) is de bron om te pinnen.
+
+**Ronde 14-07 (echt: 26-08-2027)**: de datum stond in géén van de drie u32-sporen — wel
+stopt het heap-histogram van drukbezette datums exact vlak vóór "vandaag" (22/8), dus de
+data is vers maar "vandaag" leeft niet als losse u32-glob. **v0.1.4** scant daarom ook op
+.NET DateTime-ticks (u64, middernacht, jaarvenster) in GameAssembly — de C#-laag bewaart
+de datum mogelijk als System.DateTime-static. Marks wens zodra dit betrouwbaar is: het
+peiljaar-veld in de zijbalk automatisch verbergen.
+
+## 10. Voortgangsbalk bij nieuwe data - GEDAAN (14-07)
+
+Echte voortgang, geen nep-animatie, op twee plekken in de banner:
+- **Plugin-scan**: de plugin schrijft tijdens de scan elke ~0,5 s `progress` (0..1) naar
+  `status.json` — gescande bytes/totaal voor 0-85%, koppelfase 87-90%, JSON-schrijven 90-100%
+  (verhouding ≈ echte doorlooptijd). De app pollt sneller (750 ms) tijdens een scan en toont
+  balk + percentage. Oudere plugins zonder `progress` krijgen de oude tekstbanner.
+- **Dump laden in de app**: streamende fetch met `Content-Length` → "Data laden… X / Y MB"
+  met balk, daarna "Data verwerken…" tijdens de JSON-parse.
+Zit in plugin v0.1.2 (geïnstalleerd 14-07) + app. App-kant end-to-end getest (48.869 spelers
+geladen via het nieuwe streamingpad; balkrendering geverifieerd; modeltests groen). De
+plugin-kant meeloopt bij Marks volgende F9.
+
+**Auto-laden (14-07)**: zodra de plugin klaar is, laadt de app de nieuwe dump automatisch —
+de groene balk is nu een korte bevestiging ("Nieuwe data geladen") die na 6 s vanzelf
+verdwijnt, geen klik meer nodig. End-to-end getest met een gesimuleerde scanning→done-
+overgang in `status.json`. Instructiestap 3 in de lege-staat is meegewijzigd.
+
+## 11. Vergelijkscherm v2 - GEDAAN (14-07)
+
+Op Marks verzoek volledig uitgewerkt: attributen in FM-kleuren (winnaar krijgt een
+accent-onderstreping i.p.v. kleur-override), meta-score, vraagprijs, lengte, contract en
+voet erbij, groepsgemiddelden (Technisch/Mentaal/Fysiek/Standaard, 1 decimaal, met
+kleur), een winsttelling ("Beste op … attributen"), en verborgen kenmerken +
+persoonlijkheid als eigen groepen (zelfde zichtbaarheidsregel als het detailpaneel;
+blessuregevoeligheid/vals spel/controverse tellen omgekeerd). Bij precies 2 spelers is er
+een Δ-kolom (speler 1 − speler 2; groen = speler 1 beter af, ook bij "lager is beter"
+zoals vraagprijs); bij 3 spelers vervalt de Δ-kolom en markeren de rijen de winnaar. Max
+blijft 3 spelers. End-to-end geverifieerd (Mbappé/Haaland/Wirtz); tests groen.
+
+**v2.1 (14-07, opgeruimd na Marks feedback)**: de eerste versie was één lijst van 66 rijen
+(2.195px, 2,7 schermen scrollen). Nu: groepsgemiddelden weg, winsttelling als badge in de
+kop ("11× beste attribuut"), en de attributen in twee kolommen met panelen — bij 2 spelers
+in FM-stijl (waarde | naam | waarde | Δ), bij 3 spelers naam | w1 w2 w3. Kerngetallen
+blijven bovenin als grid met sticky kop. Scrolllengte ~-40%; panelen stapelen automatisch
+op smalle vensters (minmax 300px).
+
+**v2.2 (14-07, naar FM's eigen vergelijkscherm gemodelleerd)**: vergelijkbalkjes in het
+midden van elke attribuutrij i.p.v. de Δ-tekstkolom (groen naar links = speler 1 beter,
+blauw naar rechts = speler 2; lengte ∝ verschil, 8 punten = vol; Δ als tooltip; werkt ook
+omgekeerd bij "laag is beter"). Kop is nu een eigen sticky grid boven de héle scroll met
+naam, leeftijd·positie·club, waarde·salaris·contractjaar en het winst-badge. Per paneel
+een "Gemiddeld"-voetregel met eigen balkje (zoals FM onderaan doet). Geverifieerd: sticky
+blijft staan bij scrollen, balkrichting/-lengte klopt, 3-spelermodus zonder balkjes intact.
+
+## 12. Man/vrouw-filter - GEDAAN (15-07, v0.1.19)
+
+Geslacht-byte na 3 foute pins definitief: **`person+0x19` bit `0x10`** = vrouw. Eerdere
+kandidaten 0x0A en 0x18 bit 0x08 waren jeugd/teamtype-vlaggen (bij álle jeugd gezet →
+mannelijke wonderkids werden als vrouw geflagd). Doorslaggevend: jeugd-man vs jeugd-vrouw
+diffen (leeftijd-confound weg) + validatie tegen mannen-JÉÚGD-competities. Eindvalidatie
+v0.1.19: Premier League/Eredivisie/Deense-Duitse-Franse U19 = **0 vrouwen**, vrouwencompetities
+100%, alle 228 gevonden vrouwen zitten in echte vrouwencompetities (WSL, Frauen-Bundesliga,
+Eerste Divisie Vrouwen…). Segment-toggle Mannen/Vrouwen/Beide (default Mannen) live; app-
+vangnet: filter no-op als de dump geen geslacht-data heeft (voorkwam 0-resultaten).
+
+**Beslissing 15-07 (mavarobli): vrouwen helemaal niet inladen.** De toggle is verwijderd; de plugin
+slaat vrouwen (person+0x19 bit 0x10) al bij de scan over → scheelt tijd/ruimte, en de
+regen-vrouwen die "lekten" zijn weg. Geen `gender`-veld meer in de dump, geen filter/UI meer
+in de app. Onderzoek naar de ontbrekende vrouwen (het CA/PA-filter was NIET de oorzaak — 0
+afgewezen spelers; wél een aparte class-offset ~0x219 met ~39k objecten, vermoedelijk de
+vrouwen-class) is stopgezet: niet nodig nu we vrouwen bewust weglaten. Kan later weer opgepakt
+worden als volledige vrouwen-scan ooit gewenst is.
+
+### Historie: eerdere foute pins (0x0A, 0x18)
+
+mavarobli wil man/vrouw kunnen filteren; default mannen. **Geslacht-byte (2 rondes)**: eerste pin
+`person+0x0A` was FOUT — bleek een jeugd/niveau-vlag (Simon Banza, man/Ligue 1, kreeg ook 1;
+"vrouwen" waren vooral mannelijke jeugd/lagere-divisiespelers). Oorzaak: discovery-set te
+eenzijdig (elite mannen vs jonge vrouwen → leeftijd/niveau confound). Discovery v2 met diverse
+set (Banza 31j, Mparaganda 19j, Haaland, Mbappé als mannen; vrouwen 16-18j) + vólledige
+byte-kaart wees **`person+0x18` bit `0x08`** aan: alle 4 mannen 0x00, alle 5 vrouwen 0x08.
+v0.1.16 leest dat, dumpt `gender` (0/1) per speler/staf, en logt een validatie (vrouwen per
+mannen-/vrouwencompetitie). **App-kant**: segment-toggle in Instellingen "Mannen/Vrouwen/
+Beide" (default Mannen), app-stijl; rij verschijnt alleen bij geslacht-data. Getest met
+gesimuleerde data (3 standen filteren correct). Na Marks F9 met v0.1.16: validatieregels
+checken (Premier League ~0 vrouwen), dan is de toggle definitief live.
+
+## 13. Huur-/verhuurspelers onder "Mijn club" - GEDAAN (15-07, v0.1.24)
+
+mavarobli wil bij zijn eigen club ook gehuurde/verhuurde spelers zien, in FM's kleuren (rood =
+verhuurd, blauw = gehuurd). Sleutel: **moederclub = volledige-contract-keten**
+(`person+0xA8→team(+0x10)→club(+0x30)`), terwijl de squad-walk de huidige/huurclub geeft.
+Discovery bevestigde dit met Marks verhuurde Feyenoorders (Amaury Zimmermann → SK Beveren,
+contract → Feyenoord). Plugin dumpt nu `ownerClub` wanneer die afwijkt van `club`. App: onder
+het "Mijn club"-filter worden spelers met moederclub==mijn club óók getoond; naam gekleurd
+rood (verhuurd aan X) / blauw (gehuurd van X) met tooltip. Alleen onder Mijn club (Marks
+keuze). Getest met gesimuleerde huurdata (rood/blauw + tooltip correct); tests groen.
+Kanttekening: pakt de gevallen waar de squad-walk de huurclub correct oplevert; verhuurde
+spelers die de squad-walk (nog) aan Feyenoord toekent, tonen als gewone spelers — te
+verfijnen als mavarobli ziet dat er iemand mist.
+
+## 14. Scan-overhead opgeruimd - GEDAAN (15-07, v0.1.25)
+
+mavarobli merkte dat het laden trager voelde. Oorzaak: de datum-zoektocht had een zware diagnose
+achtergelaten — voor élk 8-byte-woord in de héle heap werd gecheckt of het een FM-datum of
+.NET-tick codeerde (miljoenen extra bewerkingen + twee groeiende histogrammen per scan). Nu de
+datum via het team-schema gepind is, is dat overbodig. Verwijderd: `CountHeapDate` (2×/woord),
+de heap-tick-check (1×/woord), `HeapDateHist`/`HeapTickHist`, de image-datumscans
+(`ScanGpDates`/`ScanGaDates`/`ScanGaTicks`/`ScanImageDates`) en het `heap-dates.txt`-bestand
+plus alle bijbehorende diagnostieksecties. `FindGameDate` leest nu alleen nog rechtstreeks het
+team-schema (+ teamstemmen als kruischeck). App-kant is sowieso lichter geworden: vrouwen
+worden niet meer ingeladen en het gender-veld is weg → kleinere dump, snellere parse. Scan
+en laadtijd weer terug op het oude niveau.
+
+## 15. Diagnostics/discovery-scaffolding opgeruimd - GEDAAN (15-07, v0.1.26)
+
+Grote opschoning nu alle offsets gepind zijn. Uit de plugin verwijderd: CLUB-OFFSET-,
+DIVISIE-OFFSET- (incl. `DivDiscover`/`WriteDivCand`/`ObjNameMap`/`DivNameOffs`), SQUAD-LIJST-,
+fixture-jacht-, WAARDE-OFFSET- en WATCHLIST-discovery (incl. `WriteWatchlist`/`NormName`/
+`MoneyLike`), plus `ClubNameAt`/`ChainClubName`/`FmDateDebug`/`ResolveClubName` en de
+diagnose-verzamelingen `DiagPersons`/`DiagClubs`/`DiagTeams`/`ProbeHist`/`DiagMyClubObj`.
+Die probeerden elke F9 honderden objecten × offsets in het geheugen — puur ontwikkel-
+scaffolding voor problemen die nu opgelost zijn. `WriteDiag` is nu een strakke health-check
+(class-offset-top-15, matches, mijn club, datum-bron, 12 sample-spelers, huur-overzicht) die
+niets extra's probeert. `diagnostics.txt` is een fractie van de grootte; scan/diag weer snel.
+Health-check blijft: als een FM-patch de offsets verschuift, zie je dat aan de class-pieken.
+
+## 16. UX-ideeën (nice-to-have)
+
+- **Eigen-team-schakelaar — GEBOUWD (15-07, verifiëren met F9)**: de v0.1.9-discovery
+  vond de teamstructuur (Feyenoord: tt=0 eerste elftal/Eredivisie, tt=3 reserves, tt=11
+  O18), maar de lijst-entries bleken geen person-pointers (naamresolutie gaf rommel).
+  Oplossing in v0.1.10: **squad-walk v2** — clubs uit de bewezen contract-keten, en per
+  lijst-entry proben (direct + [entry+0x00..0x80]) tegen de bekende person-adressen; het
+  winnende offset komt in de diagnose ("entry→person-offsets"). Levert per speler
+  `teamType` (0=1e, ~3=reserves, ≥10=jeugd) én de team-divisie (jeugd → jeugdcompetitie).
+  App-kant af: chips "Alles · 1e elftal · 2e elftal · Jeugd" verschijnen onder het
+  "Mijn club"-vinkje zodra teamType-data aanwezig is (oude dumps → onzichtbaar). Getest
+  met gesimuleerde data (24/19/18 splitst correct). Check na F9 met v0.1.10: kloppen de
+  aantallen per team en het offsets-histogram in diagnostics?
 - Filteren op losse attributen / attribuut-drempels (bv. "Pace ≥ 15").
 - Snelknoppen: wonderkids, aflopende contracten, vrije spelers.
 - Rol-vergelijking tussen shortlist-spelers; export van de vergelijking.
+
+## 17. Potentie-projectie herijkt op de eigen database - GEDAAN (14-07)
+
+Marks observatie: wonderkids (bv. Sinky Petersen, CA 102 / PA 180) kregen bijna alles op 20.
+Oorzaak: de projectie schaalde elk attribuut met ×PA/CA, maar FM's CA-schaal heeft een grote
+basis. Grootschalige meting over de echte dump (`tools/ca-analysis.js`, 43.905 veldspelers +
+4.964 keepers):
+- attribuuttotaal ≈ 148 + **2,1 × CA** (r = 0,91; keepers 169 + 2,2 × CA) — het oude model
+  deelde daardoor tot ~75% te veel groeipunten uit;
+- zelfs CA-170+-spelers hebben gemiddeld maar **0,23 attributen op 20** en ~3,5 ≥ 18
+  (top-5-gemiddelde 17,6);
+- leeftijdseffect binnen een CA-band is klein (±3%), positie-spreiding sd ≈ 18-27 punten.
+
+**v2 (budget-model)**: groeibudget = T(PA) − T(CA) uit gemeten bucketgemiddelden, verdeeld met
+type-weging + demping richting de cap. Beter, maar mavarobli zag terecht dat wonderkids nog te
+complete allrounders werden (een back met Voorzetten 16 én Mandekking 17 én Koppen 19).
+
+**v3 (positieprofiel-model, 14-07, actueel)**: tweede meting (`tools/pos-curve.js`) — wélke
+attributen meegroeien met CA verschilt sterk per positie. Per positiegroep (GK/DC/FB/DM/MC/
+W/AMC/ST + ALL-fallback) is het gemiddelde profiel gemeten op CA-ankers 80/110/140/170
+(validatie: anker-170 wijkt max ~1 punt af van echte CA-165+-profielen). Projectie = eigen
+waarde + (positienorm(PA) − positienorm(CA)), gemiddeld over de posities van de speler;
+fysieke groei extra gedempt voor 24+. Persoonlijke sterktes/zwaktes blijven behouden, de
+positie-vorm klopt: Sinky Petersen (DR, CA 102/PA 180) gaat van ~alles-20 (v1) naar gem 13,9
+met Afwerken 9 en alleen zijn bestaande uitschieters op 20. Tabel in app.js gegenereerd met
+`node tools/pos-curve.js` — bij een nieuwe database/patch opnieuw draaien en vervangen.
+
+## 18. Verspreiding / launch - OPEN (13-07-2026)
+
+Marktonderzoek gedaan: zie de vergelijkingstabel in de README (Genie Scout 26 / FMST 26 / FMRTE 26
+zijn de directe concurrenten; FMST 26 lanceerde zelf pas juli 2026 met vrijwel dezelfde belofte).
+Nog te doen vóór brede verspreiding:
+
+- **Screenshot/GIF voor de README** - de app zelf werkt prima (getest tegen de echte dump, 48k+
+  spelers), maar een geautomatiseerde browserscreenshot van de lokale server hing telkens vast
+  (waarschijnlijk door de snelle status-poll-loop, niet door de app). mavarobli neemt zelf een korte
+  schermopname van de workflow (F9 → filteren → vergelijken) - levert sowieso een sterker beeld op
+  dan een statische lijst.
+- **Eerste GitHub Release** - `dist/FMSuperScout-Setup.zip` staat lokaal klaar maar is nooit
+  geüpload; zonder Release heeft geen enkele forumpost iets om naar te linken. `gh` CLI ontbreekt
+  nog op deze pc.
+- Forumpost-concepten (fmscout.com FM26-tools, r/footballmanagergames, FM-Arena) staan klaar in
+  [`docs/marketing-drafts.md`](marketing-drafts.md). Alleen plaatsen na expliciet akkoord per post.

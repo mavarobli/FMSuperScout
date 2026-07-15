@@ -1,12 +1,13 @@
 # Marktwaarde- en interesse-inschatting
 
-## Groeiende ijkset (automatisch)
+## Kalibratieset (verwijderd 15-07)
 
-De server bewaart bij elke geladen dump de spelers met een échte in-game waarde in
-`%LOCALAPPDATA%\FMSuperScout\value-history.json` (dedup op speler-id, laatste waarneming wint,
-mét speeldatum). Zo groeit de kalibratieset vanzelf over saves/seizoenen/competities heen, zonder
-handwerk. Uitlezen kan via `GET /api/value-history?full=1`. Dit is de bron om het reputatie-
-schatmodel later te herijken (en om exacte fixtures voor de tests te maken - zie `test/README.md`).
+Er liep een automatische ijkset: de server bewaarde bij elke dump de spelers met een échte
+in-game waarde in `value-history.json` (dedup op id). Nu de plugin de echte transferwaarde
+rechtstreeks uit het geheugen leest (~74%) en het schatmodel voor de rest on point is, was dat
+overbodig — het groeide alleen maar mee zonder verder iets te doen. Verwijderd: de archivering,
+het `/api/value-history`-endpoint en het bestand. Moet het schatmodel ooit opnieuw geijkt worden
+(bv. na een grote FM-patch), dan kan het verzamelen tijdelijk weer aangezet worden.
 
 ## Update: reputatie-gedreven model
 

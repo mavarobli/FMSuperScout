@@ -15,11 +15,10 @@ neppe (no-op) globals (`document`, `localStorage`, `fetch`, …) en geeft daarna
 terug. Zo testen we de echte code, niet een kopie - een modelwijziging die de tests breekt, valt
 meteen op.
 
-## Nieuwe ijkpunten toevoegen (waardemodel)
+## Waardemodel herijken
 
-De server bewaart bij elke geladen dump automatisch de spelers met een échte in-game waarde in
-`%LOCALAPPDATA%\FMSuperScout\value-history.json` (zie `app/server.js`). Wil je het waardemodel
-herijken of er een regressietest van maken: haal die set op via `GET /api/value-history?full=1`
-en leg een representatieve steekproef vast als fixture in deze map. De huidige tests toetsen
-vooral *invarianten* (waarde daalt niet bij meer reputatie, potentie blijft ≤ 20, enz.); met
-echte ijkpunten kun je daar exacte mediaanfout-grenzen aan toevoegen.
+De automatische ijkset (`value-history.json`) is verwijderd (15-07) omdat de echte waarde nu
+rechtstreeks uit het geheugen komt en het schatmodel on point is. Moet het schatmodel ooit
+opnieuw geijkt worden, zet het verzamelen dan tijdelijk terug in `app/server.js` (zie de
+git-historie van `archiveValues`). De huidige tests toetsen *invarianten* (waarde daalt niet
+bij meer reputatie, potentie blijft ≤ 20, enz.).

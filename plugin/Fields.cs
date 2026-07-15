@@ -38,6 +38,12 @@ internal static class Fields
     public const int PLAO_TRANSFER_VALUE = 0x238; // u32 GBP
 
     // --- Persoon-blok (pero); basis = person ---
+    // Geslacht: byte op person+0x19, bit 0x10 gezet = vrouw. Gepind 15-07 via discovery v3
+    // (jeugd-man vs jeugd-vrouw): 0x18 bit 0x08 bleek de JEUGD-vlag (bij álle jeugd gezet),
+    // maar 0x19 bit 0x10 is zuiver geslacht — 9 mannen (jong+oud+elite+lager) 0x02, alle
+    // vrouwen 0x12. Eerdere pins 0x0A en 0x18 waren beide jeugd/teamtype-vlaggen.
+    public const int PERO_GENDER = 0x19;
+    public const int GENDER_FEMALE_BIT = 0x10;
     public const int PERO_FIRST_NAME = 0x50;  // nested string
     public const int PERO_SECOND_NAME = 0x58;
     public const int PERO_COMMON_NAME = 0x60;
@@ -65,6 +71,18 @@ internal static class Fields
     // --- Nation ---
     public const int NATION_SHORT_NAME = 0x20; // indirecte string
     public const int NATION_NAME = 0x30;
+
+    // --- Team → competitie (gepind via diepe offset-kaart Feyenoord, 14-07-2026) ---
+    public const int TEAM_COMP = 0x50;         // ptr → competitie-object
+    public const int TEAM_COMP_ALT = 0x60;     // idem (beide wezen naar de Eredivisie)
+    public const int COMP_NAME = 0x40;         // indirecte string, volledige (sponsor)naam
+    public const int COMP_SHORT_NAME = 0x48;   // indirecte string, korte naam ("Eredivisie")
+
+    // Fixture/schema-object van een team: [team+0xA0]; +0x94 = eerstvolgende wedstrijddatum
+    // (= "vandaag" op wedstrijddagen, anders enkele dagen vooruit). Gepind 15-07-2026.
+    public const int TEAM_SCHEDULE = 0xA0;
+    public const int SCHED_NEXT_MATCH = 0x94;
+    public const int SCHED_NEXT_MATCH_ALT = 0x18;   // droeg dezelfde datum in alle metingen
 
     // --- Staf-blok (nplo); basis = staffBase = person - dynamicOffset ---
     public const int NPLO_CA = 0xDA;          // u16

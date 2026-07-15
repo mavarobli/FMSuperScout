@@ -11,6 +11,7 @@ const state = {
   cur: localStorage.getItem('fmss_cur') || '£',
   lang: localStorage.getItem('fmss_lang') || 'nl',
   showPot: false,
+  myTeam: 'all',   // teamchip bij "Mijn club": all | first | res | youth
   hideCapa: localStorage.getItem('fmss_hidecapa') === '1',
   role: localStorage.getItem('fmss_role') || '',
   compare: [],
@@ -32,16 +33,16 @@ const I18N = {
     donateBody: 'FMSuperScout is gratis en blijft gratis. Als het je een uur turen in traag menu bespaart, is een koffie welkom. Zo niet, draait ie ook gewoon door.',
     donateCta: '☕ Koffie', donateLater: 'Later',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
-    age: 'Leeftijd', refyear: 'Peiljaar', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
+    age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
     origin: 'Herkomst', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
     interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Haalbaar', listed: 'Op transferlijst',
     exp6: 'Contract < 6 mnd', exp12: 'Contract < 1 jaar', free: 'Clubloos', myclub: 'Mijn club',
-    onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: '⬇ Nieuwe data', reload: '⟳',
-    nodata: 'Nog geen data geladen', exportcsv: '⬇ Shortlist exporteren (CSV)',
+    onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: 'Nieuwe data',
+    nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Waarde', c_fee: 'Vraagprijs', c_wage: 'Salaris p/w', c_expires: 'Contract tot', c_interest: 'Interesse',
     c_status: 'Status', c_role: 'Rol', foot: 'Voet', height: 'Lengte', repLabel: 'Reputatie',
-    c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.',
+    c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.', c_div: 'Divisie',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
     int_big: 'Groot', int_ok: 'Redelijk', int_small: 'Klein', int_no: 'Nee', interestTitle: 'Interesse-inschatting',
     minorNote: 'Te jong voor een transfer.', minorIntlNote: 'Als niet-EU-minderjarige pas vanaf 18 haalbaar (FIFA-regel voor internationale transfers).',
@@ -51,22 +52,29 @@ const I18N = {
     hiddenTitle: 'Verborgen kenmerken', a_Consistency: 'Constantheid', a_ImportantMatches: 'Grote wedstrijden',
     a_InjuryProneness: 'Blessuregevoeligheid', a_Versatility: 'Veelzijdigheid', a_Dirtiness: 'Vals spel',
     showPot: 'Toon geschatte potentie', potNote: 'geschatte waarden op potentieel (PA)',
-    clubless: 'clubloos', clubUnknown: 'onbekende club', copied: 'Gekopieerd', reqSent: '⏳ Verzoek verstuurd, FM haalt de data op…',
-    dumping: '⏳ FM haalt de database op…', dumpReady: '✓ Nieuwe data klaar, klik om te laden',
-    dumpError: '⚠ Uitlezen mislukt', fmNotRunning: '⚠ Start eerst Football Manager 26 en laad je save.',
+    loanOut: 'verhuurd aan {c}', loanIn: 'gehuurd van {c}',
+    clubless: 'clubloos', clubUnknown: 'onbekende club', copied: 'Gekopieerd',
+    reqSent: 'Spelersdata inlezen…',
+    dumping: 'Spelersdata inlezen…', dumpReady: 'Nieuwe data klaar, klik om te laden',
+    dumpLoaded: 'Nieuwe data geladen',
+    dumpError: 'Uitlezen mislukt', fmNotRunning: 'Start eerst Football Manager 26 en laad je save.',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
     staffAttrs: 'Staf-attributen',
     clearAll: 'alles wissen', chipSearch: 'Zoek',
-    loading: '⏳ Data laden…',
+    loading: 'Data laden…',
+    parsing: 'Data verwerken…',
     step1: 'Start <b>FM26</b> en laad je save',
-    step2: 'Druk in de game op <kbd>F9</kbd>, of klik hier op <b>⬇ Nieuwe data</b>',
-    step3: 'Klik op de groene balk zodra de dump klaar is',
+    step2: 'Druk in de game op <kbd>F9</kbd>, of klik hier op <b>Nieuwe data</b>',
+    step3: 'De data laadt vanzelf zodra de dump klaar is',
     playersWord: 'spelers', staffWord: 'staf', clickClubFilter: 'Klik = filter op jouw club', repWord: 'reputatie',
     roleFit: 'Tactische rol', roleColHdr: 'Rol', roleAny: 'Geen rol gekozen', bestRoles: 'Beste rollen',
     compare: 'Vergelijk', comparing: 'Vergelijken', addCompare: 'Vergelijk', compareFull: 'Max. 3 spelers',
     cmpTitle: 'Spelervergelijking', cmpValue: 'Waarde', cmpTopRole: 'Beste rol',
+    cmpWinsBadge: '{n}× beste attribuut', avgLabel: 'Gemiddeld',
+    mt_all: 'Alles', mt_first: '1e elftal', mt_res: '2e elftal', mt_youth: 'Jeugd',
+    cmpDeltaHint: 'Verschil: speler 1 min speler 2 (groen = speler 1 beter af)',
     analysis: 'Analyse', anTitle: 'Squad-behoefteanalyse', anNoClub: 'Geen eigen club in de data gevonden.',
     anPlayers: 'spelers', anAvgAge: 'gem. leeftijd', anAvgCa: 'gem. CA', anTopCa: 'beste CA',
     anOk: 'Op sterkte', anThin: 'Dunne bezetting', anShort: 'Tekort', anAging: 'Vergrijzing', anNoSucc: 'Geen opvolging',
@@ -80,16 +88,17 @@ const I18N = {
     anRecShortNp: 'Te weinig spelers; werf {n} extra.',
     anRecThinNp: 'Dunne cover; een aanvulling versterkt de diepte.',
     anRecSuccNp: 'Geen jong talent op niveau; zoek een groot U{age}-talent.',
-    competition: 'Competitie', divLabel: 'Divisie', clubTier: 'Clubniveau',
-    tierTop: 'Top (rep 7500+)', tierStrong: 'Sterk (6000+)', tierMid: 'Middel (4000+)', tierLow: 'Laag (<4000)',
+    competition: 'Competitie', divLabel: 'Divisie', divSearch: 'Typ een competitie…',
+    gameDateMemory: 'Datum in de game (uit het geheugen)', gameDateDerived: 'Geschatte in-game datum (jaar zeker, dag benaderd)',
     presetsTitle: 'Opgeslagen filters', presetSave: 'Huidige filters opslaan', presetNamePrompt: 'Naam voor deze zoekopdracht',
-    presetSaved: 'Filter opgeslagen', presetNone: 'Nog geen opgeslagen filters.', presetDelConfirm: 'Weet je zeker dat je "{name}" wilt verwijderen?',
+    presetSaved: 'Filter opgeslagen', presetNone: 'Nog geen opgeslagen filters.', presetPick: 'Kies opgeslagen filter…',
+    presetDelConfirm: 'Weet je zeker dat je "{name}" wilt verwijderen?',
     presetEmptyFilters: 'Geen actieve filters om op te slaan',
     presetSaveTitle: 'Filters opslaan', presetDelTitle: 'Filter verwijderen',
     saveBtn: 'Opslaan', deleteBtn: 'Verwijderen', cancelBtn: 'Annuleren',
     c_meta: 'Meta', metaLabel: 'Meta-score',
     metaHint: 'Meta-score (1–20, zelfde schaal als een attribuut): hoe sterk deze speler scoort op de attributen die volgens FM-Arena\'s grootschalige tests de meeste punten opleveren in de match engine — vooral Snelheid en Versnelling, daarna Sprongkracht en Dribbelen.\n\nRichtlijn: 15+ elite, 13–15 sterk, 11–13 degelijk, daaronder matig.\n\nGebruik het naast CA: hoge Meta bij gelijke CA = meer rendement op het veld; hoge CA maar lage Meta = speler leunt op attributen die de engine minder beloont. Zegt niets over positie of rol; keepers vallen buiten de test.',
-    verWarn: '⚠ FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x — data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
+    verWarn: 'FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x — data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -99,16 +108,16 @@ const I18N = {
     donateBody: 'FMSuperScout is free and stays free. If it beat squinting at slow menus, a coffee helps. If not, it keeps working anyway.',
     donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
-    age: 'Age', refyear: 'Game year', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
+    age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
     origin: 'Origin', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
     interestmin: 'Interest ≥', all: 'All', attainable: 'Attainable', listed: 'Transfer listed',
     exp6: 'Contract < 6 mo', exp12: 'Contract < 1 yr', free: 'Free agent', myclub: 'My club',
-    onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: '⬇ New data', reload: '⟳',
-    nodata: 'No data loaded yet', exportcsv: '⬇ Export shortlist (CSV)',
+    onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: 'New data',
+    nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Value', c_fee: 'Asking price', c_wage: 'Wage p/w', c_expires: 'Contract until', c_interest: 'Interest',
     c_status: 'Status', c_role: 'Role', foot: 'Foot', height: 'Height', repLabel: 'Reputation',
-    c_clubrep: 'Club rep', c_worldrep: 'World rep',
+    c_clubrep: 'Club rep', c_worldrep: 'World rep', c_div: 'Division',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
     int_big: 'High', int_ok: 'Fair', int_small: 'Low', int_no: 'No', interestTitle: 'Interest estimate',
     minorNote: 'Too young for a transfer.', minorIntlNote: 'As a non-EU minor, only feasible from age 18 (FIFA rule on international transfers).',
@@ -118,22 +127,29 @@ const I18N = {
     hiddenTitle: 'Hidden', a_Consistency: 'Consistency', a_ImportantMatches: 'Big matches',
     a_InjuryProneness: 'Injury proneness', a_Versatility: 'Versatility', a_Dirtiness: 'Dirtiness',
     showPot: 'Show estimated potential', potNote: 'estimated values at potential (PA)',
-    clubless: 'free agent', clubUnknown: 'unknown club', copied: 'Copied', reqSent: '⏳ Request sent, FM is fetching the data…',
-    dumping: '⏳ FM is fetching the database…', dumpReady: '✓ New data ready, click to load',
-    dumpError: '⚠ Read failed', fmNotRunning: '⚠ Start Football Manager 26 and load your save first.',
+    loanOut: 'on loan at {c}', loanIn: 'on loan from {c}',
+    clubless: 'free agent', clubUnknown: 'unknown club', copied: 'Copied',
+    reqSent: 'Reading player data…',
+    dumping: 'Reading player data…', dumpReady: 'New data ready, click to load',
+    dumpLoaded: 'New data loaded',
+    dumpError: 'Read failed', fmNotRunning: 'Start Football Manager 26 and load your save first.',
     tag_free: 'free', tag_listed: 'listed', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
     staffAttrs: 'Staff attributes',
     clearAll: 'clear all', chipSearch: 'Search',
-    loading: '⏳ Loading data…',
+    loading: 'Loading data…',
+    parsing: 'Processing data…',
     step1: 'Start <b>FM26</b> and load your save',
-    step2: 'Press <kbd>F9</kbd> in-game, or click <b>⬇ New data</b> here',
-    step3: 'Click the green bar when the dump is ready',
+    step2: 'Press <kbd>F9</kbd> in-game, or click <b>New data</b> here',
+    step3: 'The data loads automatically once the dump is ready',
     playersWord: 'players', staffWord: 'staff', clickClubFilter: 'Click = filter on your club', repWord: 'reputation',
     roleFit: 'Tactical role', roleColHdr: 'Role', roleAny: 'No role selected', bestRoles: 'Best roles',
     compare: 'Compare', comparing: 'Comparing', addCompare: 'Compare', compareFull: 'Max. 3 players',
     cmpTitle: 'Player comparison', cmpValue: 'Value', cmpTopRole: 'Best role',
+    cmpWinsBadge: '{n}× best attribute', avgLabel: 'Average',
+    mt_all: 'All', mt_first: 'First team', mt_res: 'Reserves', mt_youth: 'Youth',
+    cmpDeltaHint: 'Difference: player 1 minus player 2 (green = player 1 better off)',
     analysis: 'Analysis', anTitle: 'Squad needs analysis', anNoClub: 'No own club found in the data.',
     anPlayers: 'players', anAvgAge: 'avg age', anAvgCa: 'avg CA', anTopCa: 'top CA',
     anOk: 'Well stocked', anThin: 'Thin cover', anShort: 'Shortage', anAging: 'Aging', anNoSucc: 'No succession',
@@ -147,19 +163,48 @@ const I18N = {
     anRecShortNp: 'Too few players; sign {n} more.',
     anRecThinNp: 'Thin cover; an addition improves depth.',
     anRecSuccNp: 'No young talent at the level; find a top U{age} prospect.',
-    competition: 'Competition', divLabel: 'Division', clubTier: 'Club level',
-    tierTop: 'Top (rep 7500+)', tierStrong: 'Strong (6000+)', tierMid: 'Mid (4000+)', tierLow: 'Low (<4000)',
+    competition: 'Competition', divLabel: 'Division', divSearch: 'Type a competition…',
+    gameDateMemory: 'In-game date (read from memory)', gameDateDerived: 'Estimated in-game date (year certain, day approximate)',
     presetsTitle: 'Saved filters', presetSave: 'Save current filters', presetNamePrompt: 'Name for this search',
-    presetSaved: 'Filter saved', presetNone: 'No saved filters yet.', presetDelConfirm: 'Are you sure you want to delete "{name}"?',
+    presetSaved: 'Filter saved', presetNone: 'No saved filters yet.', presetPick: 'Pick a saved filter…',
+    presetDelConfirm: 'Are you sure you want to delete "{name}"?',
     presetEmptyFilters: 'No active filters to save',
     presetSaveTitle: 'Save filters', presetDelTitle: 'Delete filter',
     saveBtn: 'Save', deleteBtn: 'Delete', cancelBtn: 'Cancel',
     c_meta: 'Meta', metaLabel: 'Meta score',
     metaHint: 'Meta score (1–20, same scale as an attribute): how well this player scores on the attributes that FM-Arena\'s large-scale tests show yield the most points in the match engine — mainly Pace and Acceleration, then Jumping Reach and Dribbling.\n\nRule of thumb: 15+ elite, 13–15 strong, 11–13 decent, below that modest.\n\nUse it next to CA: higher Meta at equal CA = more on-pitch return; high CA but low Meta = player relies on attributes the engine rewards less. Says nothing about position or role; goalkeepers fall outside the test.',
-    verWarn: '⚠ FM version {v} detected; memory reading is calibrated for {s}.x — data may be unreliable until FMSuperScout is updated.',
+    verWarn: 'FM version {v} detected; memory reading is calibrated for {s}.x — data may be unreliable until FMSuperScout is updated.',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
+
+// ================= SVG-iconen =================
+// Eén stijl (stroke, currentColor) die aansluit bij de bestaande UI-iconen; geen emoji.
+// Uitzondering: het koffie-icoon (☕) blijft bewust een emoji.
+const ICON_PATHS = {
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  hourglass: '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
+  warning: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  clipboard: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/>',
+  compare: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+  arrowRight: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+};
+const icon = (name, size = 14) =>
+  `<svg class="ic" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
+// Shortlist-ster: vulling stuurt CSS aan via .on op de omliggende cel/knop.
+const starSvg = (size = 15) =>
+  `<svg class="ic star-ic" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><path d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55-4.76-4.64 6.58-.96z"/></svg>`;
+// Banner/waarschuwing: icoon + veilig ge-escapete tekst (tekst kan data uit de dump bevatten).
+const bannerMsg = (ico, txt) => icon(ico, 13) + ' ' + escHtml(txt);
+// Banner met echte voortgangsbalk (frac 0..1): plugin-scanvoortgang of download-voortgang.
+const bannerProgress = (ico, txt, frac) => {
+  const pct = Math.max(0, Math.min(100, Math.round(frac * 100)));
+  return `${bannerMsg(ico, txt)} <span class="pbar"><span class="pfill" style="width:${pct}%"></span></span> <span class="ppct">${pct}%</span>`;
+};
 
 // ================= attributen =================
 // Volgorde bepaalt de 2-koloms paring: Technisch|Mentaal boven, Fysiek|Standaardsituaties eronder
@@ -246,42 +291,46 @@ function expiresHtml(p) {
   return { cls: '', txt };
 }
 
+// w = standaard kolombreedte (px) voor de vaste tabel-lay-out; door de gebruiker
+// gesleepte breedtes (colWidths) gaan vóór. Vast i.p.v. op inhoud, anders verspringen
+// de kolommen bij elke sortering/scroll (de zichtbare rijen bepalen dan de breedte).
 const PLAYER_COLS = [
-  { key: 'sl', label: '★', star: true },
-  { key: 'name', label: 'c_name', get: p => p.name, name: true },
-  { key: 'age', label: 'c_age', num: true, get: p => getAge(p) },
-  { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => p.pos || '<span class="dim">–</span>' },
-  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p) },
-  { key: 'nat', label: 'c_nat', get: p => (p.nat || []).join(', ') },
-  { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? '<span class="eu-yes">✓</span>' : '<span class="dim">–</span>' },
-  { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
-  { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
-  { key: 'meta', label: 'c_meta', num: true, help: 'metaHint', get: p => metaScore(p), render: p => metaHtml(p) },
-  { key: 'value', label: 'c_value', num: true, get: p => estValue(p).v, render: p => estHtml(p) },
-  { key: 'fee', label: 'c_fee', num: true, get: p => { const f = feeEstimate(p); return f.v == null ? -1 : f.v; }, render: p => feeHtml(p) },
-  { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney },
-  { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls },
-  { key: 'interest', label: 'c_interest', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p) },
-  { key: 'status', label: 'c_status', get: p => 0, render: p => statusHtml(p) },
+  { key: 'sl', label: '★', star: true, w: 34 },
+  { key: 'name', label: 'c_name', get: p => p.name, name: true, w: 180 },
+  { key: 'age', label: 'c_age', num: true, get: p => getAge(p), w: 50 },
+  { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => p.pos || '<span class="dim">–</span>', w: 95 },
+  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
+  { key: 'div', label: 'c_div', get: p => p.div || '', render: p => p.div ? escHtml(p.div) : '<span class="dim">–</span>', defHidden: true, w: 170 },
+  { key: 'nat', label: 'c_nat', get: p => (p.nat || []).join(', '), w: 115 },
+  { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? `<span class="eu-yes">${icon('check', 12)}</span>` : '<span class="dim">–</span>', w: 42 },
+  { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
+  { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa), w: 56 },
+  { key: 'meta', label: 'c_meta', num: true, help: 'metaHint', get: p => metaScore(p), render: p => metaHtml(p), w: 64 },
+  { key: 'value', label: 'c_value', num: true, get: p => estValue(p).v, render: p => estHtml(p), w: 95 },
+  { key: 'fee', label: 'c_fee', num: true, get: p => { const f = feeEstimate(p); return f.v == null ? -1 : f.v; }, render: p => feeHtml(p), w: 105 },
+  { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney, w: 100 },
+  { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls, w: 110 },
+  { key: 'interest', label: 'c_interest', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p), w: 90 },
+  { key: 'status', label: 'c_status', get: p => 0, render: p => statusHtml(p), w: 110 },
   // Standaard verboren extra kolommen (via rechtsklik aan te zetten, sorteerbaar):
-  { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true },
-  { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true },
-  { key: 'height', label: 'height', num: true, get: p => p.height, fmt: v => v ? v + ' cm' : '–', defHidden: true },
-  { key: 'foot', label: 'foot', get: p => p.foot || '–', defHidden: true },
+  { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true, w: 85 },
+  { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true, w: 85 },
+  { key: 'height', label: 'height', num: true, get: p => p.height, fmt: v => v ? v + ' cm' : '–', defHidden: true, w: 70 },
+  { key: 'foot', label: 'foot', get: p => p.foot || '–', defHidden: true, w: 75 },
 ];
 const STAFF_COLS = [
-  { key: 'sl', label: '★', star: true },
-  { key: 'name', label: 'c_name', get: p => p.name, name: true },
-  { key: 'age', label: 'c_age', num: true, get: p => getAge(p) },
-  { key: 'job', label: 'c_role', get: p => p.job || '–' },
-  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p) },
-  { key: 'nat', label: 'c_nat', get: p => (p.nat || []).join(', ') },
-  { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca) },
-  { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa) },
-  { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney },
-  { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls },
-  { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true },
-  { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true },
+  { key: 'sl', label: '★', star: true, w: 34 },
+  { key: 'name', label: 'c_name', get: p => p.name, name: true, w: 180 },
+  { key: 'age', label: 'c_age', num: true, get: p => getAge(p), w: 50 },
+  { key: 'job', label: 'c_role', get: p => p.job || '–', w: 150 },
+  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
+  { key: 'nat', label: 'c_nat', get: p => (p.nat || []).join(', '), w: 115 },
+  { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
+  { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa), w: 56 },
+  { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney, w: 100 },
+  { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls, w: 110 },
+  { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true, w: 85 },
+  { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true, w: 85 },
 ];
 
 // ---------- geschatte marktwaarde (GBP) ----------
@@ -303,7 +352,8 @@ const isFree = p => !p.club && !(p.clubRep > 0);
 function clubLabel(p) {
   if (p.club) return escHtml(p.club);
   if (p.clubRep > 0) return `<span class="dim" title="Club niet uitgelezen (rep ${p.clubRep})">${t('clubUnknown')}</span>`;
-  return `<span class="dim">${t('clubless')}</span>`;
+  // Transfervrij: streepje met tooltip (de status-pill "clubloos" vertelt het al).
+  return `<span class="dim" title="${t('clubless')}">–</span>`;
 }
 function estValue(p) {
   if (p.value != null && p.value > 0) return { v: p.value, est: false, lo: Math.round(p.value * 0.85), hi: Math.round(p.value * 1.15) };
@@ -327,7 +377,8 @@ function estValue(p) {
 function estHtml(p) {
   const e = estValue(p);
   if (e.v == null) return '<span class="dim">–</span>';
-  if (e.v === 0) return '<span class="dim">' + t('free_l') + '</span>';
+  // Transfervrij: gewoon een streepje (de status-kolom/pill vertelt het verhaal al).
+  if (e.v === 0) return `<span class="dim" title="${t('free_l')}">–</span>`;
   return (e.est ? '<span class="dim">~</span>' : '') + fmtMoney(e.v);
 }
 
@@ -367,24 +418,30 @@ function feeMultiplier(p) {
 
   // Club wil van de speler af → vraagprijs rond of onder de waarde, contractpremie vervalt.
   if (p.setForRelease) return 0.2;                                     // vrijwel weggeefprijs
-  if (p.listed) return Math.min(1.0, Math.max(0.35, 0.55 + 0.012 * mm));
+  // Gelijste speler: het waardeveld ÍS de door de club gezette vraagprijs
+  // (ijking 14-07: 4/4 exact binnen ±1%) — dus geen op- of afslag.
+  if (p.listed) return 1.0;
 
-  // Club wil (in principe) houden: resterende contractduur is de basisopslag.
-  let f = Math.min(1.9, Math.max(0.5, 0.55 + 0.028 * mm));
-  if (p.notForSale) f *= 1.7;                               // niet te koop: alleen los te weken met een fors bod
+  // IJking 14-07 (55 spelers, Telstar t/m Mbappé, tools/value-calib.js): FM's getoonde
+  // transferwaarde-bandbreedte omsluit ons waardeveld vrijwel altijd binnen ~±15%, en
+  // kopen blijkt rond die band te kunnen. v1 stapelde premies tot ×2,4 — veel te hoog.
+  // De signalen blijven, maar gematigd; échte "betaald vs. waarde"-datapoints van mavarobli
+  // kunnen dit verder aanscherpen.
+  let f = Math.min(1.35, Math.max(0.6, 0.7 + 0.014 * mm));
+  if (p.notForSale) f *= 1.5;                               // niet te koop: alleen los te weken met een fors bod
 
   const a = getAge(p) || 25;
   const head = Math.max(0, (p.pa || p.ca) - p.ca);
-  if (a <= 21 && head >= 15) f *= 1 + Math.min(0.45, head * 0.013);   // wonderkind-premie
-  else if (a <= 23) f *= 1.08;
+  if (a <= 21 && head >= 15) f *= 1 + Math.min(0.2, head * 0.007);    // wonderkind-premie (gematigd)
+  else if (a <= 23) f *= 1.05;
   else if (a >= 31) f *= 0.8;
   else if (a >= 29) f *= 0.9;
 
   const r = wageRankInClub(p);
   if (r) {
-    if (r.rank <= 2) f *= 1.2;                              // topverdiener: waarschijnlijk sterspeler
-    else if (r.rank <= 5) f *= 1.08;
-    else if (r.rank / r.n > 0.6) f *= 0.9;                  // randspeler: makkelijker op te halen
+    if (r.rank <= 2) f *= 1.12;                             // topverdiener: waarschijnlijk sterspeler
+    else if (r.rank <= 5) f *= 1.05;
+    else if (r.rank / r.n > 0.6) f *= 0.92;                 // randspeler: makkelijker op te halen
   }
 
   // Koper-afhankelijk: verkopers vragen meer aan een grotere/rijkere club ("big club tax")
@@ -392,15 +449,17 @@ function feeMultiplier(p) {
   const myRep = state.meta.myClubRep || 0;
   if (myRep && p.clubRep > 0) {
     const gap = myRep - p.clubRep;
-    f *= Math.min(1.35, Math.max(0.85, 1 + gap / 12000));
+    f *= Math.min(1.2, Math.max(0.88, 1 + gap / 15000));
   }
 
-  return Math.min(p.notForSale ? 3.5 : 2.4, Math.max(0.4, f));
+  return Math.min(p.notForSale ? 2.2 : 1.7, Math.max(0.4, f));
 }
 function feeEstimate(p) {
   const ev = estValue(p);
   if (ev.v == null) return { v: null };
   if (ev.v === 0) return { v: 0 };
+  // Gelijst met echte waarde: exacte clubvraagprijs, niet afronden.
+  if (p.listed && !ev.est) return { v: ev.v, valueEst: false };
   let v = ev.v * feeMultiplier(p);
   v = v >= 1e6 ? Math.round(v / 1e5) * 1e5 : Math.round(v / 1e4) * 1e4;
   return { v, valueEst: ev.est };   // valueEst: onderliggende waarde was zelf al een schatting
@@ -408,8 +467,10 @@ function feeEstimate(p) {
 function feeHtml(p) {
   const f = feeEstimate(p);
   if (f.v == null) return '<span class="dim">–</span>';
-  if (f.v === 0) return '<span class="dim">' + t('free_l') + '</span>';
-  return '<span class="dim">~</span>' + fmtMoney(f.v);
+  if (f.v === 0) return `<span class="dim" title="${t('free_l')}">–</span>`;
+  // Gelijst met echte waarde = exacte, door de club gezette vraagprijs → geen "~".
+  const exact = p.listed && !f.valueEst;
+  return (exact ? '' : '<span class="dim">~</span>') + fmtMoney(f.v);
 }
 
 // ---------- interesse-inschatting (heuristiek) ----------
@@ -632,39 +693,80 @@ async function loadDump() {
       return;
     }
     const b = $('banner');
-    b.className = 'scanning'; b.textContent = t('loading'); b.onclick = null;
-    const data = await (await fetch('/api/dump')).json();
+    b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('loading')); b.onclick = null;
+    // Streamend binnenhalen met echte voortgang (bytes ontvangen / Content-Length).
+    const resp = await fetch('/api/dump');
+    const total = Number(resp.headers.get('Content-Length')) || 0;
+    let data;
+    if (resp.body && total > 0) {
+      const reader = resp.body.getReader();
+      const chunks = []; let got = 0, lastUi = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value); got += value.length;
+        const now = performance.now();
+        if (now - lastUi > 100) {   // UI hooguit 10×/s verversen
+          lastUi = now;
+          const mb = `${t('loading')} ${(got / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB`;
+          b.innerHTML = bannerProgress('hourglass', mb, got / total);
+        }
+      }
+      const buf = new Uint8Array(got); let o = 0;
+      for (const c of chunks) { buf.set(c, o); o += c.length; }
+      // JSON.parse blokkeert de UI even; eerst de banner laten schilderen.
+      b.innerHTML = bannerMsg('hourglass', t('parsing'));
+      await new Promise(r => setTimeout(r, 30));
+      data = JSON.parse(new TextDecoder().decode(buf));
+    } else {
+      data = await resp.json();
+    }
     b.className = 'hidden';
     state.players = data.players || [];
     state.staff = data.staff || [];
     state.meta = data.meta || {};
     state._wageCeil = undefined;   // loonplafond opnieuw berekenen voor deze dump
     state._clubWages = null;       // loonrang-cache (vraagprijs) opnieuw opbouwen
-    // peiljaar: automatisch uit het afgeleide seizoensjaar (of game-datum)
+    // Peiljaar (voor leeftijdsberekening) automatisch uit de in-game datum; geen UI-veld meer.
     if (state.meta.gameDate) {
       const g = new Date(state.meta.gameDate);
       state.refYear = state.meta.gameYear || g.getFullYear();
       state.refDoy = Math.floor((g - new Date(g.getFullYear(), 0, 0)) / 864e5);
-      $('f-refyear').value = state.refYear;
     } else if (state.meta.gameYear) {
       state.refYear = state.meta.gameYear;
-      $('f-refyear').value = state.refYear;
     }
     state.dumpStamp = st.dumpTime;
     renderDumpInfo();
     renderClubBadge();
     renderVerWarn();
+    renderMyTeamChips();
     $('empty-state').classList.add('hidden');
     buildStaffRoles();
+    buildDivisions();   // divisiefilter vullen zodra er dump-data met divisies is
     applyFilters();
   } catch (e) { $('dump-info').textContent = 'fout'; console.error(e); }
 }
 function renderDumpInfo() {
-  if (!state.dumpStamp) { $('dump-info').textContent = ''; return; }
+  const gd = $('game-date');
+  if (!state.dumpStamp) { $('dump-info').textContent = ''; if (gd) gd.textContent = ''; return; }
   const when = new Date(state.dumpStamp);
   const n = state.players.length.toLocaleString();
   $('dump-info').textContent = n;
   $('dump-info').title = `${state.players.length.toLocaleString()} ${t('playersWord')} · ${state.staff.length.toLocaleString()} ${t('staffWord')}\n${when.toLocaleString()}`;
+  // In-game datum naast het spelersaantal. "memory" = exact uit het geheugen; "derived" =
+  // afgeleid (jaar zeker, dag benaderd) → tilde + tooltip zodat het verschil duidelijk is.
+  if (gd) {
+    const ds = state.meta.gameDate;
+    if (!ds) { gd.innerHTML = ''; gd.title = ''; }
+    else {
+      const derived = state.meta.gameDateSource !== 'memory';
+      const d = new Date(ds);
+      const txt = isNaN(d) ? ds : d.toLocaleDateString(state.lang === 'en' ? 'en-GB' : 'nl-NL',
+        { day: 'numeric', month: 'short', year: 'numeric' });
+      gd.innerHTML = icon('calendar', 12) + ' ' + escHtml((derived ? '~ ' : '') + txt);
+      gd.title = derived ? t('gameDateDerived') : t('gameDateMemory');
+    }
+  }
 }
 // Waarschuwing als de dump uit een andere FM-versie komt dan waarop de offsets zijn gepind:
 // de geheugen-uitlezing kan dan stilletjes verkeerde waarden geven.
@@ -672,7 +774,7 @@ function renderVerWarn() {
   const el = $('ver-warn');
   const m = state.meta;
   if (m.gameVersion && m.versionOk === false) {
-    el.textContent = tf('verWarn', { v: m.gameVersion, s: m.supportedVersion || '26.3' });
+    el.innerHTML = bannerMsg('warning', tf('verWarn', { v: m.gameVersion, s: m.supportedVersion || '26.3' }));
     el.classList.remove('hidden');
   } else el.classList.add('hidden');
 }
@@ -689,18 +791,96 @@ function buildStaffRoles() {
 }
 // Divisie-select: vult zich uit de aanwezige div-waarden; blijft verborgen zolang de
 // plugin nog geen divisie meestuurt (div is momenteel leeg in de dump).
+// Divisie-index met een sterkte-proxy: competitiereputatie dumpen we (nog) niet, maar de
+// mediane clubreputatie van de spelers erin benadert het niveau goed → sterkere competities
+// bovenaan in de suggesties. Ook een genormaliseerde naam (diacrieten/leestekens weg) voor
+// typo-tolerant zoeken.
 function buildDivisions() {
-  const cur = $('f-div').value;
-  const divs = [...new Set(state.players.map(p => p.div).filter(Boolean))].sort();
+  const byDiv = new Map();
+  for (const p of state.players) {
+    if (!p.div) continue;
+    (byDiv.get(p.div) || byDiv.set(p.div, []).get(p.div)).push(p.clubRep || 0);
+  }
+  // Sterkte-proxy = het 80e-percentiel van de clubreputaties (de top-clubs bepalen het
+  // aanzien van een competitie beter dan de mediaan, die kleine landen met een paar sterke
+  // clubs kunstmatig omhoog duwt).
+  const p80 = a => { const s = a.filter(x => x > 0).sort((x, y) => x - y); return s.length ? s[Math.floor(s.length * 0.8)] : 0; };
+  // Eigen competitie(s): de divisie(s) waarin mijn club speelt → die wil je altijd bovenaan.
+  const myClub = (state.meta.myClub || '').toLowerCase();
+  state.myDivs = new Set(state.players.filter(p => (p.club || '').toLowerCase() === myClub && p.div).map(p => p.div));
+  state.divIndex = [...byDiv.entries()]
+    .map(([name, reps]) => ({ name, norm: normStr(name), strength: p80(reps), count: reps.length, mine: state.myDivs.has(name) }))
+    .sort((a, b) => b.strength - a.strength || b.count - a.count);
   const wrap = $('fg-div');
-  if (!divs.length) { wrap.style.display = 'none'; return; }
-  wrap.style.display = '';
-  $('f-div').innerHTML = `<option value="">${t('all')}</option>` + divs.map(d => `<option>${d}</option>`).join('');
-  $('f-div').value = cur;
+  wrap.style.display = state.divIndex.length ? '' : 'none';
 }
-// Clubniveau-drempels op basis van clubreputatie (werkt nu; benadert de competitiesterkte).
-const TIER_MIN = { top: 7500, strong: 6000, mid: 4000, low: 0 };
-const TIER_MAX = { top: Infinity, strong: 7499, mid: 5999, low: 3999 };
+// Normaliseer voor zoeken: kleine letters, diacrieten weg, alleen letters/cijfers/spaties.
+function normStr(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// Levenshtein (met vroege afkap) voor typo-tolerantie op woordniveau.
+function editDist(a, b, max) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > max) return max + 1;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    let cur = [i], best = i;
+    for (let j = 1; j <= n; j++) {
+      const c = a[i - 1] === b[j - 1] ? prev[j - 1] : 1 + Math.min(prev[j - 1], prev[j], cur[j - 1]);
+      cur[j] = c; if (c < best) best = c;
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[n];
+}
+// Score een divisie tegen de (genormaliseerde) query. Hoger = betere match; -1 = geen match.
+// Combineert matchkwaliteit met competitiesterkte (tiebreak), en tolereert typo's per woord.
+function scoreDiv(entry, q) {
+  // Sterkte weegt fors bínnen een matchklasse (300 punten = het hele bereik), maar overbrugt
+  // nooit een klasse: zo staat de sterke "…Eredivisie" boven een zwakke "Eredivisie Guinea"
+  // terwijl een echte substring-match altijd boven een losse typo-match blijft.
+  // Eigen competitie krijgt een vaste bonus bovenop de sterkte, zodat "mijn" Eredivisie
+  // altijd boven gelijknamige buitenlandse competities staat en nooit uit de top-N valt.
+  const name = entry.norm, str = Math.min(300, entry.strength / 40) + (entry.mine ? 400 : 0);
+  if (!q) return str;                                     // lege query: puur op sterkte
+  // klasse 1: hele query komt aaneengesloten voor. Positie weegt fors mee (een prefix-match
+  // als "Premier League" verslaat een diepe match als "…Reservecompetitie Premier Divisie",
+  // ook al is die laatste "van mij"); de eigen-competitie-bonus tipt alleen gelijkwaardige.
+  const idx = name.indexOf(q);
+  if (idx >= 0) return 3000 + str - Math.min(450, idx * 15);
+  // klasse 2: een los woord begint met de query, of met een kleine typo
+  let hit = false;
+  for (const w of name.split(' ')) {
+    if (w.startsWith(q)) { hit = true; break; }
+    const tol = q.length >= 6 ? 2 : q.length >= 4 ? 1 : 0;
+    if (tol && editDist(q, w.slice(0, q.length + tol), tol) <= tol) { hit = true; break; }
+  }
+  if (hit) return 2000 + str;
+  // klasse 3: losse letters in volgorde (subsequence) als laatste redmiddel
+  let i = 0; for (const c of name) if (c === q[i]) i++;
+  return i === q.length ? 1000 + str : -1;
+}
+let divSuggestSel = -1;
+function renderDivSuggest() {
+  const box = $('div-suggest');
+  const q = normStr($('f-div').value);
+  const idx = state.divIndex || [];
+  const ranked = idx.map(e => ({ e, s: scoreDiv(e, q) })).filter(x => x.s >= 0)
+    .sort((a, b) => b.s - a.s).slice(0, 8);
+  if (!ranked.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  divSuggestSel = -1;
+  box.innerHTML = ranked.map((x, i) =>
+    `<div class="ds-item" data-v="${escHtml(x.e.name)}" data-i="${i}">${escHtml(x.e.name)}</div>`).join('');
+  box.classList.remove('hidden');
+  box.querySelectorAll('.ds-item').forEach(el => el.onmousedown = e => {
+    e.preventDefault();
+    $('f-div').value = el.dataset.v;
+    box.classList.add('hidden');
+    applyFilters();
+  });
+}
 // Rol-keuze: gegroepeerd op linie zodat de lijst overzichtelijk blijft.
 function buildRoleSelect() {
   const groups = [
@@ -742,6 +922,9 @@ function applyFilters() {
   const ageMin = +$('f-age-min').value || 0, ageMax = +$('f-age-max').value || 99;
   const caMin = +$('f-ca-min').value || 0, caMax = +$('f-ca-max').value || 999;
   const paMin = +$('f-pa-min').value || 0, paMax = +$('f-pa-max').value || 999;
+  const metaMin = +$('f-meta-min').value || 0, metaMax = +$('f-meta-max').value || 99;
+  // Meta-score bestaat alleen voor spelers met attributen (staf en keepers vallen erbuiten).
+  const wantMeta = state.mode !== 'staff' && (metaMin > 0 || metaMax < 99);
   const price = parseMoney($('f-price').value);
   const fee = parseMoney($('f-fee').value);
   const wage = parseMoney($('f-wage').value);
@@ -752,25 +935,37 @@ function applyFilters() {
   const wantListed = $('f-listed').checked, wantExp6 = $('f-exp6').checked, wantExp12 = $('f-exp12').checked;
   const wantFree = $('f-free').checked, onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
   const staffRole = $('f-staffrole').value;
-  const divVal = $('f-div').value;
-  const tier = $('f-tier').value;
+  const divVal = $('f-div').value.trim().toLowerCase();   // zoekbalk: substring, hoofdletterongevoelig
   const myClub = (state.meta.myClub || '').toLowerCase();
   if (state.mode === 'shortlist') rows = [...state.players, ...state.staff];
 
   state.filtered = rows.filter(p => {
     if (!p.name || !p.name.trim() || p.name.trim() === '?') return false;   // naamloze stubs verbergen
-    if (onlySl && !state.shortlist.has(p.id)) return false;
+      if (onlySl && !state.shortlist.has(p.id)) return false;
     if (name && !((p.name || '').toLowerCase().includes(name) || (p.club || '').toLowerCase().includes(name))) return false;
     const age = getAge(p);
     if (age < ageMin || age > ageMax) return false;
     if ((p.ca ?? 0) < caMin || (p.ca ?? 0) > caMax) return false;
     if ((p.pa ?? 0) < paMin || (p.pa ?? 0) > paMax) return false;
+    if (wantMeta) { const s = metaScore(p); if (s == null || s < metaMin || s > metaMax) return false; }
     if (price != null && (estValue(p).v ?? Infinity) > price) return false;
     if (fee != null && (feeEstimate(p).v ?? Infinity) > fee) return false;
     if (wage != null && (p.wage ?? Infinity) > wage) return false;
     if (nat && !(p.nat || []).some(n => n.toLowerCase().includes(nat))) return false;
     if (onlyEu && !isEu(p)) return false;
-    if (onlyMyClub && (!p.club || p.club.toLowerCase() !== myClub)) return false;
+    // "Mijn club": toon eigen spelers + verhuurde (moederclub = mijn club, spelen elders)
+    // + gehuurde (spelen bij mij, moederclub elders). Zie loanStatus() voor de kleuring.
+    if (onlyMyClub) {
+      const cl = (p.club || '').toLowerCase(), ow = (p.ownerClub || '').toLowerCase();
+      if (cl !== myClub && ow !== myClub) return false;
+    }
+    // Teamchips (1e/2e/jeugd) — alleen actief samen met "Mijn club" en teamType-data (plugin v0.1.10+).
+    if (onlyMyClub && state.myTeam !== 'all' && state.mode !== 'staff') {
+      const tt = p.teamType;
+      if (state.myTeam === 'first' && tt !== 0) return false;
+      if (state.myTeam === 'res' && !(tt >= 1 && tt <= 9)) return false;
+      if (state.myTeam === 'youth' && !(tt >= 10)) return false;
+    }
     if (wantFree && !isFree(p)) return false;
     if (wantAttain && !isAttainable(p)) return false;
     if (minInterest > 0) { const i = interestEstimate(p); if (!i || i.score < minInterest) return false; }
@@ -779,8 +974,7 @@ function applyFilters() {
     if (wantExp12) { const m = monthsUntil(p.expires); if (m == null || m > 12) return false; }
     if (activePos.size && !(p.posArr || []).some(x => activePos.has(x))) return false;
     if (state.mode === 'staff' && staffRole && p.job !== staffRole) return false;
-    if (divVal && p.div !== divVal) return false;
-    if (tier) { const r = p.clubRep || 0; if (r < TIER_MIN[tier] || r > TIER_MAX[tier]) return false; }
+    if (divVal && !(p.div || '').toLowerCase().includes(divVal)) return false;
     return true;
   });
   sortRows();
@@ -805,11 +999,11 @@ function buildChips() {
   if (activePos.size) add(`${t('position')}: ${[...activePos].join(', ')}`,
     () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); });
   if (state.mode === 'staff' && $('f-staffrole').value) add($('f-staffrole').value, () => { $('f-staffrole').value = ''; });
-  if ($('f-div').value) add(`${t('divLabel')}: ${$('f-div').value}`, () => { $('f-div').value = ''; });
-  if ($('f-tier').value) add(`${t('clubTier')}: ${$('f-tier').selectedOptions[0].textContent}`, () => { $('f-tier').value = ''; });
+  if ($('f-div').value.trim()) add(`${t('divLabel')}: ${$('f-div').value.trim()}`, () => { $('f-div').value = ''; });
   range('f-age-min', 'f-age-max', t('age'));
   range('f-ca-min', 'f-ca-max', 'CA');
   range('f-pa-min', 'f-pa-max', 'PA');
+  range('f-meta-min', 'f-meta-max', t('c_meta'));
   if (v('f-price')) add(`${t('maxvalue')} ${v('f-price')}`, clearInput('f-price'));
   if (v('f-fee')) add(`${t('maxfee')} ${v('f-fee')}`, clearInput('f-fee'));
   if (v('f-wage')) add(`${t('maxwage')} ${v('f-wage')}`, clearInput('f-wage'));
@@ -829,7 +1023,7 @@ function renderChips(chips) {
   const bar = $('chipbar');
   const n = state.filtered.length.toLocaleString();
   bar.innerHTML = `<span class="chip-count"><b>${n}</b> ${t('results')}</span>` +
-    chips.map((c, i) => `<button class="chip" data-i="${i}" title="${t('clear')}">${escHtml(c.label)}<span class="x">✕</span></button>`).join('') +
+    chips.map((c, i) => `<button class="chip" data-i="${i}" title="${t('clear')}">${escHtml(c.label)}<span class="x">${icon('x', 10)}</span></button>`).join('') +
     (chips.length > 1 ? `<button class="chip-clear">${t('clearAll')}</button>` : '');
   bar.querySelectorAll('.chip').forEach(el => el.onclick = () => { chips[+el.dataset.i].clear(); applyFilters(); });
   const ca = bar.querySelector('.chip-clear');
@@ -838,9 +1032,9 @@ function renderChips(chips) {
 // ---------- opgeslagen filterpresets ----------
 // Een preset is een momentopname van alle filtervelden (tekst, vinkjes, selects, posities
 // op het veld en de gekozen tactische rol). Bewaard in localStorage; zelfde naam = overschrijven.
-const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'];
+const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat', 'f-div'];
 const PRESET_CHECK_IDS = ['f-eu', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-myclub', 'f-shortlist'];
-const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-div', 'f-tier', 'f-role'];
+const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role'];
 function loadPresets() { try { return JSON.parse(localStorage.getItem('fmss_presets') || '[]'); } catch { return []; } }
 function storePresets(list) { localStorage.setItem('fmss_presets', JSON.stringify(list)); }
 function snapshotFilters() {
@@ -901,19 +1095,34 @@ function presetDialog(opts) {
   const inp = $('pm-input');
   if (inp) { inp.focus(); inp.onkeydown = e => { if (e.key === 'Enter') ok(); }; }
 }
+// Dropdown: knop toont de laatst toegepaste preset; het menu eronder heeft per preset
+// een kruisje om te verwijderen (met bevestiging). state.presetSel is alleen een label,
+// de chips boven de tabel blijven de bron van waarheid voor wat er actief is.
+function closePresetMenu() {
+  $('preset-dd-menu').classList.add('hidden');
+  $('preset-dd-btn').classList.remove('open');
+}
 function renderPresets() {
-  const box = $('preset-list');
-  if (!box) return;
+  const btn = $('preset-dd-btn'), menu = $('preset-dd-menu'), label = $('preset-dd-label');
   const list = loadPresets();
-  box.innerHTML = list.length
-    ? list.map((p, i) => `<span class="preset" data-i="${i}">${escHtml(p.name)}<span class="x" data-del="${i}">✕</span></span>`).join('')
-    : `<div class="preset-none">${t('presetNone')}</div>`;
-  box.querySelectorAll('.preset').forEach(el => el.onclick = e => {
-    if (e.target.dataset && e.target.dataset.del != null) return;   // ✕ heeft z'n eigen handler
+  const has = list.length > 0;
+  btn.disabled = !has;
+  if (!has) { state.presetSel = null; closePresetMenu(); }
+  label.textContent = has ? (state.presetSel || t('presetPick')) : t('presetNone');
+  menu.innerHTML = list.map((p, i) =>
+    `<div class="pd-item" data-i="${i}"><span class="pd-name">${escHtml(p.name)}</span><button class="pd-del" data-del="${i}" title="${t('deleteBtn')}">${icon('x', 11)}</button></div>`).join('');
+  menu.querySelectorAll('.pd-item').forEach(el => el.onclick = e => {
+    if (e.target.closest('.pd-del')) return;   // kruisje heeft z'n eigen handler
     const p = loadPresets()[+el.dataset.i];
-    if (p) { applyPreset(p.state); showToast('🔍 ' + p.name); }
+    closePresetMenu();
+    if (p) {
+      applyPreset(p.state);                    // wist eerst alles (reset ook presetSel)
+      state.presetSel = p.name;
+      label.textContent = p.name;
+      showToast(p.name, 'search');
+    }
   });
-  box.querySelectorAll('[data-del]').forEach(x => x.onclick = e => {
+  menu.querySelectorAll('.pd-del').forEach(x => x.onclick = e => {
     e.stopPropagation();
     const p = loadPresets()[+x.dataset.del];
     if (!p) return;
@@ -926,11 +1135,20 @@ function renderPresets() {
         const cur = loadPresets();
         const idx = cur.findIndex(q => q.name === p.name);
         if (idx >= 0) { cur.splice(idx, 1); storePresets(cur); }
+        if (state.presetSel === p.name) state.presetSel = null;
         renderPresets();
       },
     });
   });
 }
+$('preset-dd-btn').onclick = e => {
+  e.stopPropagation();
+  const m = $('preset-dd-menu');
+  m.classList.toggle('hidden');
+  $('preset-dd-btn').classList.toggle('open', !m.classList.contains('hidden'));
+};
+document.addEventListener('click', e => { if (!e.target.closest('#preset-dd')) closePresetMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePresetMenu(); });
 $('btn-preset-save').onclick = () => {
   const snap = snapshotFilters();
   if (presetIsEmpty(snap)) { showToast(t('presetEmptyFilters')); return; }
@@ -942,8 +1160,9 @@ $('btn-preset-save').onclick = () => {
       const list = loadPresets().filter(p => p.name !== name);   // zelfde naam = overschrijven
       list.push({ name, state: snap });
       storePresets(list);
+      state.presetSel = name;
       renderPresets();
-      showToast('✓ ' + t('presetSaved'));
+      showToast(t('presetSaved'), 'check');
     },
   });
 };
@@ -1032,15 +1251,20 @@ function measureRowH() {
   }
   return false;
 }
-function colLabel(c) { return c.star ? '★' : (c.label.startsWith('c_') || I18N.nl[c.label] ? t(c.label) : c.label); }
+function colLabel(c) { return c.star ? starSvg(13) : (c.label.startsWith('c_') || I18N.nl[c.label] ? t(c.label) : c.label); }
 function colWidths() { return state.colW[modeKey()] || (state.colW[modeKey()] = {}); }
 function saveColW() { localStorage.setItem('fmss_colw', JSON.stringify(state.colW)); }
 function renderTable() {
   const cols = activeCols();
   const W = colWidths();
+  // Vaste lay-out: elke kolom krijgt altijd een breedte (gebruikers-breedte wint van de
+  // standaard) en de tabel de som — anders bepalen de zichtbare rijen de breedtes en
+  // verspringt alles bij sorteren/scrollen.
+  const wOf = c => W[c.key] || c.w || 90;
+  $('grid').style.width = cols.reduce((s, c) => s + wOf(c), 0) + 'px';
   $('grid-head').innerHTML = cols.map(c => {
     const stick = c.star ? 'c-sticky' : c.name ? 'c-sticky stick-end' : '';
-    const w = W[c.key] ? ` style="width:${W[c.key]}px"` : '';
+    const w = ` style="width:${wOf(c)}px"`;
     const grip = c.star ? '' : '<span class="col-resize"></span>';   // sleepgreep rechts
     const help = c.help ? `<span class="col-help" title="${t(c.help)}">?</span>` : '';
     return `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}"${w} class="${stick} ${c.key === state.sortKey ? 'sorted' : ''}">${colLabel(c)}${help}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}${grip}</th>`;
@@ -1054,8 +1278,15 @@ function renderTable() {
         e.preventDefault(); e.stopPropagation();
         resizing = true;                                     // onderdruk de sorteer-klik hierna
         const startX = e.clientX, startW = th.getBoundingClientRect().width;
+        const grid = $('grid'), startTW = parseFloat(grid.style.width) || grid.getBoundingClientRect().width;
         th.draggable = false;
-        const move = ev => { const nw = Math.max(40, Math.round(startW + ev.clientX - startX)); th.style.width = nw + 'px'; colWidths()[k] = nw; };
+        // Tabelbreedte beweegt mee, anders herverdeelt de vaste lay-out de andere kolommen.
+        const move = ev => {
+          const nw = Math.max(40, Math.round(startW + ev.clientX - startX));
+          th.style.width = nw + 'px';
+          grid.style.width = Math.round(startTW + (nw - startW)) + 'px';
+          colWidths()[k] = nw;
+        };
         const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); th.draggable = true; saveColW(); renderVisible(); };
         document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
       });
@@ -1114,6 +1345,17 @@ function openColMenu(x, y) {
 function closeColMenu() { const m = $('colmenu'); if (m) m.remove(); }
 document.addEventListener('click', e => { if (!e.target.closest('#colmenu')) closeColMenu(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeColMenu(); });
+// Huurstatus t.o.v. mijn club — alleen relevant onder het "Mijn club"-filter (Marks keuze),
+// dus daarbuiten geen kleuring. loan-out = verhuurd (rood), loan-in = gehuurd (blauw).
+function loanStatus(p) {
+  if (!$('f-myclub').checked) return '';
+  const my = (state.meta.myClub || '').toLowerCase();
+  if (!my) return '';
+  const cl = (p.club || '').toLowerCase(), ow = (p.ownerClub || '').toLowerCase();
+  if (ow === my && cl && cl !== my) return 'loan-out';
+  if (cl === my && ow && ow !== my) return 'loan-in';
+  return '';
+}
 function renderVisible() {
   const wrap = $('table-wrap'), cols = activeCols();
   const total = state.filtered.length;
@@ -1133,11 +1375,16 @@ function renderVisible() {
       const stick = c.star ? 'c-sticky' : c.name ? 'c-sticky stick-end' : '';
       if (c.star) {
         const on = state.shortlist.has(p.id);
-        return `<td class="star-cell ${stick} ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</td>`;
+        return `<td class="star-cell ${stick} ${on ? 'on' : ''}" data-star="${p.id}">${starSvg(15)}</td>`;
       }
       if (c.render) return `<td class="${c.num ? 'num' : ''}">${c.render(p)}</td>`;
       let v = c.get(p);
-      if (c.name) return `<td class="pname ${stick}" title="Klik = kopieer naam">${v ? escHtml(v) : '?'}</td>`;
+      if (c.name) {
+        const ls = loanStatus(p);
+        const lt = ls === 'loan-out' ? ` · ${tf('loanOut', { c: p.club || '?' })}`
+          : ls === 'loan-in' ? ` · ${tf('loanIn', { c: p.ownerClub || '?' })}` : '';
+        return `<td class="pname ${ls} ${stick}" title="Klik = kopieer naam${lt}">${v ? escHtml(v) : '?'}</td>`;
+      }
       if (c.dimNull && !v) return `<td class="dim">–</td>`;
       if (c.fmt) v = c.fmt(v);
       if (v == null || v === '') v = '–';
@@ -1162,14 +1409,14 @@ $('table-wrap').addEventListener('scroll', () => {
 });
 
 // ---------- klembord / toast ----------
-function showToast(msg) {
+function showToast(msg, ico) {
   const el = $('toast');
-  el.textContent = msg; el.className = 'show';
+  el.innerHTML = (ico ? icon(ico, 13) + ' ' : '') + escHtml(msg); el.className = 'show';
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => el.className = 'hidden', 1600);
 }
 function copyName(name) {
-  const ok = () => showToast('📋 ' + t('copied') + ': ' + name);
+  const ok = () => showToast(t('copied') + ': ' + name, 'clipboard');
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(name).then(ok, () => fallbackCopy(name, ok));
   else fallbackCopy(name, ok);
 }
@@ -1209,7 +1456,7 @@ function exportShortlist() {
   a.href = URL.createObjectURL(blob);
   a.download = 'fmsuperscout-shortlist.csv';
   a.click(); URL.revokeObjectURL(a.href);
-  showToast('✓ ' + all.length + ' → CSV');
+  showToast(all.length + ' → CSV', 'check');
 }
 
 // ---------- detailpaneel ----------
@@ -1237,40 +1484,53 @@ function mentalGrowthFactor(age) {
   if (age >= 28) return 1.15;
   return 1.0;
 }
-// ----- Potentie-projectie (afgeleid, niet 1-op-1 GenieScout) -----
-// FM's CA is een lineaire, positie-gewogen som van de zichtbare attributen (bron: FM Scout CA-gids).
-// Daardoor is "elk attribuut × PA/CA" de profielbehoudende projectie die precies op PA uitkomt —
-// dat is waarom GenieScout proportioneel opschaalt. Twee reële effecten die dat negeert, corrigeren we:
-//  1) de cap op 20 (extreme headroom loopt vast), en
-//  2) groei is niet uniform: fysiek groeit jong en daalt met leeftijd, mentaal/techniek groeit langer door.
-// Aanpak: neem de proportionele groei g0 = attr·(PA/CA − 1) als magnitude-anker, tilt de VÓRM met
-// leeftijd-/type-factoren, en hernormaliseer zodat de totale groei gelijk blijft aan g0 (dus de
-// projectie blijft ~op PA uitkomen). Zo krijgt een oudere speler zijn groei in hoofd/techniek i.p.v.
-// snelheid, terwijl een tiener ~proportioneel opschaalt (GenieScout-achtig). Set-pieces groeien traag.
+// ----- Potentie-projectie: positieprofiel-model, gemeten op de eigen dump -----
+// Twee empirische lessen (tools/ca-analysis.js + tools/pos-curve.js, 48k spelers):
+//  1) FM's CA-schaal heeft een grote basis (totaal ≈ 148 + 2,1×CA) — ×PA/CA overdreef enorm.
+//  2) Wélke attributen meegroeien met CA verschilt sterk per positie: een CA-180-back krijgt
+//     er nauwelijks Afwerken bij, wel Voorzetten/Tackelen. Een budget-model zonder positie
+//     maakte van elk wonderkind een onrealistische allrounder.
+// Daarom per positiegroep het gemeten gemiddelde attribuutprofiel op CA-ankers 80/110/140/170
+// (POS_ATTR_PROFILE, gegenereerd met tools/pos-curve.js; validatie: anker-170 wijkt max ~1 punt
+// af van echte CA-165+-profielen). Projectie = eigen waarde + (norm(PA) − norm(CA)) van de
+// eigen positiegroep(en): de positie-vorm klopt én persoonlijke sterktes/zwaktes blijven.
+const POS_CA_ANCHORS = [80, 110, 140, 170];
+const POS_ATTR_PROFILE = {ALL:{Crossing:[7.5,9.5,10.7,12],Dribbling:[8.2,10.5,12.1,14.2],Finishing:[7.4,8.9,10,11.8],Heading:[8.3,9.8,10.7,11.7],LongShots:[6.7,9.1,10.5,11.9],Marking:[7.9,9.3,10.3,11.2],OffTheBall:[8.8,11,12.3,13.9],Passing:[9.3,11.3,12.8,14.8],PenaltyTaking:[5,8.1,10,11.2],Tackling:[8.5,9.6,10.8,11.6],Vision:[8.3,10.7,12.4,14.5],Handling:[2.1,2.1,2.1,2.1],AerialReach:[2.1,2.1,2.1,2],CommandOfArea:[2.1,2.1,2.1,2.1],Communication:[2.1,2.1,2.1,2.2],Kicking:[2.1,2.1,2.1,2],Throwing:[2.1,2.1,2.1,2],Anticipation:[9.4,11.6,13.3,15.1],Decisions:[10.9,11.5,12.6,14.4],OneOnOnes:[2.1,2.1,2.1,2.1],Positioning:[8.3,9.9,11.1,12],Reflexes:[2.1,2.1,2.1,2.1],FirstTouch:[10.1,11.6,13,15.1],Technique:[9.9,11.8,13.3,15.2],Flair:[8.9,10.3,11.9,13.8],Corners:[5.5,7.8,8.9,9.6],Teamwork:[9.1,11.7,13.2,14.4],WorkRate:[10.1,12.2,13.7,14.9],LongThrows:[4.7,6.9,7.8,7.7],Eccentricity:[2.1,2.1,2.1,2.1],RushingOut:[2.1,2.1,2.1,2.1],Punching:[2.1,2.1,2.1,2],Acceleration:[11.7,12.3,13.4,14.7],FreeKicks:[5.4,7.8,9.1,10.2],Strength:[8,10.5,11.9,13.5],Stamina:[10,11.9,13.6,14.9],Pace:[11.7,12.3,13.5,14.9],JumpingReach:[9.5,10.6,11.2,12],Leadership:[8.1,9.2,10.2,11.8],Balance:[9.5,11.4,12.9,14.7],Bravery:[8.8,11.2,12.8,13.7],Aggression:[10.4,11.3,12.4,13.3],Agility:[11.2,11.9,13.2,14.8],NaturalFitness:[12.1,12.5,13.4,14.8],Determination:[11.1,12.4,13.8,15.5],Composure:[8.6,11.1,12.7,14.9],Concentration:[8.3,10.7,12.3,13.9]},AMC:{Crossing:[8,10.5,11.9,13.2],Dribbling:[10,12.1,13.7,15.7],Finishing:[9.6,10.5,11.9,13.8],Heading:[6.5,7.9,8.6,9.6],LongShots:[8.4,10.7,12.2,13.8],Marking:[5.8,7,7.9,8.8],OffTheBall:[10.3,12.1,13.5,15.1],Passing:[10.6,12.3,13.8,15.5],PenaltyTaking:[5.9,9.3,11.7,12.6],Tackling:[6.2,7.4,8.4,9.1],Vision:[10.6,12.4,13.9,15.9],Handling:[2.1,2.1,2.1,2.1],AerialReach:[2.1,2.1,2.1,2],CommandOfArea:[2.1,2.1,2.1,2.2],Communication:[2.1,2.1,2.1,2.3],Kicking:[2.1,2.1,2.1,1.9],Throwing:[2.1,2.1,2.2,2.1],Anticipation:[9.1,11.3,13,14.8],Decisions:[10.9,11.6,12.8,14.4],OneOnOnes:[2.1,2.1,2.1,2],Positioning:[6.7,8.2,9.2,9.9],Reflexes:[2.1,2.1,2.1,2.1],FirstTouch:[11.5,12.6,14.2,16.1],Technique:[11.7,13.1,14.8,16.4],Flair:[11.9,13,14.4,15.6],Corners:[6.7,9.9,11.8,12.5],Teamwork:[9.2,11.3,12.7,14.1],WorkRate:[10.2,11.7,13.1,14.6],LongThrows:[4,5.4,5.9,6.5],Eccentricity:[2.1,2.1,2.1,2.1],RushingOut:[2.1,2.1,2.1,1.9],Punching:[2.1,2.1,2.1,1.9],Acceleration:[12,12.3,13.3,14.3],FreeKicks:[6.6,9.8,11.6,12.7],Strength:[6.7,8.8,10,11.9],Stamina:[9.7,11.4,13,14.6],Pace:[11.7,12,13,14.3],JumpingReach:[8,8.6,8.9,9.8],Leadership:[8.1,8.7,9.7,10.9],Balance:[9.1,11.1,12.8,14.6],Bravery:[7.5,9.8,11.2,12.1],Aggression:[9.7,10.1,11,12.1],Agility:[11.5,12.5,14,15.6],NaturalFitness:[12,12.2,13,14.1],Determination:[10.8,12.2,13.4,15.4],Composure:[9.5,11.5,13,15.1],Concentration:[7.5,10,11.6,13.3]},DC:{Crossing:[5.1,7.2,8.4,8.9],Dribbling:[4.8,7.8,9.8,11.3],Finishing:[4,6.1,7,8],Heading:[11,12.7,14,15.4],LongShots:[4.6,6.8,7.7,8.3],Marking:[11.7,12.6,13.9,15.4],OffTheBall:[5.8,8.3,9.5,9.8],Passing:[7.5,10.6,12.4,14.1],PenaltyTaking:[3.9,6.2,7.6,8.4],Tackling:[11.6,12.7,14,15.6],Vision:[6.3,9.5,11.3,13.2],Handling:[2.1,2.1,2.1,2.1],AerialReach:[2.1,2.1,2.1,1.9],CommandOfArea:[2.1,2.1,2.1,2.1],Communication:[2.1,2.1,2.1,2],Kicking:[2.1,2.1,2.1,2.1],Throwing:[2.1,2.1,2.2,2.1],Anticipation:[10,12,13.8,15.8],Decisions:[11.6,11.7,12.7,14.6],OneOnOnes:[2.1,2.1,2.1,1.9],Positioning:[11.6,12.6,13.8,15.5],Reflexes:[2.1,2.1,2,2],FirstTouch:[7.5,10.2,11.7,13.4],Technique:[6.9,10,11.8,13.5],Flair:[5.8,7.1,8.6,9.8],Corners:[3.6,5.1,5.4,5.2],Teamwork:[8.3,11.8,13.6,14.7],WorkRate:[9,12,13.8,15.1],LongThrows:[4.8,7.9,9.4,9.7],Eccentricity:[2.1,2.1,2.2,2],RushingOut:[2.1,2.1,2.2,2.3],Punching:[2.1,2.1,2.1,1.9],Acceleration:[10.6,11.3,12.5,13.8],FreeKicks:[4.1,5.6,6.3,6.6],Strength:[9.7,12.4,14.1,15.8],Stamina:[9.3,11.8,13.5,14.5],Pace:[10.9,11.8,13.4,14.9],JumpingReach:[12.1,13.5,14.4,15.6],Leadership:[8.6,10.6,12,13.7],Balance:[9.4,11.6,13.2,14.2],Bravery:[10.7,12.7,14.2,15.6],Aggression:[11.3,12.4,13.6,14.4],Agility:[10.2,10.7,11.8,13.1],NaturalFitness:[12.1,12.6,13.3,14.7],Determination:[11.2,12.6,14.1,15.9],Composure:[7.5,10.8,12.7,14.9],Concentration:[9.7,11.6,13.2,14.8]},DM:{Crossing:[6,8.7,10.2,11.7],Dribbling:[6.5,9.7,11.6,13.8],Finishing:[6,7.8,9,10.6],Heading:[7.5,9.7,10.4,11.5],LongShots:[7.9,9.7,11.1,12.3],Marking:[9.4,11,12,12.8],OffTheBall:[8,10.4,12,14.2],Passing:[10.8,12.4,13.9,16],PenaltyTaking:[4.8,8.1,10,10.8],Tackling:[11.2,11.9,13.1,14],Vision:[9.9,11.7,13.3,15.5],Handling:[2.1,2.1,2,2],AerialReach:[2.1,2.1,2.1,2.1],CommandOfArea:[2.1,2.1,2,2.4],Communication:[2.1,2.1,2.1,2.3],Kicking:[2.1,2.1,2.1,1.9],Throwing:[2.1,2.1,2.1,1.9],Anticipation:[9.9,12.1,13.8,15.8],Decisions:[11.9,12.1,13.2,15],OneOnOnes:[2.1,2.1,2.1,2.3],Positioning:[10.3,11.9,13.3,14.3],Reflexes:[2.1,2.1,2.1,2],FirstTouch:[10.9,12.1,13.4,15.4],Technique:[10.4,12,13.5,15.5],Flair:[6.8,9.3,11.1,13.6],Corners:[5.5,8,9.6,9.7],Teamwork:[10.2,12.9,14.6,15.5],WorkRate:[11.6,13.2,14.7,15.8],LongThrows:[4.2,6.3,7.2,6.9],Eccentricity:[2.1,2.1,2.1,2.1],RushingOut:[2.1,2.1,2.2,2.1],Punching:[2.1,2.1,2.1,1.9],Acceleration:[10.8,11.4,12.4,13.6],FreeKicks:[6,8.3,9.7,10.1],Strength:[8.4,10.9,12.3,13.8],Stamina:[10.2,12.5,14.4,16.1],Pace:[10.9,11.5,12.6,13.7],JumpingReach:[9.6,10.7,11,11.8],Leadership:[8.6,10.4,11.6,12.4],Balance:[9.7,11.7,13.2,14.9],Bravery:[9.5,12,13.5,14.1],Aggression:[10.9,12.2,13.3,14.1],Agility:[10.4,11.4,12.7,14.4],NaturalFitness:[12.2,12.7,13.9,15.1],Determination:[11.2,12.8,14.2,15.5],Composure:[8.6,11.5,13.2,15.4],Concentration:[9.3,11.6,13.4,14.7]},FB:{Crossing:[9.9,11.3,12.6,13.9],Dribbling:[7.6,10.3,12,13.4],Finishing:[4.9,7.1,8.4,9.9],Heading:[7.6,9.3,10.1,11],LongShots:[5.4,8.1,9.4,10.8],Marking:[9.3,10.9,12,12.7],OffTheBall:[7.8,10.8,12.5,14.2],Passing:[8.8,11,12.4,14.5],PenaltyTaking:[4.3,6.9,8.4,9.3],Tackling:[10.7,11.6,12.8,13.3],Vision:[7.8,10.1,11.7,13.8],Handling:[2.1,2.1,2.1,1.9],AerialReach:[2.1,2.1,2.1,2.2],CommandOfArea:[2.1,2.1,2.2,1.8],Communication:[2.1,2.1,2.1,2.2],Kicking:[2.1,2.1,2,1.8],Throwing:[2.1,2.1,2.1,1.9],Anticipation:[9.3,11.4,12.9,14.8],Decisions:[11.1,11.4,12.4,14.3],OneOnOnes:[2.1,2.1,2.1,2],Positioning:[9.4,11.2,12.4,13.9],Reflexes:[2.1,2.1,2.1,2.2],FirstTouch:[9.3,11,12.5,14.3],Technique:[9.2,11.2,12.7,14.4],Flair:[7.4,9.3,11.1,12.7],Corners:[5.4,8,9.1,9.4],Teamwork:[10,12.2,13.6,14.7],WorkRate:[10.3,12.7,14.2,15.1],LongThrows:[6.5,9.8,11.2,11.1],Eccentricity:[2.1,2.1,2.2,2.1],RushingOut:[2.1,2.1,2.2,2.4],Punching:[2.1,2.1,2.1,2.1],Acceleration:[12.4,12.8,14,15.4],FreeKicks:[4.3,7.1,8.5,9.5],Strength:[8,10.2,11.7,13.5],Stamina:[10.9,12.4,14.1,15.2],Pace:[12.2,12.7,14.1,15.5],JumpingReach:[9.2,9.9,10.7,11.6],Leadership:[8.3,9,10,11.3],Balance:[9.8,11.3,12.7,14.5],Bravery:[9.9,11.6,13.2,14],Aggression:[10.5,11.5,12.8,14],Agility:[11.8,12.2,13.3,14.9],NaturalFitness:[12.2,12.7,13.7,15.1],Determination:[11.1,12.4,13.9,15.6],Composure:[7.8,10.5,12.2,14.4],Concentration:[9.7,11.2,12.6,14.1]},GK:{Crossing:[2.1,2.3,2.3,2.3],Dribbling:[2.1,2.4,2.8,3.7],Finishing:[2,2.1,2.1,2.2],Heading:[4.3,5.3,5.4,7.3],LongShots:[2.1,2.5,2.7,2.5],Marking:[2.1,2.3,2.4,1.8],OffTheBall:[2.4,3.4,4.1,3.9],Passing:[8.2,10.1,11.3,12.6],PenaltyTaking:[2.4,2.8,3.5,4.8],Tackling:[2.1,2.5,2.6,3],Vision:[6.6,9,10.5,12],Handling:[11.5,12.3,13.4,15.1],AerialReach:[11.4,13.2,14.1,15.4],CommandOfArea:[9.6,11.5,12.9,14.6],Communication:[9,11.4,12.8,14.6],Kicking:[9.9,11.6,13,14],Throwing:[8.7,11.6,13.2,14.3],Anticipation:[8.8,11.5,13,14.5],Decisions:[11.7,11.5,12.4,13.9],OneOnOnes:[9.9,12.6,14.4,16.6],Positioning:[9.7,12.1,13.3,15.1],Reflexes:[12,13.3,15.2,17.1],FirstTouch:[4.3,7.6,9.7,11.9],Technique:[4.9,8.1,9.9,12],Flair:[2.5,4.4,5.7,8.2],Corners:[3.2,3.7,4.1,4.7],Teamwork:[7.7,10.8,12.2,12.9],WorkRate:[6.8,10.3,11.9,13.4],LongThrows:[2.1,2.6,2.9,3],Eccentricity:[6.5,8,8.9,9.3],RushingOut:[9.5,10.7,12,13.2],Punching:[9.3,10.3,11,10.6],Acceleration:[9.4,9.7,10.3,11.1],FreeKicks:[4.3,4.9,5.2,5.4],Strength:[7.4,10.8,12.4,13.4],Stamina:[5.7,9.4,11.3,12.2],Pace:[8.9,9.6,10.3,11.3],JumpingReach:[12.7,14.1,14.9,15.6],Leadership:[8,9.9,11.4,13],Balance:[8.3,10.8,12,12.4],Bravery:[11.5,12.2,13.2,14.1],Aggression:[9.2,9.5,10.1,11.7],Agility:[10.7,12,13.3,15],NaturalFitness:[11.7,12.2,13.1,13.6],Determination:[11.1,12.3,13.6,15.5],Composure:[7.2,10.7,12.6,14.3],Concentration:[10.2,11.6,12.9,14.5]},MC:{Crossing:[6.7,9.5,10.9,12.2],Dribbling:[7.6,10.6,12.3,14.3],Finishing:[7.2,8.8,10.1,11.8],Heading:[6.6,8.7,9.6,10.9],LongShots:[8.4,10.3,11.6,13],Marking:[8.3,9.7,10.7,11.8],OffTheBall:[9.1,11.3,12.7,14.7],Passing:[11.4,12.7,14,15.9],PenaltyTaking:[5.1,8.6,10.7,11.5],Tackling:[9.1,10.5,11.6,12.6],Vision:[10.8,12.2,13.6,15.7],Handling:[2.1,2.1,2.1,2.1],AerialReach:[2.1,2.1,2.1,2.1],CommandOfArea:[2.1,2.1,2.1,2.2],Communication:[2.1,2.1,2.1,2.2],Kicking:[2.1,2.1,2.1,1.9],Throwing:[2.1,2.1,2.2,1.9],Anticipation:[9.4,11.9,13.5,15.3],Decisions:[11.5,12,13.1,14.9],OneOnOnes:[2.1,2.1,2.1,2.2],Positioning:[8.7,10.8,12.1,13.2],Reflexes:[2.1,2.1,2.1,2],FirstTouch:[11.6,12.4,13.7,15.6],Technique:[11.2,12.6,14,15.8],Flair:[8.8,10.7,12.4,14.4],Corners:[6.1,9,10.6,11],Teamwork:[9.9,12.5,14.1,15.3],WorkRate:[11.4,12.9,14.2,15.6],LongThrows:[4.1,6,6.8,7],Eccentricity:[2.1,2.1,2.1,2.1],RushingOut:[2.1,2.1,2.2,2.2],Punching:[2.1,2.1,2.1,1.9],Acceleration:[11.3,11.7,12.6,13.8],FreeKicks:[6.2,9,10.5,11.4],Strength:[7.7,10.1,11.5,13.1],Stamina:[10.3,12.2,14.1,15.8],Pace:[11.3,11.7,12.7,13.9],JumpingReach:[8.8,9.7,10.3,11.2],Leadership:[8.4,9.9,11,12.1],Balance:[9.4,11.5,13,14.5],Bravery:[8.3,11.2,12.8,13.8],Aggression:[10.6,11.6,12.6,13.8],Agility:[11,11.9,13.1,14.7],NaturalFitness:[12.2,12.5,13.6,15],Determination:[11.2,12.6,13.9,15.7],Composure:[8.9,11.6,13.2,15.3],Concentration:[8.7,11.1,12.8,14.4]},ST:{Crossing:[6.5,8.7,9.7,11.4],Dribbling:[10.6,11.3,12.4,14.9],Finishing:[11.8,12.4,13.9,15.5],Heading:[10.5,11.5,12.7,12.5],LongShots:[7,9.8,11.4,13],Marking:[4.8,6.2,6.9,7.6],OffTheBall:[11.3,12.7,14.1,15.7],Passing:[8.2,10.4,11.8,13.8],PenaltyTaking:[6.4,10.2,12.6,14.5],Tackling:[4.1,6,6.9,7.5],Vision:[7.4,10.1,11.8,13.9],Handling:[2.1,2.1,2.1,2],AerialReach:[2.1,2.1,2.1,2],CommandOfArea:[2.1,2.1,2.1,2.1],Communication:[2.1,2.1,2.1,2.2],Kicking:[2.1,2.1,2.1,2.1],Throwing:[2.1,2.1,2.1,1.9],Anticipation:[9.8,11.8,13.4,15.2],Decisions:[10,11.2,12.4,14.1],OneOnOnes:[2.1,2.1,2.2,2.3],Positioning:[5.7,7.4,7.9,8.1],Reflexes:[2.1,2.1,2.1,1.9],FirstTouch:[11,11.8,13,15.2],Technique:[10.5,11.9,13.4,15.4],Flair:[11,11.5,12.9,15.2],Corners:[5.3,7,7.6,8.9],Teamwork:[8.2,11,12.6,13.9],WorkRate:[9.1,12,13.5,14.4],LongThrows:[3.7,5.5,6.1,6.4],Eccentricity:[2.1,2.1,2.1,2.4],RushingOut:[2.1,2.1,2.1,1.8],Punching:[2.1,2.1,2,2.2],Acceleration:[12,12.5,13.6,15.5],FreeKicks:[5.5,7.7,8.9,10.4],Strength:[8.5,11.4,13,13.8],Stamina:[9.7,11.6,13.2,14.3],Pace:[11.8,12.7,13.8,15.6],JumpingReach:[10,11.8,12.5,12.5],Leadership:[7.8,8.4,9.3,11],Balance:[9.5,11.7,13.1,14.9],Bravery:[7.8,11,12.8,13.2],Aggression:[9.8,10.9,12.2,12.8],Agility:[11.1,11.8,13,15.2],NaturalFitness:[12.1,12.3,13.2,14.9],Determination:[11,12.4,14,15.3],Composure:[10.2,11.6,13,14.9],Concentration:[6.9,10.1,11.8,13.1]},W:{Crossing:[10,11.1,12.2,13.9],Dribbling:[10.7,12.4,14,16.4],Finishing:[9,10.3,11.6,14.1],Heading:[6.4,7.9,8.4,9.2],LongShots:[7.1,10,11.6,13.1],Marking:[5.4,6.7,7.5,8],OffTheBall:[10.2,12,13.3,15.3],Passing:[9.8,11.3,12.5,14.6],PenaltyTaking:[5.4,8.8,10.8,12.4],Tackling:[5.5,6.9,7.7,7.8],Vision:[8.4,10.9,12.6,14.9],Handling:[2.1,2.1,2,2.3],AerialReach:[2.1,2.1,2.1,2],CommandOfArea:[2.1,2.1,2.1,1.9],Communication:[2.1,2.1,2.1,2.2],Kicking:[2.1,2.1,2.1,2],Throwing:[2.1,2.1,2.1,2.1],Anticipation:[8.7,11,12.5,14.3],Decisions:[9.7,10.8,12,14],OneOnOnes:[2.1,2.1,2.1,2.2],Positioning:[5.8,7.5,8.4,8.7],Reflexes:[2.1,2.1,2.1,2],FirstTouch:[10.8,12,13.4,15.8],Technique:[11,12.5,14.1,16.2],Flair:[11.5,12.7,14.2,16],Corners:[6.8,9.3,10.8,12.3],Teamwork:[9,10.7,12,13.2],WorkRate:[10.1,11.6,12.9,14.1],LongThrows:[4.7,6.2,6.6,6.2],Eccentricity:[2.1,2.1,2.1,2.2],RushingOut:[2.1,2.1,2.1,1.8],Punching:[2.1,2.1,2.1,2],Acceleration:[12.5,13.2,14.5,15.7],FreeKicks:[6.1,8.8,10.4,11.8],Strength:[6.6,8.9,10.1,11.6],Stamina:[10,11.4,12.9,14.1],Pace:[12.3,12.9,14.1,15.2],JumpingReach:[7.9,8.6,8.9,9.6],Leadership:[7.7,7.8,8.5,10.4],Balance:[9.5,11.1,12.6,14.7],Bravery:[7.5,9.8,11.3,12],Aggression:[9.6,10.1,11.1,11.6],Agility:[12.2,12.9,14.4,16.2],NaturalFitness:[12,12.2,13.1,14.4],Determination:[11.1,12.1,13.4,15.2],Composure:[8.4,10.7,12.3,14.5],Concentration:[6.9,9.6,11.1,12.9]}};
+const POS_GROUP_OF = { GK: 'GK', SW: 'DC', DC: 'DC', DL: 'FB', DR: 'FB', WBL: 'FB', WBR: 'FB',
+  DM: 'DM', MC: 'MC', ML: 'W', MR: 'W', AML: 'W', AMR: 'W', AMC: 'AMC', ST: 'ST' };
+const posGroupsOf = p => {
+  const gs = [...new Set((p.posArr || []).map(x => POS_GROUP_OF[x]).filter(g => POS_ATTR_PROFILE[g]))];
+  return gs.length ? gs : ['ALL'];
+};
+// Positienorm voor attribuut-ankers a op willekeurige CA (lineair tussen ankers, doorgetrokken erbuiten).
+function posNorm(a, ca) {
+  if (ca <= 80) return a[0] - (80 - ca) * (a[1] - a[0]) / 30;
+  if (ca >= 170) return a[3] + (ca - 170) * (a[3] - a[2]) / 30;
+  for (let i = 1; i < 4; i++)
+    if (ca <= POS_CA_ANCHORS[i]) return a[i - 1] + (a[i] - a[i - 1]) * (ca - POS_CA_ANCHORS[i - 1]) / 30;
+  return a[3];
+}
+
 function projectAttrs(p) {
   if (!p.pa || !p.ca || p.pa <= p.ca || !p.attrs) return null;
-  const f = p.pa / p.ca;
   const age = getAge(p);
-  const physF = physGrowthFactor(age);
-  const mentF = mentalGrowthFactor(age);
-  const techF = age != null && age >= 31 ? 0.8 : 1.0;   // techniek tapert heel licht bij oudere spelers
-  const keys = Object.keys(p.attrs).filter(k => PHYS_ATTRS.has(k) || MENTAL_ATTRS.has(k) || SETPIECE_ATTRS.has(k)
-    || !['Consistency', 'ImportantMatches', 'Versatility', 'InjuryProneness', 'Dirtiness'].includes(k));
-  let sumG0 = 0, sumGM = 0;
-  const g0 = {}, m = {};
-  for (const k of keys) {
-    const a = p.attrs[k];
-    if (a == null) continue;
-    g0[k] = a * (f - 1);
-    m[k] = PHYS_ATTRS.has(k) ? physF : SETPIECE_ATTRS.has(k) ? 0.55 : MENTAL_ATTRS.has(k) ? mentF : techF;
-    sumG0 += g0[k];
-    sumGM += g0[k] * m[k];
-  }
-  const norm = sumGM > 0 ? sumG0 / sumGM : 1;            // behoud totale groei-magnitude (≈ op PA)
+  // De positienormen zijn al "leeftijdsecht" (CA-180-spelers zijn doorgaans ~25): een jonge
+  // speler groeit er vanzelf realistisch fysiek bij. Alleen voor oudere spelers met rest-
+  // potentieel dempen we fysieke groei extra — die komt er niet meer.
+  const physF = age == null || age <= 23 ? 1 : physGrowthFactor(age);
+  const groups = posGroupsOf(p);
+  const keys = Object.keys(p.attrs)
+    .filter(k => !['Consistency', 'ImportantMatches', 'Versatility', 'InjuryProneness', 'Dirtiness'].includes(k));
   const proj = {};
   for (const k of keys) {
-    if (g0[k] == null) continue;
-    proj[k] = Math.min(20, Math.round(p.attrs[k] + g0[k] * m[k] * norm));
+    let d = 0, n = 0;
+    for (const g of groups) {
+      const a = POS_ATTR_PROFILE[g][k];
+      if (a) { d += Math.max(0, posNorm(a, p.pa) - posNorm(a, p.ca)); n++; }
+    }
+    d = n ? d / n : 0;
+    if (PHYS_ATTRS.has(k)) d *= physF;
+    proj[k] = Math.min(20, Math.round(p.attrs[k] + d));
   }
   return proj;
 }
@@ -1281,17 +1541,17 @@ function showDetail(p) {
   const isPlayer = !!p.attrs;
   const on = state.shortlist.has(p.id);
   const ev = estValue(p);
-  const valTxt = ev.v == null ? '–' : ev.v === 0 ? t('free_l') : ev.est ? `${fmtMoney(ev.lo)} – ${fmtMoney(ev.hi)}` : fmtMoney(ev.v);
+  const valTxt = ev.v == null || ev.v === 0 ? '–' : ev.est ? `${fmtMoney(ev.lo)} – ${fmtMoney(ev.hi)}` : fmtMoney(ev.v);
 
   const gauge = (!state.hideCapa && (p.ca != null || p.pa != null)) ? `<div class="capa">
     <div class="capa-nums"><span><b>CA</b> <span class="ca-bar">${p.ca ?? '–'}</span></span><span><b>PA</b> <span class="pa-bar">${p.pa ?? '–'}</span></span></div>
     <div class="capa-track"><span class="capa-pa" style="width:${Math.min(100, (p.pa ?? 0) / 2)}%"></span><span class="capa-ca" style="width:${Math.min(100, (p.ca ?? 0) / 2)}%"></span></div>
   </div>` : '';
   const inCmp = state.compare.includes(p.id);
-  let html = `<h2>${escHtml(p.name)} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${on ? '★' : '☆'}</span>
-    <button class="copybtn" title="Kopieer naam">📋</button>
-    <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">⚖</button></h2>
-  <div class="sub">${getAge(p)} · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}</div>
+  let html = `<h2>${escHtml(p.name)} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${starSvg(18)}</span>
+    <button class="copybtn" title="Kopieer naam">${icon('clipboard', 13)}</button>
+    <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">${icon('compare', 13)}</button></h2>
+  <div class="sub">${getAge(p)} · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
   ${gauge}
   <div class="kv">
     ${isPlayer ? `<div><b>${t('c_pos')}</b> ${p.pos || '–'}</div><div><b>${t('foot')}</b> ${p.foot || '–'}</div>` : `<div><b>${t('c_role')}</b> ${p.job || '–'}</div>`}
@@ -1363,14 +1623,14 @@ function showDetail(p) {
       return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t('a_' + k)}</span><span class="v ${cls}">${v}</span></div>`;
     }).join('') + '</div>' : '';
     // Grid: links Technisch/Keepen + Standaardsituaties (Mentaal loopt ernaast over 2 rijen),
-    // onderste rij Fysiek | Persoonlijkheid op gelijke hoogte.
+    // onderste rij links Fysiek + Verborgen kenmerken, rechts Persoonlijkheid.
     const techKey = isGk ? 'g_goalkeeping' : 'g_technical';
     html += `<div class="attr-grid">
       <div style="grid-area:tech">${col[techKey] || ''}</div>
       <div style="grid-area:sp">${col['g_setpieces'] || ''}</div>
       <div style="grid-area:ment">${col['g_mental'] || ''}</div>
-      <div style="grid-area:phys">${col['g_physical'] || ''}</div>
-      <div style="grid-area:pers">${state.hideCapa ? '' : persHtml + hidHtml}</div>
+      <div style="grid-area:phys">${col['g_physical'] || ''}${state.hideCapa ? '' : hidHtml}</div>
+      <div style="grid-area:pers">${state.hideCapa ? '' : persHtml}</div>
     </div>`;
   } else if (p.staffAttrs) {
     html += `<div class="attr-cols"><div class="attr-col"><h3>${t('staffAttrs')}</h3>` +
@@ -1398,7 +1658,7 @@ function maybeDonateNudge() {
   if (n < 25) return;
   localStorage.setItem('fmss_donate', '1');
   const el = $('donate-nudge');
-  el.innerHTML = `<button class="dn-x" title="${t('donateLater')}">✕</button>
+  el.innerHTML = `<button class="dn-x" title="${t('donateLater')}">${icon('x', 12)}</button>
     <div class="dn-title">☕ ${t('donateTitle')}</div>
     <div class="dn-text">${t('donateBody')}</div>
     <div class="dn-actions"><a class="dn-cta" href="${KOFI}" target="_blank" rel="noopener">${t('donateCta')}</a>
@@ -1424,11 +1684,11 @@ function renderCompareTray() {
   tray.classList.remove('hidden');
   const chips = state.compare.map(id => {
     const p = findPlayer(id);
-    return `<span class="ct-chip" data-id="${id}">${p ? escHtml(p.name) : '?'}<span class="x" data-rm="${id}">✕</span></span>`;
+    return `<span class="ct-chip" data-id="${id}">${p ? escHtml(p.name) : '?'}<span class="x" data-rm="${id}">${icon('x', 10)}</span></span>`;
   }).join('');
   tray.innerHTML = `<div class="ct-label">${t('comparing')}</div>${chips}` +
     `<button class="ct-go" ${state.compare.length < 2 ? 'disabled' : ''}>${t('compare')} (${state.compare.length})</button>` +
-    `<button class="ct-clear" title="${t('clear')}">✕</button>`;
+    `<button class="ct-clear" title="${t('clear')}">${icon('x', 13)}</button>`;
   tray.querySelectorAll('[data-rm]').forEach(x => x.onclick = e => { e.stopPropagation(); toggleCompare(+x.dataset.rm); });
   tray.querySelectorAll('.ct-chip').forEach(c => c.onclick = () => { const p = findPlayer(+c.dataset.id); if (p) showDetail(p); });
   tray.querySelector('.ct-go').onclick = openCompare;
@@ -1441,56 +1701,168 @@ function bestRoleScore(p) {
 function openCompare() {
   const players = state.compare.map(findPlayer).filter(Boolean);
   if (players.length < 2) return;
-  const cell = (vals, i, hi) => {
-    const v = vals[i];
-    if (v == null) return '<span class="dim">·</span>';
-    const nums = vals.filter(x => x != null);
+  const n = players.length;
+  const two = n === 2;   // bij precies 2 spelers is er een Δ-kolom; bij 3 markeert de rij de winnaar
+
+  // Beste/slechtste per rij (hi=false: laag is beter; hi=null: neutraal, geen markering).
+  const marksOf = (vals, hi) => {
+    const nums = vals.filter(v => v != null);
+    if (hi == null || nums.length < 2) return vals.map(() => '');
     const best = hi ? Math.max(...nums) : Math.min(...nums);
     const worst = hi ? Math.min(...nums) : Math.max(...nums);
-    const cls = nums.length > 1 && v === best ? 'cmp-best' : (nums.length > 1 && v === worst ? 'cmp-worst' : '');
-    return `<span class="${cls}">${v}</span>`;
+    if (best === worst) return vals.map(() => '');
+    return vals.map(v => v == null ? '' : v === best ? 'cmp-best' : v === worst ? 'cmp-worst' : '');
   };
+  // Δ-cel (alleen bij 2 spelers): speler 1 − speler 2, groen als speler 1 beter af is.
+  const deltaCell = (vals, hi, fmtAbs) => {
+    if (!two) return '';
+    const [a, b] = vals;
+    if (a == null || b == null) return '<div class="cmp-cell cmp-delta"><span class="dim">·</span></div>';
+    const d = a - b;
+    const cls = d === 0 || hi == null ? 'cmp-dzero' : (d > 0) === (hi !== false) ? 'cmp-dpos' : 'cmp-dneg';
+    const txt = d === 0 ? '=' : (d > 0 ? '+' : '−') + fmtAbs(Math.abs(d));
+    return `<div class="cmp-cell cmp-delta"><span class="${cls}">${txt}</span></div>`;
+  };
+  // Generieke rij. opts: hi (true/false/null), fmt, dec (decimalen), attr (FM-kleur),
+  // invert (hoog=slecht → omgekeerde kleur, bv. blessuregevoeligheid).
+  const row = (label, vals, opts = {}) => {
+    const hi = 'hi' in opts ? opts.hi : true;
+    const fmtV = opts.fmt || (v => opts.dec ? v.toFixed(opts.dec) : String(v));
+    const marks = marksOf(vals, hi);
+    const cells = vals.map((v, i) => {
+      if (v == null) return '<div class="cmp-cell"><span class="dim">·</span></div>';
+      const color = opts.attr ? ' ' + (opts.invert ? attrClass(21 - v) : attrClass(v)) : '';
+      return `<div class="cmp-cell"><span class="v${color} ${marks[i]}">${fmtV(v)}</span></div>`;
+    }).join('');
+    return `<div class="cmp-row"><div class="cmp-lbl">${label}</div>${cells}${deltaCell(vals, hi, fmtV)}</div>`;
+  };
+  const textRow = (label, vals) => `<div class="cmp-row"><div class="cmp-lbl">${label}</div>` +
+    vals.map(v => `<div class="cmp-cell">${v ? escHtml(v) : '<span class="dim">·</span>'}</div>`).join('') +
+    (two ? '<div class="cmp-cell cmp-delta"></div>' : '') + '</div>';
+
+  // ----- winsttelling (voor het kop-badge): bij hoeveel attributen uniek de beste? -----
+  const isGk = players.every(p => (p.posArr || []).includes('GK'));
+  const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
+  const wins = players.map(() => 0);
+  for (const [, keys] of groups)
+    for (const k of keys) {
+      const vals = players.map(p => p.attrs ? p.attrs[k] : null);
+      const nums = vals.filter(v => v != null);
+      if (nums.length < 2) continue;
+      const best = Math.max(...nums);
+      const idx = vals.map((v, i) => v === best ? i : -1).filter(i => i >= 0);
+      if (idx.length === 1 && best !== Math.min(...nums)) wins[idx[0]]++;
+    }
+
+  // ----- kop: eigen sticky grid boven de hele scroll (namen + stamdata altijd zichtbaar) -----
   const headRow = `<div class="cmp-row cmp-head"><div class="cmp-lbl"></div>` +
-    players.map(p => `<div class="cmp-cell"><div class="cmp-name">${escHtml(p.name)}</div><div class="cmp-meta">${getAge(p)} · ${p.pos || p.job || ''}<br>${p.club ? escHtml(p.club) : t('clubless')}</div></div>`).join('') + '</div>';
-  const statRow = (label, vals, opts = {}) => {
-    const hi = opts.hi !== false;
-    return `<div class="cmp-row"><div class="cmp-lbl">${label}</div>` +
-      vals.map((_, i) => `<div class="cmp-cell">${opts.fmt ? (vals[i] == null ? '<span class="dim">·</span>' : cellFmt(vals, i, hi, opts.fmt)) : cell(vals, i, hi)}</div>`).join('') + '</div>';
-  };
-  function cellFmt(vals, i, hi, fmt) {
-    const nums = vals.filter(x => x != null);
-    const best = hi ? Math.max(...nums) : Math.min(...nums);
-    const cls = nums.length > 1 && vals[i] === best ? 'cmp-best' : '';
-    return `<span class="${cls}">${fmt(vals[i])}</span>`;
-  }
-  let body = headRow;
+    players.map((p, i) => {
+      const ev = estValue(p);
+      const val = ev.v > 0 ? fmtMoney(ev.v) : null;
+      const bits = [val, p.wage > 0 ? fmtMoney(p.wage) + ' p/w' : null,
+        p.expires ? String(p.expires).slice(0, 4) : null].filter(Boolean).join(' · ');
+      return `<div class="cmp-cell"><div class="cmp-name">${escHtml(p.name)}</div>` +
+        `<div class="cmp-meta">${getAge(p)} · ${p.pos || p.job || ''} · ${p.club ? escHtml(p.club) : '–'}` +
+        `${bits ? `<br>${bits}` : ''}` +
+        `${p.attrs ? `<br><span class="cmp-winsb">${tf('cmpWinsBadge', { n: wins[i] })}</span>` : ''}</div></div>`;
+    }).join('') +
+    (two ? `<div class="cmp-cell cmp-delta" title="${t('cmpDeltaHint')}">Δ</div>` : '') + '</div>';
+
+  // ----- kerngetallen -----
+  let body = '';
   if (!state.hideCapa) {
-    body += statRow('CA', players.map(p => p.ca));
-    body += statRow('PA', players.map(p => p.pa));
+    body += row('CA', players.map(p => p.ca));
+    body += row('PA', players.map(p => p.pa));
   }
-  body += statRow(t('cmpValue'), players.map(p => estValue(p).v), { fmt: fmtMoney });
-  body += statRow(t('wageLabel'), players.map(p => p.wage), { fmt: fmtMoney, hi: false });
-  body += statRow(t('c_age'), players.map(p => getAge(p)), { hi: false });
+  body += row(t('c_meta'), players.map(p => metaScore(p)), { fmt: v => v.toFixed(1) });
+  body += row(t('cmpValue'), players.map(p => estValue(p).v), { fmt: fmtMoney, hi: null });
+  body += row(t('c_fee'), players.map(p => { const f = feeEstimate(p); return f.v > 0 ? f.v : null; }), { fmt: fmtMoney, hi: false });
+  body += row(t('wageLabel'), players.map(p => p.wage), { fmt: fmtMoney, hi: false });
+  body += row(t('c_age'), players.map(p => getAge(p)), { hi: false });
+  body += row(t('height'), players.map(p => p.height || null), { fmt: v => v + ' cm', hi: null });
+  body += textRow(t('contractLabel'), players.map(p => fmtDate(p.expires)));
+  body += textRow(t('foot'), players.map(p => p.foot));
   const roles = players.map(bestRoleScore);
   body += `<div class="cmp-row"><div class="cmp-lbl">${t('cmpTopRole')}</div>` +
-    roles.map(r => `<div class="cmp-cell">${r ? `${r.name}<br><b class="${roleClass(r.score)}">${r.score.toFixed(1)}</b>` : '<span class="dim">·</span>'}</div>`).join('') + '</div>';
+    roles.map(r => `<div class="cmp-cell">${r ? `${r.name}<br><b class="${roleClass(r.score)}">${r.score.toFixed(1)}</b>` : '<span class="dim">·</span>'}</div>`).join('') +
+    (two ? '<div class="cmp-cell cmp-delta"></div>' : '') + '</div>';
 
-  // Attributen (alleen spelers; per rij winnaar groen). Groepeer met de bestaande groepen.
-  const anyPlayer = players.some(p => p.attrs);
-  if (anyPlayer) {
-    const isGk = players.every(p => (p.posArr || []).includes('GK'));
-    const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
-    for (const [gk, keys] of groups) {
-      const present = keys.filter(k => players.some(p => p.attrs && p.attrs[k] != null));
-      if (!present.length) continue;
-      body += `<div class="cmp-group">${t(gk)}</div>`;
-      for (const k of present) body += statRow(attrName(k), players.map(p => p.attrs ? p.attrs[k] : null));
+  // ----- attributen: twee kolommen met panelen, rijen in FM-stijl -----
+  // Bij 2 spelers per rij: naam | waarde1 | vergelijkbalkje | waarde2 (zoals FM zelf):
+  // het balkje wijst met kleur en lengte naar wie beter is (groen = speler 1, blauw =
+  // speler 2), lengte ∝ het verschil. Bij 3 spelers: naam | w1 w2 w3 met winnaar-markering.
+  const cmpBar = (a, b, hi, dec) => {
+    if (a == null || b == null || hi == null)
+      return '<span class="cbar" title="–"><i class="cb-tick"></i></span>';
+    const d = a - b;
+    const p1beter = (d > 0) === (hi !== false);
+    const pct = Math.min(100, Math.round(Math.abs(d) / 8 * 100));   // 8 punten verschil = vol
+    const dTxt = d === 0 ? '=' : (d > 0 ? '+' : '−') + (dec ? Math.abs(d).toFixed(dec) : Math.abs(d));
+    return `<span class="cbar" title="Δ ${dTxt}"><i class="cb-tick"></i>` +
+      (d === 0 ? '' : `<i class="${p1beter ? 'cb-l' : 'cb-r'}" style="width:${Math.max(6, pct / 2)}%"></i>`) + '</span>';
+  };
+  const attrPanelRow = (label, vals, opts = {}) => {
+    const hi = 'hi' in opts ? opts.hi : true;
+    const marks = marksOf(vals, hi);
+    const fmtV = v => opts.dec ? v.toFixed(opts.dec) : String(v);
+    const cellV = (v, i) => v == null ? '<span class="cpv dim">·</span>' :
+      `<span class="cpv v ${opts.invert ? attrClass(21 - v) : attrClass(v)} ${marks[i]}">${fmtV(v)}</span>`;
+    if (two)
+      return `<div class="cpr${opts.foot ? ' cpr-foot' : ''}"><span class="cpl">${label}</span>${cellV(vals[0], 0)}${cmpBar(vals[0], vals[1], hi, opts.dec)}${cellV(vals[1], 1)}</div>`;
+    return `<div class="cpr cpr3${opts.foot ? ' cpr-foot' : ''}"><span class="cpl">${label}</span>${vals.map((v, i) => cellV(v, i)).join('')}</div>`;
+  };
+  const panel = (title, rowsHtml) => rowsHtml ? `<div class="cmpg"><h3>${title}</h3>${rowsHtml}</div>` : '';
+  const buildGroup = (gkey, keys) => {
+    const present = (keys || []).filter(k => players.some(p => p.attrs && p.attrs[k] != null));
+    if (!present.length) return '';
+    let rows = present.map(k =>
+      attrPanelRow(attrName(k), players.map(p => p.attrs ? p.attrs[k] : null))).join('');
+    // FM-stijl voetregel: groepsgemiddelde met eigen vergelijkbalkje.
+    if (present.length >= 3) {
+      const avgs = players.map(p => {
+        const vs = present.map(k => p.attrs ? p.attrs[k] : null).filter(v => v != null);
+        return vs.length ? Math.round(10 * vs.reduce((s, v) => s + v, 0) / vs.length) / 10 : null;
+      });
+      rows += attrPanelRow(t('avgLabel'), avgs, { dec: 1, foot: true });
     }
+    return panel(t(gkey), rows);
+  };
+
+  let panels = '';
+  if (players.some(p => p.attrs)) {
+    const gmap = Object.fromEntries(groups.map(([k, keys]) => [k, keys]));
+    // Verborgen kenmerken + persoonlijkheid (zelfde zichtbaarheidsregel als het detailpaneel).
+    let hidPanel = '', persPanel = '';
+    if (!state.hideCapa) {
+      const hid = [['Consistency', true], ['ImportantMatches', true], ['Versatility', true],
+        ['InjuryProneness', false], ['Dirtiness', false]]
+        .filter(([k]) => players.some(p => p.attrs && p.attrs[k] > 0));
+      hidPanel = panel(t('hiddenTitle'), hid.map(([k, good]) =>
+        attrPanelRow(t('a_' + k), players.map(p => p.attrs && p.attrs[k] > 0 ? p.attrs[k] : null),
+          { hi: good, invert: !good })).join(''));
+      const pers = [['ambition', true], ['professionalism', true], ['loyalty', null], ['pressure', true],
+        ['temperament', true], ['sportsmanship', null], ['adaptability', true], ['controversy', false]]
+        .filter(([k]) => players.some(p => p[k] > 0));
+      persPanel = panel(t('personaTitle'), pers.map(([k, dir]) =>
+        attrPanelRow(t(k), players.map(p => p[k] > 0 ? p[k] : null),
+          { hi: dir, invert: dir === false })).join(''));
+    }
+    // Links de "lange" groepen (technisch/keepen + fysiek), rechts mentaal + standaard;
+    // verborgen links en persoonlijkheid rechts houdt beide kolommen in balans.
+    const leftStack = buildGroup(isGk ? 'g_goalkeeping' : 'g_technical', gmap[isGk ? 'g_goalkeeping' : 'g_technical'])
+      + buildGroup('g_physical', gmap.g_physical) + hidPanel;
+    const rightStack = buildGroup('g_mental', gmap.g_mental)
+      + buildGroup('g_setpieces', gmap.g_setpieces) + persPanel;
+    if (leftStack || rightStack)
+      panels = `<div class="cmp-panels"><div>${leftStack}</div><div>${rightStack}</div></div>`;
   }
-  const cols = `120px repeat(${players.length}, 1fr)`;
+
+  const cols = two ? '130px 1fr 1fr 72px' : `130px repeat(${n}, 1fr)`;
   $('compare-inner').innerHTML =
-    `<div class="cmp-top"><h2>${t('cmpTitle')}</h2><button id="cmp-close">✕</button></div>` +
-    `<div class="cmp-grid" style="grid-template-columns:${cols}">${body}</div>`;
+    `<div class="cmp-top"><h2>${t('cmpTitle')}</h2><button id="cmp-close">${icon('x', 15)}</button></div>` +
+    `<div class="cmp-scroll">` +
+    `<div class="cmp-grid cmp-headgrid" style="grid-template-columns:${cols}">${headRow}</div>` +
+    `<div class="cmp-grid" style="grid-template-columns:${cols}">${body}</div>${panels}</div>`;
   $('compare-modal').classList.remove('hidden');
   $('cmp-close').onclick = closeCompare;
 }
@@ -1592,7 +1964,7 @@ function renderAnalysis() {
       </div>
       <div class="an-young">${t('anYoungTalent')}: ${yt ? `${escHtml(yt.name)} <span class="dim">(${getAge(yt)}${state.hideCapa ? '' : `, PA ${yt.pa || '·'}`})</span>` : t('anNone')}</div>
       ${x.rec ? `<div class="an-rec">${x.rec}</div>` : ''}
-      ${x.scout ? `<button class="an-scout" data-grp="${x.g.id}">${t('anScout')} →</button>` : ''}
+      ${x.scout ? `<button class="an-scout" data-grp="${x.g.id}">${t('anScout')} ${icon('arrowRight', 11)}</button>` : ''}
     </div>`;
   }).join('');
 
@@ -1612,19 +1984,39 @@ function scoutFor(s) {
   if (s.minPa) $('f-pa-min').value = s.minPa;
   if (s.maxAge) $('f-age-max').value = s.maxAge;
   applyFilters();
-  showToast('🔍 ' + [...codes].join(', '));
+  showToast([...codes].join(', '), 'search');
 }
 $('detail-close').onclick = () => { $('detail').classList.add('hidden'); state.selected = null; renderVisible(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-close').onclick(); });
 
 // ---------- UI-bediening ----------
-['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
+['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
   let tm; $(id).addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(applyFilters, 150); });
 });
 ['f-eu', 'f-myclub', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
 $('f-staffrole').addEventListener('change', applyFilters);
-$('f-div').addEventListener('change', applyFilters);
-$('f-tier').addEventListener('change', applyFilters);
+// Divisie-zoekbalk: filter terwijl je typt + eigen suggestie-dropdown (app-stijl, i.p.v.
+// de native datalist die als lichte "wolk" uit de donkere UI viel).
+$('f-div').addEventListener('input', () => { renderDivSuggest(); applyFilters(); });
+$('f-div').addEventListener('focus', renderDivSuggest);
+$('f-div').addEventListener('blur', () => setTimeout(() => $('div-suggest').classList.add('hidden'), 120));
+$('f-div').addEventListener('keydown', e => {
+  const box = $('div-suggest');
+  if (box.classList.contains('hidden')) return;
+  const items = [...box.querySelectorAll('.ds-item')];
+  if (!items.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    divSuggestSel = (divSuggestSel + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items.forEach((el, i) => el.classList.toggle('sel', i === divSuggestSel));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const pick = items[divSuggestSel] || items[0];
+    $('f-div').value = pick.dataset.v; box.classList.add('hidden'); applyFilters();
+  } else if (e.key === 'Escape') {
+    box.classList.add('hidden');
+  }
+});
 $('f-interest').addEventListener('change', applyFilters);
 $('f-role').addEventListener('change', () => {
   state.role = $('f-role').value;
@@ -1634,16 +2026,15 @@ $('f-role').addEventListener('change', () => {
   applyFilters();
   if (state.selected) showDetail(state.selected);
 });
-$('f-refyear').addEventListener('input', () => { const y = +$('f-refyear').value; if (y >= 2000 && y <= 2100) { state.refYear = y; applyFilters(); } });
 $('pos-clear').onclick = () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); applyFilters(); };
 
 $('btn-clear').onclick = () => {
-  document.querySelectorAll('#filters input[type=text], #filters input[type=number]').forEach(i => { if (i.id !== 'f-refyear') i.value = ''; });
+  document.querySelectorAll('#filters input[type=text], #filters input[type=number]').forEach(i => i.value = '');
   document.querySelectorAll('#filters input[type=checkbox]').forEach(i => i.checked = false);
   $('f-staffrole').value = ''; $('f-interest').value = '0';
-  $('f-div').value = ''; $('f-tier').value = '';
   activePos.clear();
   document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on'));
+  state.presetSel = null; renderPresets();   // dropdown-label terug naar de placeholder
   applyFilters();
 };
 $('btn-sidebar').onclick = () => document.body.classList.toggle('sidebar-collapsed');
@@ -1741,9 +2132,9 @@ $('btn-fetch').onclick = async () => {
   const b = $('banner');
   try {
     const st = await (await fetch('/api/fmstatus')).json();
-    if (!st.running) { b.className = 'scanning error'; b.textContent = t('fmNotRunning'); b.onclick = null; return; }
+    if (!st.running) { b.className = 'scanning error'; b.innerHTML = bannerMsg('warning', t('fmNotRunning')); b.onclick = null; return; }
     await fetch('/api/refresh', { method: 'POST' });
-    b.className = 'scanning'; b.textContent = t('reqSent'); b.onclick = null;
+    b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('reqSent')); b.onclick = null;
   } catch { showToast('!'); }
 };
 
@@ -1752,6 +2143,7 @@ function applyLang() {
   document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
   document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
   document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
+  document.querySelectorAll('[data-help]').forEach(el => el.title = t(el.dataset.help));   // ?-tooltips
   $('f-name').placeholder = t('searchph');
   $('btn-coffee').title = t('donateBtn');
   renderDumpInfo();
@@ -1775,7 +2167,9 @@ function setMode(mode) {
   $('fg-pitch').style.display = mode === 'staff' || isAn ? 'none' : '';
   $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
   $('fg-role').style.display = mode === 'staff' || isAn ? 'none' : '';
+  $('f-meta-row').style.display = mode === 'staff' ? 'none' : '';   // meta-score bestaat niet voor staf
   $('sl-bar').classList.toggle('hidden', mode !== 'shortlist');
+  renderMyTeamChips();
   document.body.classList.toggle('mode-analysis', isAn);
   state.selected = null;
   $('detail').classList.add('hidden');
@@ -1798,6 +2192,27 @@ $('tab-shortlist').onclick = () => setMode('shortlist');
 $('tab-analysis').onclick = () => setMode('analysis');
 $('btn-reload').onclick = loadDump;
 
+// ---------- teamchips: 1e/2e/jeugd binnen "Mijn club" ----------
+// Zichtbaar zodra het "Mijn club"-vinkje aanstaat én de dump teamType-data heeft
+// (plugin v0.1.10+); oudere dumps → chips blijven verborgen, filter doet niets.
+function renderMyTeamChips() {
+  const box = $('myteam-chips');
+  const myClub = (state.meta.myClub || '').toLowerCase();
+  const hasData = myClub && state.players.some(p => p.teamType != null && (p.club || '').toLowerCase() === myClub);
+  const show = hasData && $('f-myclub').checked && state.mode !== 'staff';
+  box.style.display = show ? '' : 'none';
+  if (!show) return;
+  const opts = [['all', t('mt_all')], ['first', t('mt_first')], ['res', t('mt_res')], ['youth', t('mt_youth')]];
+  box.innerHTML = opts.map(([k, lbl]) =>
+    `<button class="mt-chip ${state.myTeam === k ? 'on' : ''}" data-mt="${k}">${lbl}</button>`).join('');
+  box.querySelectorAll('.mt-chip').forEach(b => b.onclick = () => {
+    state.myTeam = b.dataset.mt;
+    renderMyTeamChips();
+    applyFilters();
+  });
+}
+$('f-myclub').addEventListener('change', renderMyTeamChips);
+
 // ---------- statuspolling (F9 / knop-feedback) ----------
 let lastPluginState = null, lastDumpTime = null;
 async function poll() {
@@ -1805,23 +2220,36 @@ async function poll() {
     const st = await (await fetch('/api/status')).json();
     const b = $('banner');
     const pl = st.plugin;
-    if (pl && pl.state === 'scanning') { b.className = 'scanning'; b.textContent = t('dumping'); }
+    if (pl && pl.state === 'scanning') {
+      b.className = 'scanning';
+      // Plugin v0.1.2+ schrijft echte scanvoortgang (0..1) in status.json; oudere
+      // plugins niet — dan de oude tekstbanner zonder balk.
+      b.innerHTML = typeof pl.progress === 'number'
+        ? bannerProgress('hourglass', t('dumping'), pl.progress)
+        : bannerMsg('hourglass', t('dumping'));
+    }
     else if (pl && pl.state === 'error') {
       b.className = 'scanning error';
-      b.textContent = t('dumpError') + (pl.error ? ': ' + pl.error : '');
+      b.innerHTML = bannerMsg('warning', t('dumpError') + (pl.error ? ': ' + pl.error : ''));
       b.onclick = null;
     }
     else if (pl && pl.state === 'done') {
       if ((st.dumpTime && st.dumpTime !== lastDumpTime && lastDumpTime !== null) || lastPluginState === 'scanning') {
-        b.className = 'done';
-        b.textContent = `${t('dumpReady')} (${pl.players.toLocaleString()} · ${pl.staff.toLocaleString()})`;
-        b.onclick = () => { loadDump(); b.className = 'hidden'; };
+        // Nieuwe dump klaar → automatisch laden; de groene balk is alleen nog een
+        // korte bevestiging (verdwijnt vanzelf), geen klik meer nodig.
+        loadDump().then(() => {
+          b.className = 'done';
+          b.innerHTML = bannerMsg('check', `${t('dumpLoaded')} (${pl.players.toLocaleString()} · ${pl.staff.toLocaleString()})`);
+          b.onclick = () => { b.className = 'hidden'; };
+          setTimeout(() => { if (b.className === 'done') b.className = 'hidden'; }, 6000);
+        });
       }
     }
     lastPluginState = pl ? pl.state : null;
     if (st.dumpTime) lastDumpTime = st.dumpTime;
   } catch { /* server weg */ }
-  setTimeout(poll, 2000);
+  // Tijdens een scan sneller pollen zodat de voortgangsbalk vloeiend meeloopt.
+  setTimeout(poll, lastPluginState === 'scanning' ? 750 : 2000);
 }
 
 // Heartbeat: alleen in de standalone app-modus, zodat de server stopt als het venster sluit.

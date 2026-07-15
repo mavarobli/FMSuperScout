@@ -12,7 +12,7 @@ public class Plugin : BasePlugin
 {
     public const string Id = "com.mark.fmsuperscout";
     public const string Name = "FMSuperScout";
-    public const string Version = "0.1.0";
+    public const string Version = "0.1.26";
 
     internal static new ManualLogSource Log;
 

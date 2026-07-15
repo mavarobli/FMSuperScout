@@ -82,6 +82,11 @@ The plugin is C# (BepInEx 6, IL2CPP). It builds with a standard .NET SDK:
 dotnet build plugin/FMSuperScout.csproj -c Release
 ```
 
+On this machine the SDK lives user-local (not on PATH):
+`%LOCALAPPDATA%\Microsoft\dotnet\dotnet.exe build plugin/FMSuperScout.csproj -c Release`.
+Install the built DLL by copying `plugin/bin/Release/FMSuperScout.dll` to
+`<FM26>\BepInEx\plugins\` while the game is closed.
+
 ## Getting data out of Football Manager
 
 The app reads whatever the FMSuperScout plugin last dumped from your **active save**:
@@ -91,8 +96,7 @@ The app reads whatever the FMSuperScout plugin last dumped from your **active sa
 3. When the green bar appears, click it to load. If a read fails, the app shows a red bar with the
    reason instead of waiting forever.
 
-Data lives in `%LOCALAPPDATA%\FMSuperScout\` (`dump*.json`, `status.json`, `diagnostics.txt`, and a
-growing `value-history.json` of real in-game values used to recalibrate the value model over time).
+Data lives in `%LOCALAPPDATA%\FMSuperScout\` (`dump*.json`, `status.json`, `diagnostics.txt`).
 
 The plugin install/removal steps for the game itself are in [`docs/`](docs/) and the in-repo
 `Installeer plugin.cmd`. BepInEx only *adds* files to the FM folder, so it is fully reversible
@@ -132,6 +136,27 @@ by the model tests in [`test/`](test/).
 | `installer/` | Icon generator, launcher, PowerShell installer, package builder |
 | `test/` | Zero-dependency model tests (`npm test`) |
 | `docs/` | Value-model, .fmf-format and status/backlog notes |
+
+## How it compares
+
+There's a healthy little ecosystem of FM26 tools that read hidden data from memory. Here's how
+FMSuperScout stacks up, as of July 2026:
+
+| | FMSuperScout | FM Genie Scout 26 | FMST 26 | FMRTE 26 |
+|---|---|---|---|---|
+| Price | Free, no ads | Free (ads) or €6+ for ad-free | Free | Free to scout, paid to save edits |
+| Open source | Yes | No | No | No |
+| Live from memory | Yes | Yes | Yes | Yes |
+| Tactical role ratings | 19 FM roles, sortable | – | – | – |
+| Player comparison | Up to 3, side-by-side | – | – | – |
+| Squad needs analysis | Depth/aging/succession, 1-click scout | – | – | – |
+| Saved filter presets | Yes | – | – | – |
+| Hide hidden stats toggle | Yes, one click | – | – | – |
+| Statistics depth | Core scouting fields | Extensive | 100+ columns, xG/p90 | Extensive (editor-first) |
+
+No shade to the others — Genie Scout in particular has been the default recommendation since 2009
+for good reason. FMSuperScout is aimed at a specific gap: fast squad-management workflow (compare,
+find gaps, save your filters) rather than a raw stats dump or a save editor.
 
 ## Support
 

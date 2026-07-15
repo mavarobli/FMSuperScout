@@ -9,19 +9,29 @@
 </head>
 <body>
 <header id="topbar">
-  <button id="btn-sidebar" title="Filters">☰</button>
+  <button id="btn-sidebar" title="Filters">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
   <img id="brand-logo" src="logo.svg" alt="" width="26" height="26">
   <h1>FM<span>Super</span>Scout</h1>
   <nav>
     <button id="tab-players" class="tab active" data-i18n="players">Spelers</button>
     <button id="tab-staff" class="tab" data-i18n="staff">Staf</button>
-    <button id="tab-shortlist" class="tab">★ <span data-i18n="shortlist">Shortlist</span> <span id="sl-count">0</span></button>
+    <button id="tab-shortlist" class="tab">
+      <svg class="star-ic" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55-4.76-4.64 6.58-.96z"/></svg>
+      <span data-i18n="shortlist">Shortlist</span> <span id="sl-count">0</span></button>
     <button id="tab-analysis" class="tab" data-i18n="analysis">Analyse</button>
   </nav>
   <div id="club-badge" title="Klik = filter op jouw club"></div>
   <div id="dump-info"></div>
-  <button id="btn-fetch" data-i18n="fetch" title="Vraag FM om een nieuwe dump">⬇ Nieuwe data</button>
-  <button id="btn-reload" data-i18n="reload" title="Herlaad de laatste dump">⟳</button>
+  <div id="game-date"></div>
+  <button id="btn-fetch" title="Vraag FM om een nieuwe dump">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    <span data-i18n="fetch">Nieuwe data</span>
+  </button>
+  <button id="btn-reload" title="Herlaad de laatste dump">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+  </button>
   <button id="btn-coffee" title="Steun FMSuperScout">☕</button>
   <button id="btn-settings" title="Instellingen / Settings" aria-label="Settings">
     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -50,7 +60,13 @@
 
     <div class="fsection" id="fg-presets" data-sec="presets">
       <div class="fsec-head" data-i18n="presetsTitle">Opgeslagen filters</div>
-      <div id="preset-list"></div>
+      <div id="preset-dd">
+        <button id="preset-dd-btn" type="button" disabled>
+          <span id="preset-dd-label"></span>
+          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="preset-dd-menu" class="hidden"></div>
+      </div>
       <button id="btn-preset-save">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         <span data-i18n="presetSave">Huidige filters opslaan</span>
@@ -77,7 +93,7 @@
       <div class="frow"><span data-i18n="age">Leeftijd</span><div class="range2"><input type="number" id="f-age-min" placeholder="–">–<input type="number" id="f-age-max" placeholder="–"></div></div>
       <div class="frow capa-row"><span>CA</span><div class="range2"><input type="number" id="f-ca-min" placeholder="–">–<input type="number" id="f-ca-max" placeholder="–"></div></div>
       <div class="frow capa-row"><span>PA</span><div class="range2"><input type="number" id="f-pa-min" placeholder="–">–<input type="number" id="f-pa-max" placeholder="–"></div></div>
-      <div class="frow"><span data-i18n="refyear" title="Huidig in-game jaar">Peiljaar</span><input type="number" id="f-refyear" class="yr"></div>
+      <div class="frow" id="f-meta-row"><span>Meta <span class="col-help" data-help="metaHint">?</span></span><div class="range2"><input type="number" id="f-meta-min" placeholder="–">–<input type="number" id="f-meta-max" placeholder="–"></div></div>
     </div>
 
     <div class="fsection" data-sec="financial">
@@ -97,17 +113,10 @@
       <div class="fsec-head" data-i18n="competition">Competitie</div>
       <div class="fgroup" id="fg-div" style="display:none">
         <label data-i18n="divLabel">Divisie</label>
-        <select id="f-div"></select>
-      </div>
-      <div class="fgroup">
-        <label data-i18n="clubTier">Clubniveau</label>
-        <select id="f-tier">
-          <option value="" data-i18n="all">Alle</option>
-          <option value="top" data-i18n="tierTop">Top</option>
-          <option value="strong" data-i18n="tierStrong">Sterk</option>
-          <option value="mid" data-i18n="tierMid">Middel</option>
-          <option value="low" data-i18n="tierLow">Laag</option>
-        </select>
+        <div id="div-search">
+          <input type="text" id="f-div" autocomplete="off" data-i18n-ph="divSearch" placeholder="Typ een competitie…">
+          <div id="div-suggest" class="hidden"></div>
+        </div>
       </div>
     </div>
 
@@ -126,6 +135,7 @@
       <label class="chk"><input type="checkbox" id="f-exp12"> <span data-i18n="exp12">Contract &lt; 1 jaar</span></label>
       <label class="chk"><input type="checkbox" id="f-free"> <span data-i18n="free">Clubloos</span></label>
       <label class="chk"><input type="checkbox" id="f-myclub"> <span data-i18n="myclub">Mijn club</span></label>
+      <div id="myteam-chips" style="display:none"></div>
       <label class="chk"><input type="checkbox" id="f-shortlist"> <span data-i18n="onlyshortlist">Alleen shortlist</span></label>
     </div>
 
@@ -134,7 +144,10 @@
 
   <section id="content">
     <div id="sl-bar" class="hidden">
-      <button id="btn-export" data-i18n="exportcsv">⬇ Shortlist exporteren (CSV)</button>
+      <button id="btn-export">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span data-i18n="exportcsv">Shortlist exporteren (CSV)</span>
+      </button>
     </div>
     <div id="chipbar"></div>
     <div id="table-wrap">
@@ -145,7 +158,13 @@
     </div>
     <div id="analysis" class="hidden"></div>
     <div id="empty-state">
-      <div class="es-icon">⚽</div>
+      <div class="es-icon">
+        <svg viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round">
+          <circle cx="32" cy="32" r="28"/>
+          <polygon points="32,22 42,29.5 38,41 26,41 22,29.5" fill="currentColor" stroke="none"/>
+          <path d="M32 22V8 M42 29.5 55.5 24.5 M38 41l8.5 11 M26 41l-8.5 11 M22 29.5 8.5 24.5"/>
+        </svg>
+      </div>
       <h2 data-i18n="nodata">Nog geen data geladen</h2>
       <ol class="es-steps">
         <li data-i18n-html="step1"></li>
@@ -156,7 +175,9 @@
   </section>
 
   <aside id="detail" class="hidden">
-    <button id="detail-close">✕</button>
+    <button id="detail-close">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
     <div id="detail-body"></div>
   </aside>
 </div>

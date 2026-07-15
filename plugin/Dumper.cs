@@ -13,8 +13,6 @@ internal static class Dumper
     internal static long VtGp;
     internal static int LinkedViaSquad;
     internal static int ClubCount;
-    // Person-adressen van de eerste spelers, voor club-offset-discovery in de diagnose.
-    internal static readonly List<(ulong person, string name, string club)> DiagPersons = new();
     internal static string MyClub;       // club van de human-manager
     internal static string ManagerName;  // naam van de human-manager
     internal static int MyClubRep;       // reputatie van jouw club (~0..10000)
@@ -22,18 +20,24 @@ internal static class Dumper
     internal static DateTime? GameDate;  // exacte in-game datum uit geheugen (null = niet gevonden)
     internal static string GameVersion;  // versie van game_plugin.dll (bv. "26.3.2.0")
     internal static bool VersionOk = true; // major.minor == gepinde offsets-versie
-    // Datum-kandidaten voor de diagnose (waarde, aantal hits, voorbeeld-offsets t.o.v. GpBase).
-    internal static List<(uint val, int n, List<ulong> offs)> DateCands = new();
+    // Team-object van de human-manager, waaruit de in-game datum wordt gelezen (team-schema).
+    internal static ulong DiagMyTeam;
+    // Datum-stemmen van alle teams ([team+0xA0]+0x94), als kruischeck op de team-schema-lezing.
+    internal static Dictionary<uint, int> DateVotes = new();
 
     // Statusbestand dat de web-app pollt (betrouwbare F9-feedback, ook zonder console).
-    private static void WriteStatus(string state, int players, int staff, string error = null)
+    // progress (0..1) is échte scanvoortgang: gescande bytes / totaal; de app toont er
+    // een voortgangsbalk mee. Invariant-cultuur: JSON eist een punt als decimaalteken.
+    private static void WriteStatus(string state, int players, int staff, string error = null, double progress = -1)
     {
         try
         {
             Directory.CreateDirectory(OutDir);
             string errField = error == null ? "" : $",\"error\":\"{JsonEscape(error)}\"";
+            string progField = progress < 0 ? "" :
+                ",\"progress\":" + System.Math.Clamp(progress, 0, 1).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
             File.WriteAllText(Path.Combine(OutDir, "status.json"),
-                $"{{\"state\":\"{state}\",\"players\":{players},\"staff\":{staff},\"at\":\"{DateTime.Now:s}\"{errField}}}");
+                $"{{\"state\":\"{state}\",\"players\":{players},\"staff\":{staff},\"at\":\"{DateTime.Now:s}\"{progField}{errField}}}");
         }
         catch { }
     }
@@ -79,20 +83,27 @@ internal static class Dumper
         var managers = new List<(ulong person, string name, string club, int rep)>(); // human-managers
         var personToUid = new Dictionary<ulong, uint>(1 << 17); // person/objectstart-adres → uid
         var clubObjs = new List<ulong>();                        // gedetecteerde club-objecten
-        long candidates = 0, vtGp = 0;
+        long candidates = 0, vtGp = 0, women = 0;
 
         const int ChunkSize = 32 * 1024 * 1024; // 32 MB blokken
         var buf = new byte[ChunkSize];
 
+        // Echte scanvoortgang voor de web-app: verwerkte bytes / totaal. De scan is
+        // veruit de langste fase → die krijgt 0..0.85; koppelen/JSON de rest.
+        ulong totalBytes = 0;
+        foreach (var r in mem.ScanRegions) totalBytes += r.size;
+        ulong doneBytes = 0;
+        long lastProgMs = 0;
+
         foreach (var (start, size) in mem.ScanRegions)
         {
-            if (size < 0x40) continue;
+            if (size < 0x40) { doneBytes += size; continue; }
             ulong scanned = 0;
             while (scanned < size)
             {
                 int want = (int)System.Math.Min((ulong)ChunkSize, size - scanned);
                 ulong chunkBase = start + scanned;
-                if (!mem.ReadBlock(chunkBase, buf, want)) { scanned += (ulong)want; continue; }
+                if (!mem.ReadBlock(chunkBase, buf, want)) { scanned += (ulong)want; doneBytes += (ulong)want; continue; }
 
                 for (int i = 0; i + 0x10 <= want; i += 8)
                 {
@@ -131,6 +142,9 @@ internal static class Dumper
                         ushort ca = mem.U16(basePtr + Fields.PLAO_CA);
                         ushort pa = mem.U16(basePtr + Fields.PLAO_PA);
                         if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
+                        // Vrouwenvoetbal niet inladen (Marks keuze: kost tijd/ruimte, niet gebruikt).
+                        // Geslacht = person+0x19 bit 0x10; vrouw → overslaan.
+                        if ((mem.U8(p + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0) { women++; continue; }
                         offsetHist[off] = offsetHist.GetValueOrDefault(off) + 1;
                         if (!players.ContainsKey(uid))
                         {
@@ -151,25 +165,33 @@ internal static class Dumper
                             staff[uid] = st;
                             if (off == Fields.HUMAN_MANAGER_OFFSET)
                             {
-                                var (mc, mrep) = ResolveClub(mem, p);
+                                var (mc, mrep, _) = ResolveClub(mem, p);
                                 managers.Add((p, st.Name, mc ?? st.Club, mrep));
                             }
                         }
                     }
                 }
                 scanned += (ulong)want;
+                doneBytes += (ulong)want;
+                if (sw.ElapsedMilliseconds - lastProgMs >= 500 && totalBytes > 0)
+                {
+                    lastProgMs = sw.ElapsedMilliseconds;
+                    WriteStatus("scanning", players.Count, staff.Count, null, 0.85 * doneBytes / totalBytes);
+                }
             }
         }
-        Plugin.Log.LogInfo($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten");
+        Plugin.Log.LogInfo($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten · {women:N0} vrouwen overgeslagen");
         Dumper.AllOffHist = allOffHist;
         Dumper.VtGp = vtGp;
+        WriteStatus("scanning", players.Count, staff.Count, null, 0.87);
 
         // ---- Squad-gebaseerde clubkoppeling (authoritatief) ----
         // Loop clubs → teams → spelerslijst. Elke speler krijgt de club van zijn selectie;
         // bij meerdere selecties wint het eerste elftal (laagste teamtype). Ook: welke club
         // heeft de human-manager als teammanager → jouw club.
         var mgrAddrs = new HashSet<ulong>(managers.Select(x => x.person));
-        var squadClub = new Dictionary<uint, (string club, int tt, int rep)>();
+        var squadClub = new Dictionary<uint, (string club, int tt, int rep, string div)>();
+        DiagMyTeam = 0;
         foreach (ulong club in clubObjs)
         {
             string cname = ClubNameOf(mem, club);
@@ -188,7 +210,7 @@ internal static class Dumper
                 // manager van dit team → is het jouw human-manager?
                 ulong mgr = mem.Ptr(team + 0x80);
                 if (mgr != 0 && mgrAddrs.Contains(mgr) && (MyClub == null || tt == 0))
-                { MyClub = cname; MyClubRep = trep; }
+                { MyClub = cname; MyClubRep = trep; DiagMyTeam = team; }
                 // spelerslijst
                 ulong pb = mem.Ptr(team + 0x38), pe = mem.Ptr(team + 0x40);
                 if (pb == 0 || pe <= pb) continue;
@@ -199,16 +221,101 @@ internal static class Dumper
                     ulong pp = mem.Ptr(pb + pi * 8);
                     if (pp == 0 || !personToUid.TryGetValue(pp, out uint puid)) continue;
                     if (!squadClub.TryGetValue(puid, out var cur) || tt < cur.tt)
-                        squadClub[puid] = (cname, tt, trep);
+                        squadClub[puid] = (cname, tt, trep, CompNameOf(mem, team));
                 }
             }
         }
+        // ---- Squad-walk v2 (15-07): clubs uit de bewezen contract-keten, en lijst-entries
+        // opgelost door te PROBEN tegen de bekende person-adressen (de entries bleken geen
+        // person-pointers; naamresolutie gaf rommel, maar een pointerveld erin wijst wél
+        // naar de speler). Levert per speler het échte team (tt: 0=1e, 3=reserves, 11=U18)
+        // en de team-divisie (jeugdspelers → jeugdcompetitie). En passant stemmen alle
+        // teams over de in-game datum via [team+0xA0]+0x94 (droeg exact "vandaag", 15-07).
+        var clubAddrs = new HashSet<ulong>();
+        foreach (var p in players.Values)
+        {
+            if (p.PersonAddr == 0) continue;
+            ulong pcon = mem.Ptr(p.PersonAddr + (ulong)Fields.PERO_FULL_CONTRACT);
+            if (pcon == 0) continue;
+            ulong pteam = mem.Ptr(pcon + 0x10);
+            if (pteam == 0) continue;
+            ulong pclub = mem.Ptr(pteam + 0x30);
+            if (pclub != 0) clubAddrs.Add(pclub);
+        }
+        DateVotes = new Dictionary<uint, int>();
+        foreach (ulong club in clubAddrs)
+        {
+            string cname = ClubNameOf(mem, club);
+            if (cname == null) continue;
+            ulong tb2 = mem.Ptr(club + 0x18), te2 = mem.Ptr(club + 0x20);
+            if (tb2 == 0 || te2 <= tb2 || (te2 - tb2) % 8 != 0) continue;
+            long tcnt2 = (long)((te2 - tb2) / 8);
+            if (tcnt2 > 24) continue;
+            for (long ti = 0; ti < tcnt2; ti++)
+            {
+                ulong team = mem.Ptr(tb2 + (ulong)ti * 8);
+                if (team == 0) continue;
+                int tt = mem.U8(team + 0x28);
+                int trep = mem.U16(team + 0xA8);
+                if (trep is < 0 or > 12000) trep = 0;
+                // Datum-stem: [team+0xA0]+0x94 = eerstvolgende wedstrijd van dit team. Normaliseer
+                // op de gedecodeerde datum (het rauwe veld kan vlagbits in 9-15 dragen; op de rauwe
+                // waarde stemmen versnippert dezelfde dag → v0.1.11-bug: alles weggefilterd).
+                ulong dobj = mem.Ptr(team + (ulong)Fields.TEAM_SCHEDULE);
+                if (dobj != 0)
+                {
+                    var (dy, ddoy) = DecodeFmDate(mem.U32(dobj + (ulong)Fields.SCHED_NEXT_MATCH));
+                    if (dy is >= 2020 and <= 2060)
+                    {
+                        uint norm = ((uint)dy << 16) | (uint)ddoy;
+                        DateVotes[norm] = DateVotes.GetValueOrDefault(norm) + 1;
+                    }
+                }
+                string tdiv = CompNameOf(mem, team);
+                ulong pb2 = mem.Ptr(team + 0x38), pe2 = mem.Ptr(team + 0x40);
+                if (pb2 == 0 || pe2 <= pb2 || (pe2 - pb2) % 8 != 0) continue;
+                long pcnt2 = (long)((pe2 - pb2) / 8);
+                if (pcnt2 > 60) continue;
+                for (long pi = 0; pi < pcnt2; pi++)
+                {
+                    ulong pp = mem.Ptr(pb2 + (ulong)pi * 8);
+                    if (pp == 0) continue;
+                    uint puid = 0;
+                    int hitOff = -1;
+                    if (personToUid.TryGetValue(pp, out puid)) hitOff = -2;   // entry ís de speler
+                    else
+                        for (int off = 0x00; off <= 0x80; off += 8)
+                        {
+                            ulong q = mem.Ptr(pp + (ulong)off);
+                            if (q != 0 && personToUid.TryGetValue(q, out puid)) { hitOff = off; break; }
+                        }
+                    if (hitOff == -1) continue;
+                    if (!squadClub.TryGetValue(puid, out var cur2) || tt < cur2.tt)
+                        squadClub[puid] = (cname, tt, trep, tdiv);
+                }
+            }
+        }
+        Plugin.Log.LogInfo($"Squad-walk v2: {squadClub.Count} spelers gekoppeld over {clubAddrs.Count} keten-clubs.");
+
         // Koppel clubs aan spelers (squad wint; anders blijft contract-keten-fallback staan).
         foreach (var p in players.Values)
-            if (squadClub.TryGetValue(p.Uid, out var sc)) { p.Club = sc.club; if (sc.rep > 0) p.ClubRep = sc.rep; }
+            if (squadClub.TryGetValue(p.Uid, out var sc))
+            { p.Club = sc.club; if (sc.rep > 0) p.ClubRep = sc.rep; if (sc.div != null) p.Div = sc.div; p.TeamType = sc.tt; }
 
         Dumper.LinkedViaSquad = squadClub.Count;
         Dumper.ClubCount = clubObjs.Count;
+
+        // Mijn team via de manager-keten (person→contract→team) — hieruit leest FindGameDate
+        // de in-game datum (team-schema). Robuuster dan de squad-walk-match hierboven.
+        foreach (var mg in managers)
+        {
+            ulong mcon = mem.Ptr(mg.person + (ulong)Fields.PERO_FULL_CONTRACT);
+            if (mcon == 0) continue;
+            ulong mteam = mem.Ptr(mcon + 0x10);
+            if (mteam == 0) continue;
+            DiagMyTeam = mteam;
+            break;
+        }
 
         // Human-manager fallback als geen team-match gevonden is.
         var me = managers.FirstOrDefault(x => !string.IsNullOrEmpty(x.club));
@@ -239,6 +346,7 @@ internal static class Dumper
 
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
+        WriteStatus("scanning", players.Count, staff.Count, null, 0.90);
 
         WriteJson(players.Values, staff.Values);
         WriteDiag(mem, players, staff, offsetHist, candidates, sw.ElapsedMilliseconds);
@@ -307,9 +415,14 @@ internal static class Dumper
         e.Controversy = ClampAttr(m.U8(person + Fields.PERO_CONTROVERSY));
         e.PersonAddr = person;
         e.PlAddr = pl;
-        var (cname, crep) = ResolveClub(m, person);
-        e.Club = cname; e.ClubRep = crep;
-        if (DiagPersons.Count < 60) DiagPersons.Add((person, e.Name, e.Club));
+        e.Gender = (m.U8(person + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
+        var (cname, crep, cdiv) = ResolveClub(m, person);
+        e.Club = cname; e.ClubRep = crep; e.Div = cdiv;
+        // Moederclub = club uit het volledige contract (person+0xA8→team→club). Voor verhuurde
+        // spelers wijkt dit af van de squad-club (waar ze nú spelen); daarmee detecteert de app
+        // huur: eigenaar==mijn club & speelt elders = verhuurd; speelt bij mij & eigenaar elders
+        // = gehuurd. squad-walk overschrijft e.Club straks met de huidige club.
+        e.OwnerClub = cname;
         return e;
     }
 
@@ -333,7 +446,9 @@ internal static class Dumper
             e.Job = JobName(m.U8(con + 0x26));   // pero.Pcjo — echte functie uit contract
         }
         if (string.IsNullOrEmpty(e.Job)) e.Job = "Staflid";
-        e.Club = ResolveClubName(m, person);
+        e.Gender = (m.U8(person + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
+        var (sclub, _, sdiv) = ResolveClub(m, person);
+        e.Club = sclub; e.Div = sdiv;
         return e;
     }
 
@@ -377,34 +492,34 @@ internal static class Dumper
     // Fallback-club via contract-keten: contract(0xA8)→team(0x10)→club(0x30). Voor spelers
     // buiten geladen competities (die niet in een selectie-object staan). De squad-walk
     // overschrijft dit met de authoritatieve club. Ook gebruikt voor staf/manager.
-    private static (string name, int rep) ResolveClub(MemScan m, ulong person)
+    private static (string name, int rep, string div) ResolveClub(MemScan m, ulong person)
     {
         ulong con = m.Ptr(person + (ulong)Fields.PERO_FULL_CONTRACT);
-        if (con == 0) return (null, 0);
+        if (con == 0) return (null, 0, null);
         ulong team = m.Ptr(con + 0x10);
-        if (team == 0) return (null, 0);
+        if (team == 0) return (null, 0, null);
         int rep = m.U16(team + 0xA8);
         if (rep is < 0 or > 12000) rep = 0;
         ulong club = m.Ptr(team + 0x30);
-        return (club == 0 ? null : ClubNameOf(m, club), rep);
+        return (club == 0 ? null : ClubNameOf(m, club), rep, CompNameOf(m, team));
     }
 
-    private static string ResolveClubName(MemScan m, ulong person) => ResolveClub(m, person).name;
-
-    // Diagnose-helpers: clubnaam via directe pointer op person+off, en via de oude keten.
-    private static string ClubNameAt(MemScan m, ulong addr)
+    // Competitienaam van een team: [team+0x50/0x60] → VOLLEDIGE naam op comp+0x40, anders
+    // de korte op comp+0x48. Volgorde bewust: de korte naam mist bij niet-gelicentieerde
+    // competities de landkwalificatie (heel Spanje werd "Eerste Divisie"); de volledige
+    // naam heeft die wel ("Oostenrijkse Eredivisie" — geverifieerd 15-07 via de comp-kaart).
+    private static readonly int[] TeamCompOffs = { Fields.TEAM_COMP, Fields.TEAM_COMP_ALT };
+    private static string CompNameOf(MemScan m, ulong team)
     {
-        ulong club = m.Ptr(addr);
-        return club == 0 ? "-" : (ClubNameOf(m, club) ?? "-");
-    }
-    private static string ChainClubName(MemScan m, ulong person)
-    {
-        ulong con = m.Ptr(person + (ulong)Fields.PERO_FULL_CONTRACT);
-        if (con == 0) return "-";
-        ulong team = m.Ptr(con + 0x10);
-        if (team == 0) return "-";
-        ulong club = m.Ptr(team + 0x30);
-        return club == 0 ? "-" : (ClubNameOf(m, club) ?? "-");
+        foreach (int toff in TeamCompOffs)
+        {
+            ulong comp = m.Ptr(team + (ulong)toff);
+            if (comp == 0) continue;
+            string s = m.IndirectString(comp + Fields.COMP_NAME);
+            if (!PlausibleClub(s)) s = m.IndirectString(comp + Fields.COMP_SHORT_NAME);
+            if (PlausibleClub(s)) return s;
+        }
+        return null;
     }
 
     private static string ClubNameOf(MemScan m, ulong club)
@@ -414,6 +529,9 @@ internal static class Dumper
     }
 
     // Alleen echte namen: overwegend Latijnse letters, geen Cyrillische/rare bytes.
+    // Accepteert het hele Latijnse Unicode-blok (t/m Latin Extended-A/B + Additional),
+    // anders vallen bv. Poolse (Lech Poznań, ł/ń/ś) en Turkse (ğ/ş/ı) clubnamen weg
+    // en toont de app "onbekende club" terwijl de reputatie wél gelezen is.
     private static bool PlausibleClub(string s)
     {
         if (string.IsNullOrEmpty(s) || s.Length is < 2 or > 48) return false;
@@ -421,7 +539,7 @@ internal static class Dumper
         foreach (char c in s)
         {
             if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) latin++;
-            else if (c > 0x7F && !"àáâäãåèéêëìíîïòóôöõùúûüñçøæœšžčćđ".Contains(char.ToLower(c))) weird++;
+            else if (c > 0x7F && !(char.IsLetter(c) && (c <= 0x24F || (c >= 0x1E00 && c <= 0x1EFF)))) weird++;
         }
         return latin >= 2 && weird == 0;
     }
@@ -492,31 +610,39 @@ internal static class Dumper
         catch (Exception e) { Plugin.Log.LogWarning("Versiedetectie mislukt: " + e.Message); }
     }
 
-    // Exacte in-game datum zoeken in de game_plugin-image en, indien gevonden, de leeftijden
-    // herberekenen. Kandidaten en keuze gaan naar diagnostics.txt zodat de offset later
-    // hard gepind kan worden.
+    // In-game datum: GEPIND op het schema-object van MIJN team ([team+0xA0]+0x94, of +0x18) —
+    // de eerstvolgende wedstrijddatum, in elke meting exact "vandaag" op wedstrijddagen
+    // (geverifieerd 19-09). Rechtstreeks gelezen (team via manager-keten); teamstemmen
+    // (DateVotes, gratis in de squad-walk verzameld) als kruischeck. Lukt het niet, dan blijft
+    // de afgeleide datum (seizoensjaar + systeemmaand/-dag) staan. Geen zware geheugenscans meer.
     private static void FindGameDate(MemScan mem, IEnumerable<Person> players, IEnumerable<Person> staff)
     {
         GameDate = null;
-        DateCands = new List<(uint, int, List<ulong>)>();
         try
         {
-            var cands = mem.ScanGpDates(GameYear - 1, GameYear + 1);
-            DateCands = cands.GroupBy(c => c.val)
-                .Select(g => (val: g.Key, n: g.Count(), offs: g.Select(x => x.addr - mem.GpBase).Take(3).ToList()))
-                .OrderByDescending(x => (int)(x.val >> 16) == GameYear ? 1 : 0)   // cohort-jaar eerst
-                .ThenByDescending(x => x.n)
-                .ToList();
-            var best = DateCands.FirstOrDefault(x => x.n >= 2);
-            if (best.val == 0) { Plugin.Log.LogInfo("In-game datum: geen betrouwbare kandidaat (≥2 hits) gevonden."); return; }
-            var (year, doy) = DecodeFmDate(best.val);
-            GameDate = new DateTime(year, 1, 1).AddDays(doy - 1);
-            GameYear = year;   // datum uit geheugen is leidend boven de cohort-afleiding
-            foreach (var p in players.Concat(staff))
-                if (p.BirthYear > 0) p.Age = AgeAt(p.BirthYear, p.BirthDoy, GameDate.Value);
-            Plugin.Log.LogInfo($"In-game datum: {GameDate.Value:yyyy-MM-dd} ({best.n} hits, bv. gp+0x{best.offs[0]:X})");
+            uint pin = 0;
+            if (DiagMyTeam != 0)
+            {
+                ulong sch = mem.Ptr(DiagMyTeam + (ulong)Fields.TEAM_SCHEDULE);
+                if (sch != 0)
+                    foreach (int so in new[] { Fields.SCHED_NEXT_MATCH, Fields.SCHED_NEXT_MATCH_ALT })
+                    {
+                        var (y, d) = DecodeFmDate(mem.U32(sch + (ulong)so));
+                        if (y >= GameYear - 1 && y <= GameYear + 1) { pin = ((uint)y << 16) | (uint)d; break; }
+                    }
+            }
+            if (pin != 0)
+            {
+                var (year, doy) = DecodeFmDate(pin);
+                GameDate = new DateTime(year, 1, 1).AddDays(doy - 1);
+                GameYear = year;
+                foreach (var p in players.Concat(staff))
+                    if (p.BirthYear > 0) p.Age = AgeAt(p.BirthYear, p.BirthDoy, GameDate.Value);
+                Plugin.Log.LogInfo($"In-game datum via team-schema: {GameDate.Value:yyyy-MM-dd} (kruischeck {DateVotes.GetValueOrDefault(pin)} teamstemmen)");
+            }
+            else Plugin.Log.LogInfo("In-game datum: team-schema niet leesbaar — bron blijft 'derived'.");
         }
-        catch (Exception e) { Plugin.Log.LogWarning("Datum-discovery mislukt: " + e.Message); }
+        catch (Exception e) { Plugin.Log.LogWarning("Datum-bepaling mislukt: " + e.Message); }
     }
 
     // ---------- output ----------
@@ -551,15 +677,26 @@ internal static class Dumper
         j.Prop("source", "FMSuperScout plugin v" + Plugin.Version);
         j.EndObj();
 
+        // Voortgang 0.90→1.0 tijdens het wegschrijven (laatste ~10% van de doorlooptijd).
+        int total = 0, written = 0;
+        if (players is ICollection<Person> pc) total += pc.Count;
+        if (staff is ICollection<Person> sc) total += sc.Count;
+
         j.Key("players"); j.BeginArr();
-        foreach (var p in players) WritePerson(j, p, true);
+        foreach (var p in players) { WritePerson(j, p, true); WriteJsonProgress(++written, total); }
         j.EndArr();
 
         j.Key("staff"); j.BeginArr();
-        foreach (var p in staff) WritePerson(j, p, false);
+        foreach (var p in staff) { WritePerson(j, p, false); WriteJsonProgress(++written, total); }
         j.EndArr();
         j.EndObj();
         j.Close();
+    }
+
+    private static void WriteJsonProgress(int written, int total)
+    {
+        if (total > 0 && written % 8192 == 0)
+            WriteStatus("scanning", 0, 0, null, 0.90 + 0.10 * written / total);
     }
 
     private static void WritePerson(JsonWriter j, Person p, bool isPlayer)
@@ -572,7 +709,10 @@ internal static class Dumper
         if (p.BirthYear > 0) { j.Prop("dob", $"{p.BirthYear:D4}"); j.Prop("birthYear", p.BirthYear); j.Prop("birthDoy", p.BirthDoy); }
         j.Key("nat"); j.BeginArr(); foreach (var n in p.Nat) j.Val(n); j.EndArr();
         j.Prop("club", p.Club);
-        j.Null4("div");
+        // Moederclub alleen emitten als die afwijkt van de huidige club (= huurrelatie); scheelt ruis.
+        if (isPlayer && p.OwnerClub != null && p.OwnerClub != p.Club) j.Prop("ownerClub", p.OwnerClub);
+        j.Prop("div", p.Div);
+        // Geen gender-veld meer: vrouwen worden al bij de scan overgeslagen (person+0x19 bit 0x10).
         j.Prop("ca", p.Ca);
         j.Prop("pa", p.Pa);
         Money(j, "wage", p.Wage);
@@ -581,6 +721,7 @@ internal static class Dumper
         {
             j.Prop("pos", string.Join(", ", p.PosArr));
             j.Key("posArr"); j.BeginArr(); foreach (var x in p.PosArr) j.Val(x); j.EndArr();
+            if (p.TeamType >= 0) j.Prop("teamType", p.TeamType);   // 0=1e, ~3=reserves, ≥10=jeugd
             j.Prop("foot", p.Foot);
             if (p.Height > 0) j.Prop("height", p.Height);
             Money(j, "value", p.Value);
@@ -627,96 +768,34 @@ internal static class Dumper
             w.WriteLine($"Kandidaten: {candidates:N0}  (vtable in game_plugin: {VtGp:N0})");
             w.WriteLine($"Spelers: {players.Count}  Staf: {staff.Count}  Tijd: {ms} ms");
             w.WriteLine();
-            w.WriteLine("=== DIAGNOSE: alle class-offsets (meta+4) met plausibele UID, top 50 ===");
-            w.WriteLine("(De echte speler/staf-classes zijn de grote pieken; vergelijk met verwacht speler=0x288)");
-            foreach (var kv in AllOffHist.OrderByDescending(x => x.Value).Take(50))
+            // Health-check: de grote pieken horen speler=0x288 en staf=0x100 te zijn. Wijkt dit
+            // af na een FM-patch, dan zijn de class-offsets verschoven en moeten ze opnieuw gepind.
+            w.WriteLine("=== Class-offsets (meta+4) met plausibele UID, top 15 ===");
+            foreach (var kv in AllOffHist.OrderByDescending(x => x.Value).Take(15))
                 w.WriteLine($"  0x{kv.Key:X} ({kv.Key,5}) : {kv.Value:N0}");
             w.WriteLine();
             w.WriteLine("Matches per offset (speler/staf-filter geslaagd):");
             foreach (var kv in hist.OrderByDescending(x => x.Value))
                 w.WriteLine($"  0x{kv.Key:X} ({kv.Key}) : {kv.Value}");
             w.WriteLine();
-
-            // === CLUB-OFFSET DISCOVERY ===
-            // Voor de eerste spelers: welke person-offset wijst naar een object met een
-            // plausibele clubnaam (indirecte string op +0xC0/+0xC8)? De offset met de
-            // meeste hits is de echte persoon→club-pointer.
-            w.WriteLine("=== CLUB-OFFSET DISCOVERY (person→club) ===");
-            var clubHits = new Dictionary<int, int>();
-            var clubSamples = new Dictionary<int, List<string>>();
-            foreach (var (person, _, _) in DiagPersons)
-            {
-                for (int off = 0x08; off <= 0x180; off += 8)
-                {
-                    ulong club = m.Ptr(person + (ulong)off);
-                    if (club == 0) continue;
-                    string name = m.IndirectString(club + 0xC0) ?? m.IndirectString(club + 0xC8);
-                    if (!PlausibleClub(name)) continue;
-                    clubHits[off] = clubHits.GetValueOrDefault(off) + 1;
-                    var lst = clubSamples.GetValueOrDefault(off) ?? (clubSamples[off] = new List<string>());
-                    if (lst.Count < 5 && !lst.Contains(name)) lst.Add(name);
-                }
-            }
-            if (clubHits.Count == 0)
-                w.WriteLine("  (geen enkele offset gaf clubnamen — clubnaam-string zit mogelijk anders)");
-            foreach (var kv in clubHits.OrderByDescending(x => x.Value).Take(20))
-                w.WriteLine($"  person+0x{kv.Key:X} : {kv.Value}/{DiagPersons.Count} hits  bv. [{string.Join(", ", clubSamples[kv.Key])}]");
-            w.WriteLine();
             w.WriteLine($"Mijn club: {ManagerName} · {MyClub} · reputatie={MyClubRep}");
             w.WriteLine($"Clubs gedetecteerd: {ClubCount} · spelers via selectie gekoppeld: {LinkedViaSquad}");
+            w.WriteLine($"In-game datum: {(GameDate is DateTime g2 ? g2.ToString("yyyy-MM-dd") + " (memory)" : "derived")} · game-versie: {GameVersion ?? "?"}");
             w.WriteLine();
 
-            // === GAME-DATUM DISCOVERY ===
-            // Vergelijk de gekozen datum met de echte in-game datum; klopt een andere kandidaat
-            // beter, dan is dát de offset om te pinnen (gp+0x… blijft stabiel binnen een versie).
-            w.WriteLine("=== GAME-DATUM DISCOVERY (u32 FM-datums in game_plugin, venster = seizoensjaar ±1) ===");
-            w.WriteLine($"Gekozen: {(GameDate is DateTime g2 ? g2.ToString("yyyy-MM-dd") : "GEEN (fallback naar systeemdatum)")} · game-versie: {GameVersion ?? "?"}");
-            foreach (var c in DateCands.Take(20))
-            {
-                var (cy, cdoy) = DecodeFmDate(c.val);
-                string iso = "?";
-                try { iso = new DateTime(cy, 1, 1).AddDays(cdoy - 1).ToString("yyyy-MM-dd"); } catch { }
-                w.WriteLine($"  0x{c.val:X8} = {iso}  hits={c.n}  offs: {string.Join(", ", c.offs.Select(o => $"gp+0x{o:X}"))}");
-            }
-            if (DateCands.Count == 0) w.WriteLine("  (geen kandidaten — datum leeft mogelijk alleen op de heap)");
-            w.WriteLine();
-            w.WriteLine("=== TOP-20 CA — huidige club (via selectie) vs alternatieven ===");
-            w.WriteLine("(FINAL = wat de app toont; vergelijk met in-game. 0x80=geboorteplaats, 0x108/keten=oude bron)");
-            foreach (var p in players.Values.OrderByDescending(x => x.Ca).Take(20))
-            {
-                string c108 = ClubNameAt(m, p.PersonAddr + 0x108);
-                string cChain = ChainClubName(m, p.PersonAddr);
-                w.WriteLine($"  {p.Name,-22} CA{p.Ca} rep={p.ClubRep,-5} | FINAL={p.Club ?? "-"} | 0x108={c108} | keten={cChain}");
-            }
-            w.WriteLine();
-            w.WriteLine("Sample spelers (eerste 12) — let op reputatie-schaal (clubRep/worldRep):");
+            w.WriteLine("Sample spelers (eerste 12):");
             foreach (var p in players.Values.Take(12))
-                w.WriteLine($"  uid={p.Uid} {p.Name} lft={p.Age} CA={p.Ca} PA={p.Pa} pos={string.Join("/", p.PosArr)} club={p.Club} clubRep={p.ClubRep} worldRep={p.WorldRep} nat={string.Join(",", p.Nat)} val={p.Value} wage={p.Wage} exp={p.Expires}");
+                w.WriteLine($"  {p.Name} lft={p.Age} CA={p.Ca} PA={p.Pa} pos={string.Join("/", p.PosArr)} club={p.Club} div={p.Div} val={p.Value} exp={p.Expires}");
             w.WriteLine();
             w.WriteLine("Sample staf (eerste 8):");
             foreach (var p in staff.Values.Take(8))
-                w.WriteLine($"  uid={p.Uid} {p.Name} lft={p.Age} CA={p.Ca} PA={p.Pa} rol={p.Job} club={p.Club}");
+                w.WriteLine($"  {p.Name} lft={p.Age} CA={p.Ca} PA={p.Pa} rol={p.Job} club={p.Club}");
             w.WriteLine();
 
-            // === WAARDE-OFFSET DISCOVERY ===
-            // Doel: het geheugenveld vinden dat FM's echte transferwaarde bevat (zoals GenieScout leest).
-            // Voor bekende spelers loggen we alle "geld-achtige" u32-waarden in een venster op het
-            // player-data-object. Zoek in GenieScout de echte waarde van deze spelers op; de offset
-            // waarvan de waarde (in £; €-bedrag ÷ 1,16) klopt over meerdere spelers is de juiste.
-            w.WriteLine("=== WAARDE-OFFSET DISCOVERY ===");
-            w.WriteLine("(Zoek onderstaande spelers in GenieScout; geef mij hun exacte waarde. Money-achtige u32 op pl+offset:)");
-            bool Moneyish(uint v) => v >= 50_000u && v <= 600_000_000u && v != 0xFFFFFFFFu;
-            foreach (var p in players.Values.Where(x => x.PlAddr != 0).OrderByDescending(x => x.Ca).Take(20))
-            {
-                var hits = new List<string>();
-                for (int off = 0x160; off <= 0x320; off += 4)
-                {
-                    uint v = m.U32(p.PlAddr + (ulong)off);
-                    if (Moneyish(v)) hits.Add($"0x{off:X}={v:N0}");
-                }
-                w.WriteLine($"  {p.Name,-22} CA{p.Ca} lft{p.Age} wage={p.Wage} val0x238={p.Value} clubRep={p.ClubRep}");
-                w.WriteLine($"      {string.Join("  ", hits)}");
-            }
+            // Huur-overzicht: moederclub (volledig contract) ≠ huidige squad-club.
+            w.WriteLine("=== Huur-overzicht (moederclub ≠ huidige club, top 40) ===");
+            foreach (var p in players.Values.Where(x => x.OwnerClub != null && x.OwnerClub != x.Club).Take(40))
+                w.WriteLine($"  {p.Name,-24} speelt: {p.Club ?? "-"}  ·  moederclub: {p.OwnerClub}");
         }
         catch (Exception e) { Plugin.Log.LogWarning("Diag schrijven mislukt: " + e.Message); }
     }
@@ -731,6 +810,10 @@ internal sealed class Person
     public int BirthDoy;
     public List<string> Nat = new();
     public string Club;
+    public string OwnerClub;    // moederclub (volledig contract); ≠ Club bij huur
+    public string Div;
+    public int Gender;          // 0 = man, 1 = vrouw
+    public int TeamType = -1;   // 0 = 1e elftal, ~3 = reserves, ≥10 = jeugd; -1 = onbekend
     public bool IsPlayer;
     public ushort Ca;
     public ushort Pa;
