@@ -672,11 +672,15 @@ internal static class Dumper
         catch (Exception e) { Plugin.Log.LogWarning("Versiedetectie mislukt: " + e.Message); }
     }
 
-    // In-game datum: GEPIND op het schema-object van MIJN team ([team+0xA0]+0x94, of +0x18) —
-    // de eerstvolgende wedstrijddatum, in elke meting exact "vandaag" op wedstrijddagen
-    // (geverifieerd 19-09). Rechtstreeks gelezen (team via manager-keten); teamstemmen
-    // (DateVotes, gratis in de squad-walk verzameld) als kruischeck. Lukt het niet, dan blijft
-    // de afgeleide datum (seizoensjaar + systeemmaand/-dag) staan. Geen zware geheugenscans meer.
+    // In-game datum: gelezen van het schema-object van MIJN team ([team+0xA0]+0x94, of +0x18) =
+    // de eerstvolgende wedstrijddatum. Op wedstrijddagen is dat exact "vandaag"; tussen duels
+    // (winter-/zomerstop) loopt het tot ~2 weken achter. BEKENDE BEPERKING (15-07): de échte
+    // wereldklok wordt niet als leesbaar FM-datum-u32 op team-/schema-/competitie-/club-objecten
+    // opgeslagen (discovery over 9.800 teams gaf nergens een gedeelde "vandaag"); hij leeft
+    // vermoedelijk als C#-DateTime in GameAssembly of op een globaal wereld-object. Bewust niet
+    // verder achterna gejaagd — de impact is cosmetisch (leeftijd verandert alleen op verjaardag).
+    // Rechtstreeks gelezen (team via manager-keten); teamstemmen (DateVotes) als kruischeck.
+    // Lukt het niet, dan blijft de afgeleide datum (seizoensjaar + systeemmaand/-dag) staan.
     private static void FindGameDate(MemScan mem, IEnumerable<Person> players, IEnumerable<Person> staff)
     {
         GameDate = null;

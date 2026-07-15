@@ -168,7 +168,26 @@ De plugin leest de bestandsversie van `game_plugin.dll` en zet `gameVersion` /
 Wijkt de versie af, dan toont de app een ambergele balk "data mogelijk onbetrouwbaar". Bij een
 nieuwe FM-patch: offsets verifiëren en `SUPPORTED_*` in `Fields.cs` ophogen.
 
-## 9. In-game datum - GEPIND via team-stemmen (15-07, plugin v0.1.10; verifiëren met F9)
+## 9. In-game datum - GEPIND via team-schema; BEKENDE BEPERKING tijdens speelpauzes (15-07)
+
+**Beperking ontdekt 15-07 (v0.1.30→0.1.33)**: mavarobli zag de app 22 dec tonen terwijl de game
+op 1-3 jan stond. Oorzaak: `[team+0xA0]+0x94` is de **eerstvolgende wedstrijddatum**, geen
+wereldklok. Op wedstrijddagen (waarop we in september pinden) valt dat samen met "vandaag";
+tijdens de winter-/zomerstop blijft het op de laatste/eerstvolgende wedstrijd staan en loopt
+het tot ~2 weken achter. Een discovery-scan (tijdelijk in v0.1.31/0.1.32) over **9.791 teams**
+op alle datumvelden van team-, schema-, competitie- én club-objecten vond **nergens** een
+gedeelde "vandaag"-datum: geen enkele offset had hoge overeenstemming op de echte datum (de
+comp-velden dragen seizoens-/aanmaakdatums uit 2026, de sched-velden zijn per team verschillende
+wedstrijddata). Conclusie: de kalenderklok wordt niet als leesbaar FM-datum-u32 op deze native
+DB-objecten opgeslagen; hij leeft vermoedelijk als C#-`DateTime` (ticks) in GameAssembly of op
+een globaal wereld-object. **Beslissing mavarobli: zo laten** — de exacte jacht (meerdere FM-dicht/
+F9-rondes, onzekere uitkomst) is de moeite niet waard, want de impact is cosmetisch: leeftijd
+verandert alleen op een verjaardag, dus ~2 weken speling verandert vrijwel nooit een leeftijd.
+De discovery-scaffolding is weer opgeruimd (v0.1.33). Wie het later toch exact wil: begin bij
+een .NET-`DateTime`-ticks-scan in GameAssembly of een pointer-pad vanaf de human-manager naar
+het wereld-object.
+
+### Historie: pin via team-stemmen (15-07, plugin v0.1.10)
 
 **Doorbraak 15-07**: de fixture-jacht toonde dat `[team+0xA0]+0x94` exact de huidige
 in-game datum draagt (2027-09-05 op meerdere onafhankelijke teams, bevestigd door mavarobli).
@@ -359,6 +378,23 @@ fysieke groei extra gedempt voor 24+. Persoonlijke sterktes/zwaktes blijven beho
 positie-vorm klopt: Sinky Petersen (DR, CA 102/PA 180) gaat van ~alles-20 (v1) naar gem 13,9
 met Afwerken 9 en alleen zijn bestaande uitschieters op 20. Tabel in app.js gegenereerd met
 `node tools/pos-curve.js` — bij een nieuwe database/patch opnieuw draaien en vervangen.
+
+## 19. Scan geparallelliseerd - GEDAAN (15-07, v0.1.30)
+
+Na de opschoning (14/15) bleef de hoofdscan met ~17s de flessenhals; die is
+volledig het doorlopen van de heap (95% van de F9-tijd). De geheugenregio's zijn
+onafhankelijk, dus ze worden nu round-robin over **N workers (cores−1)** verdeeld —
+elke worker leest in een eigen buffer en verzamelt in eigen collecties, die na
+`Task.WaitAll` lock-vrij worden samengevoegd. Resultaat op Marks 16-core machine
+(15 workers): **hoofdscan 17.134 → 8.438 ms**, totale F9 **18,1s → 9,8s** (~halvering).
+Geen lineaire schaling met cores omdat de scan geheugenbandbreedte-gebonden is
+(het hele heap wordt via ReadProcessMemory gekopieerd) — ~2× is het realistische
+plafond. Data-integriteit ongewijzigd geverifieerd (48,9k spelers, 32,5k staf,
+huur/club-koppeling consistent). Implementatienoot: `Task.Run` i.p.v.
+`Parallel.ForEach`, omdat een Il2Cpp-referentie een uitgeklede `NullableAttribute`
+bevat waardoor de compiler struikelt over Parallels geannoteerde delegate; een
+parameterloze Task-lambda omzeilt dat. De "Fasen"-regel in `diagnostics.txt` blijft
+als goedkope, permanente perf-diagnostiek staan.
 
 ## 18. Verspreiding / launch - OPEN (13-07-2026)
 
