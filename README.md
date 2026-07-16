@@ -4,46 +4,39 @@
 
 <h1 align="center">FMSuperScout</h1>
 
-<p align="center">A fast, accurate scouting tool for <strong>Football Manager 26</strong> (Windows / Steam).</p>
+<p align="center">A fast, accurate scouting tool for <strong>Football Manager 26</strong> (Windows).</p>
 
 ---
 
-FMSuperScout reads the full database of your open save (players **and** staff), including the
-values FM normally hides: **CA/PA** (current and potential ability), the hidden personality
-attributes, and FM's **real transfer value**. You get a snappy, spreadsheet-style app with search,
-filters, role ratings, player comparison and squad analysis over 50,000+ people.
+FMSuperScout reads the full database of your open save (players **and** staff), including what FM
+normally hides: **CA/PA**, hidden personality attributes and FM's **real transfer value**. You get
+a snappy, spreadsheet-style app with search, filters, role ratings, comparison and squad analysis
+over 45,000+ people.
 
-It has two parts: a small **BepInEx plugin** that runs inside the game and dumps the database to
-JSON, and a **local web app** (no internet, no accounts, data never leaves your PC) where you
-search, filter and compare.
+Two parts: a small **BepInEx plugin** that dumps the database to JSON from inside the game, and a
+**local web app** where you search, filter and compare. No internet, no accounts, data never
+leaves your PC.
 
-> Single-player use only. The plugin **only reads** memory (it never writes to the game) and runs
-> fully offline.
+> Single-player use only. The plugin **only reads** memory, it never writes to the game.
 
 ## Features
 
 - **Search and filter**: name/club, age, CA, PA, value, asking price, wage, nationality, EU/EEA,
-  contract expiring, free agents, transfer-listed, club reputation tier, and more. Pick positions
-  on a clickable pitch.
-- **Tactical role ratings**: FM roles (Advanced Forward, Ball-Playing Defender, Deep-Lying
-  Playmaker, and more) scored per player from the key/preferable attributes; sortable column plus
-  a "best roles" panel in each profile.
-- **Player comparison**: put up to 3 players side by side, best value per attribute highlighted.
-- **Squad needs analysis**: breaks your squad down by position group, flags thin depth, aging, or
-  no succession, and scouts candidates for the gap with one click.
-- **Player profile**: attributes exactly as in FM (grouped, keeper-aware) with FM colours, the
-  hidden **personality** and hidden characteristics (consistency, injury proneness, and more), a
-  CA/PA gauge, and a **potential-attributes projection**.
-- **Market value read from memory**: FM's actual transfer value for most players, with a calibrated
-  estimate as fallback for the rest (see *Accuracy*).
-- **Asking-price estimate**: what a club is likely to want for the player (value adjusted for
-  contract length, transfer status, age/potential and club size).
-- **Transfer-interest estimate**: reputation- and wage-based, aware of youth settling and the FIFA
-  under-18 international-transfer rule.
+  contract status, division (with smart search). Pick positions on a clickable pitch.
+- **Tactical role ratings**: 19 FM roles scored from the key attributes; sortable column plus a
+  "best roles" panel per profile.
+- **Player comparison**: up to 3 side by side, FM-style bars, hidden stats included.
+- **Squad analysis**: flags thin depth, aging and missing succession per position group, and
+  scouts candidates for the gap in one click.
+- **Player profile**: attributes in FM colours and grouping, personality and hidden
+  characteristics, a CA/PA gauge and a potential projection per attribute.
+- **Market value from memory**: FM's actual transfer value for most players, a calibrated
+  estimate for the rest (see *Accuracy*).
+- **Asking price and transfer interest**: estimates based on contract, transfer status, age,
+  reputation gap and wages, including the FIFA under-18 transfer rule.
 - **Shortlist** (★) with its own tab and CSV export.
-- **Settings**: language NL/EN, currency GBP/EUR, and a **Show hidden stats** toggle (on by
-  default; turn it off to hide CA/PA, personality and hidden characteristics everywhere at once,
-  for those who consider them cheating).
+- **Settings**: NL/EN, GBP/EUR, and a toggle to hide all hidden stats at once for those who
+  consider them cheating.
 
 ## Install (end users)
 
@@ -51,15 +44,15 @@ One installer does everything: the viewer app, the BepInEx mod layer **and** the
 No coding needed, nothing else to download.
 
 1. Grab **`FMSuperScout-Setup.exe`** from the [Releases](https://github.com/mavarobli/FMSuperScout/releases) page.
-2. Windows SmartScreen may warn about an unknown publisher — the installer is not code-signed
-   (it's a free tool). Click **More info → Run anyway**. Want to verify first? Check the file's
-   SHA-256 against the release notes: `Get-FileHash .\FMSuperScout-Setup.exe -Algorithm SHA256`.
-3. Run it. The wizard finds your FM26 folder automatically (Steam — all libraries — plus Epic
-   and Xbox/Game Pass detection in beta) and installs everything. Already using BepInEx for
-   another mod? It is left untouched; only the plugin DLL is added.
-4. Start FM26. **The first launch takes 1–3 minutes longer** (a black console window is normal —
-   the mod layer is generating its bindings). Your antivirus may ask about BepInEx: that is the
-   standard FM26 mod loader, allow it.
+2. Windows SmartScreen may warn about an unknown publisher, since the installer isn't code-signed.
+   Click **More info → Run anyway**. Want to verify first? Check the file's SHA-256 against the
+   release notes: `Get-FileHash .\FMSuperScout-Setup.exe -Algorithm SHA256`.
+3. Run it. The wizard finds your FM26 folder automatically (Steam incl. extra libraries, Epic and
+   Xbox/Game Pass in beta) and installs everything. Already using BepInEx for another mod? It is
+   left untouched; only the plugin DLL is added.
+4. Start FM26. **The first launch takes 1-3 minutes longer** and shows a black console window.
+   That's normal, the mod layer is generating its bindings. Your antivirus may ask about BepInEx:
+   that's the standard FM26 mod loader, allow it.
 5. Load your save, press **F9**, and open **FMSuperScout** from the Start menu.
 
 To remove it: *Apps and features* → FMSuperScout. That removes the viewer and the plugin DLL;
@@ -162,9 +155,9 @@ FMSuperScout stacks up, as of July 2026:
 | Hide hidden stats toggle | Yes, one click | – | – | – |
 | Statistics depth | Core scouting fields | Extensive | 100+ columns, xG/p90 | Extensive (editor-first) |
 
-No shade to the others — Genie Scout in particular has been the default recommendation since 2009
-for good reason. FMSuperScout is aimed at a specific gap: fast squad-management workflow (compare,
-find gaps, save your filters) rather than a raw stats dump or a save editor.
+No shade to the others. Genie Scout has been the default recommendation since 2009 for good
+reason. FMSuperScout aims at a different gap: fast squad-management workflow (compare, find gaps,
+save your filters) rather than a raw stats dump or a save editor.
 
 ## Support
 

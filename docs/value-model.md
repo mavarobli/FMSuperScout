@@ -5,7 +5,7 @@
 Er liep een automatische ijkset: de server bewaarde bij elke dump de spelers met een échte
 in-game waarde in `value-history.json` (dedup op id). Nu de plugin de echte transferwaarde
 rechtstreeks uit het geheugen leest (~74%) en het schatmodel voor de rest on point is, was dat
-overbodig — het groeide alleen maar mee zonder verder iets te doen. Verwijderd: de archivering,
+overbodig, het groeide alleen maar mee. Verwijderd: de archivering,
 het `/api/value-history`-endpoint en het bestand. Moet het schatmodel ooit opnieuw geijkt worden
 (bv. na een grote FM-patch), dan kan het verzamelen tijdelijk weer aangezet worden.
 
