@@ -31,6 +31,10 @@ new release is built, so the Unreleased section below is what the next release s
   when a filter inside them is active, so nothing hides silently.
 - The small "clear" button next to the Position header is gone; the position chip above
   the table and Clear filters already cover it.
+- The attribute filter popup now uses a search field instead of long dropdowns: type
+  "pac" and hit Enter to add a Pace rule, focus jumps straight to the min field. Prefix
+  matches rank first, attributes already in use are hidden from the suggestions, and
+  the helper text is gone.
 - Shorter, simpler meta score explanation in the tooltip (NL and EN).
 
 ### Fixed

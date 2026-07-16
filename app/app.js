@@ -41,8 +41,8 @@ const I18N = {
     interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Beschikbaar', listed: 'Op transferlijst',
     attainHint: 'Kan hij weg bij zijn club? Op de transferlijst, aangeboden, clubloos of contract loopt binnen 12 maanden af (en niet "niet te koop"). Zegt niets over of hij naar JOU wil; dat is Interesse.',
     exp6: '< 6 mnd', exp12: '< 1 jaar', free: 'Clubloos', myclub: 'Mijn club', contractF: 'Contract',
-    advBtn: 'Attribuutfilter', advTitle: 'Filter op attributen', advHint: 'Alle regels moeten kloppen.',
-    advAdd: '+ attribuut', advClear: 'Wissen', advDone: 'Klaar', advMin: 'min', advMax: 'max', advColAttr: 'Attribuut',
+    advBtn: 'Attribuutfilter', advTitle: 'Filter op attributen', advSearch: 'Zoek een attribuut…',
+    advClear: 'Wissen', advDone: 'Klaar', advMin: 'min', advMax: 'max', advColAttr: 'Attribuut',
     onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: 'Nieuwe data',
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
@@ -121,8 +121,8 @@ const I18N = {
     interestmin: 'Interest ≥', all: 'All', attainable: 'Available', listed: 'Transfer listed',
     attainHint: 'Can he leave his club? Transfer listed, offered out, a free agent, or contract ends within 12 months (and not "not for sale"). Says nothing about whether he wants to join YOU; that is Interest.',
     exp6: '< 6 mo', exp12: '< 1 yr', free: 'Free agent', myclub: 'My club', contractF: 'Contract',
-    advBtn: 'Attribute filter', advTitle: 'Filter on attributes', advHint: 'All rules must match.',
-    advAdd: '+ attribute', advClear: 'Clear', advDone: 'Done', advMin: 'min', advMax: 'max', advColAttr: 'Attribute',
+    advBtn: 'Attribute filter', advTitle: 'Filter on attributes', advSearch: 'Search an attribute…',
+    advClear: 'Clear', advDone: 'Done', advMin: 'min', advMax: 'max', advColAttr: 'Attribute',
     onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: 'New data',
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
@@ -647,34 +647,30 @@ function updateAdvBtn() {
 }
 function advDialog() {
   const m = $('adv-modal');
-  // Keepersgroep alleen met de GK-specifieke attributen: gedeelde (FirstTouch, Passing,
-  // Technique) staan al onder Technisch, dubbel opnemen geeft dubbele selects.
+  // Doorzoekbare attributencatalogus: veld-, keeper- (alleen GK-specifiek, gedeelde
+  // staan al onder Technisch), verborgen en persoonlijkheidsattributen.
   const gkOnly = ATTR_GROUPS_GK[0][1].filter(k => !ATTR_GROUPS_OUTFIELD.some(([, ks]) => ks.includes(k)));
-  const groups = [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', gkOnly]];
-  const optHtml = sel => {
-    let h = groups.map(([g, keys]) => `<optgroup label="${t(g)}">` +
-      keys.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${attrName(k)}</option>`).join('') + '</optgroup>').join('');
-    if (!state.hideCapa) {
-      h += `<optgroup label="${t('hiddenTitle')}">` + ADV_HIDDEN_KEYS.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${t('a_' + k)}</option>`).join('') + '</optgroup>';
-      h += `<optgroup label="${t('personaTitle')}">` + ADV_PERS_KEYS.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${t(k)}</option>`).join('') + '</optgroup>';
-    }
-    return h;
-  };
+  const catalog = [];
+  for (const [g, keys] of [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', gkOnly]])
+    for (const k of keys) catalog.push({ k, label: attrName(k), group: t(g) });
+  if (!state.hideCapa) {
+    for (const k of ADV_HIDDEN_KEYS) catalog.push({ k, label: t('a_' + k), group: t('hiddenTitle') });
+    for (const k of ADV_PERS_KEYS) catalog.push({ k, label: t(k), group: t('personaTitle') });
+  }
   const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
   const close = () => { m.classList.add('hidden'); document.removeEventListener('keydown', esc, true); };
   const render = () => {
     m.innerHTML = `<div class="pm-card adv-card">
       <div class="pm-title">${t('advTitle')}</div>
-      <div class="pm-body">${t('advHint')}</div>
-      <div class="adv-head"><span class="ah-attr">${t('advColAttr')}</span><span class="ah-mm">${t('advMin')}</span><span class="ah-mm">${t('advMax')}</span><span class="ah-sp"></span></div>
+      <div class="adv-search"><input type="text" id="adv-q" placeholder="${t('advSearch')}" autocomplete="off"><div id="adv-sug" class="hidden"></div></div>
+      ${state.advF.length ? `<div class="adv-head"><span class="ah-attr">${t('advColAttr')}</span><span class="ah-mm">${t('advMin')}</span><span class="ah-mm">${t('advMax')}</span><span class="ah-sp"></span></div>` : ''}
       <div id="adv-rows">` + state.advF.map((r, i) => `
         <div class="adv-row" data-i="${i}">
-          <select class="adv-k">${optHtml(r.k)}</select>
+          <span class="adv-name">${advLabel(r.k)}</span>
           <input type="number" class="adv-min" min="1" max="20" placeholder="${t('advMin')}" value="${r.min || ''}">
           <input type="number" class="adv-max" min="1" max="20" placeholder="${t('advMax')}" value="${r.max || ''}">
           <button class="adv-x" title="${t('clear')}">${icon('x', 12)}</button>
         </div>`).join('') + `</div>
-      <button class="adv-add">${t('advAdd')}</button>
       <div class="pm-actions">
         <button class="pm-cancel">${t('advClear')}</button>
         <button class="pm-ok">${t('advDone')}</button>
@@ -682,20 +678,45 @@ function advDialog() {
     </div>`;
     m.querySelectorAll('.adv-row').forEach(row => {
       const r = state.advF[+row.dataset.i];
-      row.querySelector('.adv-k').onchange = e => { r.k = e.target.value; saveAdv(); applyFilters(); };
       row.querySelector('.adv-min').oninput = e => { r.min = +e.target.value || 0; saveAdv(); applyFilters(); };
       row.querySelector('.adv-max').oninput = e => { r.max = +e.target.value || 0; saveAdv(); applyFilters(); };
-      row.querySelector('.adv-x').onclick = () => { state.advF.splice(+row.dataset.i, 1); saveAdv(); applyFilters(); render(); };
+      row.querySelector('.adv-x').onclick = () => { state.advF.splice(+row.dataset.i, 1); saveAdv(); applyFilters(); render(); $('adv-q').focus(); };
     });
-    m.querySelector('.adv-add').onclick = () => { state.advF.push({ k: 'Pace', min: 0, max: 0 }); saveAdv(); render(); };
+    // Zoekveld: typen filtert de catalogus, klik of Enter voegt de regel toe en zet de
+    // focus op het min-veld van de nieuwe rij.
+    const q = $('adv-q'), sug = $('adv-sug');
+    const addRule = k => {
+      state.advF.push({ k, min: 0, max: 0 });
+      saveAdv(); render();
+      const mins = m.querySelectorAll('.adv-min');
+      mins[mins.length - 1].focus();
+    };
+    const showSug = () => {
+      const term = q.value.trim().toLowerCase();
+      const used = new Set(state.advF.map(r => r.k));
+      // Prefix-matches eerst: "sne" → Snelheid boven Versnelling, zodat Enter goed pakt.
+      const hits = catalog.filter(c => !used.has(c.k) && (!term || c.label.toLowerCase().includes(term)))
+        .sort((a, b) => a.label.toLowerCase().indexOf(term) - b.label.toLowerCase().indexOf(term))
+        .slice(0, 10);
+      sug.innerHTML = hits.map(c => `<div class="adv-sug-i" data-k="${c.k}"><span>${c.label}</span><span class="asg">${c.group}</span></div>`).join('');
+      sug.classList.toggle('hidden', !hits.length);
+      // mousedown (niet click): vóór de blur van het zoekveld
+      sug.querySelectorAll('.adv-sug-i').forEach(el => el.onmousedown = e => { e.preventDefault(); addRule(el.dataset.k); });
+    };
+    q.oninput = showSug;
+    q.onfocus = showSug;
+    q.onblur = () => setTimeout(() => sug.classList.add('hidden'), 120);
+    q.onkeydown = e => {
+      if (e.key === 'Enter') { const f = sug.querySelector('.adv-sug-i'); if (f) addRule(f.dataset.k); }
+    };
     m.querySelector('.pm-cancel').onclick = () => { state.advF = []; saveAdv(); applyFilters(); render(); };
     m.querySelector('.pm-ok').onclick = close;
   };
   document.addEventListener('keydown', esc, true);
   m.onclick = e => { if (e.target === m) close(); };
-  if (!state.advF.length) state.advF.push({ k: 'Pace', min: 0, max: 0 });
   render();
-  m.classList.remove('hidden');
+  m.classList.remove('hidden');   // eerst zichtbaar, anders pakt focus() niet
+  $('adv-q').focus();
 }
 
 // ---------- tactische rollen (rolgeschiktheid) ----------
