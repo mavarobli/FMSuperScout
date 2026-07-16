@@ -20,6 +20,9 @@ new release is built, so the Unreleased section below is what the next release s
   are off.
 - Contract dates display as dd-mm-yyyy. CSV export keeps ISO dates for spreadsheets.
 
+### Changed
+- Shorter, simpler meta score explanation in the tooltip (NL and EN).
+
 ## [1.0.0] - 2026-07-15
 
 First public release.
