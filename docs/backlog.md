@@ -30,8 +30,13 @@ Status-overzicht van wat af is, wat open staat, en ideeën. Nog niet gebouwd waa
 **Nog te doen vóór release:**
 - **mavarobli test de .exe end-to-end** op de eigen machine (wizard, detectie, snelkoppeling, F9).
 - Epic/Xbox-detectie is **onbeproefd** (hier alleen Steam) → in de release als bèta markeren.
-- Ongesigneerd → SmartScreen-melding "onbekende uitgever" ("Meer info → Toch uitvoeren");
-  code-signing (~€200+/jr of Azure Trusted Signing) pas overwegen als de tool aanslaat.
+- **Signing-beslissing (15-07, mavarobli akkoord): eerste release ongesigneerd**, met SHA-256-
+  checksum (bouwt `build-exe.ps1` nu automatisch als `.sha256` naast de exe) en een
+  VirusTotal-scanlink in de release notes — zoals gebruikelijk in de modding-scene. De
+  SmartScreen-melding ("Meer info → Toch uitvoeren") staat uitgelegd in de release notes
+  (`docs/release-notes-v1.0.0.md`, concept klaar). Slaat de tool aan, dan alsnog signen:
+  **Certum Open Source** (~€60-90/jr) of **SignPath.io** (gratis voor OSS) zijn de
+  kandidaten; exe-metadata (uitgever/omschrijving/versie) zit er al in.
 
 ## 2. In-app data ophalen met FM-detectie - GEDAAN
 

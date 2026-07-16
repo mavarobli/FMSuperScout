@@ -70,5 +70,10 @@ Write-Host "Stage klaar: $mb MB ongecomprimeerd"
 & $iscc (Join-Path $PSScriptRoot 'FMSuperScout.iss')
 if ($LASTEXITCODE -ne 0) { throw "ISCC faalde (exit $LASTEXITCODE)" }
 $exe = Join-Path $dist 'FMSuperScout-Setup.exe'
+
+# SHA-256 voor de release notes (verificatie door downloaders; we releasen ongesigneerd).
+$hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+Set-Content -Path "$exe.sha256" -Value "$hash  FMSuperScout-Setup.exe" -NoNewline
 Write-Host ''
 Write-Host "Klaar: $exe ($([math]::Round((Get-Item $exe).Length/1MB,1)) MB)" -ForegroundColor Green
+Write-Host "SHA-256: $hash"
