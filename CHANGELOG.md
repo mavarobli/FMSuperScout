@@ -23,8 +23,12 @@ new release is built, so the Unreleased section below is what the next release s
   green "Available" tag on player profiles stays, now with an explanatory tooltip.
 - Attribute filter polish: the selected attribute is actually visible now (a CSS clash
   squeezed the dropdown to 17px), column headers in the popup, goalkeeper duplicates
-  removed from the list, and active rules show in the filter sidebar with their own
-  remove buttons.
+  removed from the list. Active rules show only as chips above the table plus a count
+  on the button; the extra list in the sidebar was redundant.
+- Tidier filter sidebar (39% shorter on first use): secondary sections (presets, role,
+  financial, origin and competition merged into one, availability) start collapsed,
+  your own open/closed clicks are remembered as before, and section headers get a dot
+  when a filter inside them is active, so nothing hides silently.
 - Shorter, simpler meta score explanation in the tooltip (NL and EN).
 
 ### Fixed

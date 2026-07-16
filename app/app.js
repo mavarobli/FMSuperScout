@@ -37,7 +37,7 @@ const I18N = {
     donateCta: '☕ Koffie', donateLater: 'Later',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
-    origin: 'Herkomst', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
+    origin: 'Herkomst', originComp: 'Herkomst & competitie', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
     interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Beschikbaar', listed: 'Op transferlijst',
     attainHint: 'Kan hij weg bij zijn club? Op de transferlijst, aangeboden, clubloos of contract loopt binnen 12 maanden af (en niet "niet te koop"). Zegt niets over of hij naar JOU wil; dat is Interesse.',
     exp6: '< 6 mnd', exp12: '< 1 jaar', free: 'Clubloos', myclub: 'Mijn club', contractF: 'Contract',
@@ -117,7 +117,7 @@ const I18N = {
     donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
-    origin: 'Origin', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
+    origin: 'Origin', originComp: 'Origin & competition', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
     interestmin: 'Interest ≥', all: 'All', attainable: 'Available', listed: 'Transfer listed',
     attainHint: 'Can he leave his club? Transfer listed, offered out, a free agent, or contract ends within 12 months (and not "not for sale"). Says nothing about whether he wants to join YOU; that is Interest.',
     exp6: '< 6 mo', exp12: '< 1 yr', free: 'Free agent', myclub: 'My club', contractF: 'Contract',
@@ -637,18 +637,13 @@ const advValue = (p, k) => ADV_PERS_KEYS.includes(k) ? (p[k] || null) : (p.attrs
 const activeAdvRules = () => state.advF.filter(r => r.k && (r.min || r.max) && !(state.hideCapa && advIsHidden(r.k)));
 const advChipTxt = r => `${advLabel(r.k)} ${r.min && r.max ? r.min + '–' + r.max : r.min ? '≥ ' + r.min : '≤ ' + r.max}`;
 function saveAdv() { localStorage.setItem('fmss_adv', JSON.stringify(state.advF)); updateAdvBtn(); }
+// Alleen een teller op de knop; de regels zelf staan al in de chips boven de tabel
+// en in de popup, een derde lijst in de zijbalk was dubbelop.
 function updateAdvBtn() {
-  const rules = activeAdvRules();
+  const n = activeAdvRules().length;
   const b = $('btn-adv');
-  b.textContent = t('advBtn') + '…';
-  b.classList.toggle('has-rules', rules.length > 0);
-  // Actieve regels direct zichtbaar in de filterbalk, elk met een eigen kruisje.
-  $('adv-list').innerHTML = rules.map(r =>
-    `<div class="adv-li"><span>${advChipTxt(r)}</span><button class="adv-li-x" title="${t('clear')}">${icon('x', 10)}</button></div>`).join('');
-  [...$('adv-list').querySelectorAll('.adv-li-x')].forEach((x, i) => x.onclick = () => {
-    state.advF = state.advF.filter(r => r !== rules[i]);
-    saveAdv(); applyFilters();
-  });
+  b.textContent = t('advBtn') + (n ? ` (${n})` : '') + '…';
+  b.classList.toggle('has-rules', n > 0);
 }
 function advDialog() {
   const m = $('adv-modal');
@@ -1121,7 +1116,26 @@ function applyFilters() {
   });
   sortRows();
   renderChips(buildChips());
+  updateSecDots();
   renderTable();
+}
+
+// Stip op de sectiekop zodra er binnen die sectie een filter actief is; zo zie je ook
+// bij ingeklapte secties waar je moet zijn.
+function updateSecDots() {
+  const val = id => { const e = $(id); return e ? e.value.trim() : ''; };
+  const on = {
+    position: activePos.size > 0,
+    role: !!$('f-role').value,
+    quality: ['f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max'].some(id => val(id)) || activeAdvRules().length > 0,
+    financial: ['f-price', 'f-fee', 'f-wage'].some(id => val(id)),
+    origin: !!(val('f-nat') || $('f-eu').checked || val('f-div')),
+    availability: +$('f-interest').value > 0 || $('f-listed').checked || !!$('f-contract').value || $('f-myclub').checked || $('f-shortlist').checked,
+  };
+  document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
+    const k = sec.dataset.sec;
+    if (k in on) sec.classList.toggle('f-on', !!on[k]);
+  });
 }
 
 // ---------- actieve filters als chips boven de tabel ----------
@@ -2204,7 +2218,10 @@ $('btn-export').onclick = exportShortlist;
 $('btn-coffee').onclick = openKofi;
 
 // inklapbare filtersecties (voorkeur onthouden)
-const collapsedSecs = new Set(JSON.parse(localStorage.getItem('fmss_secs') || '[]'));
+// Eerste gebruik (geen opgeslagen stand): secundaire secties dicht zodat de zijbalk op
+// één scherm past (progressive disclosure). Eigen klikgedrag wordt daarna onthouden.
+const rawSecs = localStorage.getItem('fmss_secs');
+const collapsedSecs = new Set(rawSecs ? JSON.parse(rawSecs) : ['presets', 'role', 'financial', 'origin', 'availability']);
 document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
   const key = sec.dataset.sec;
   if (collapsedSecs.has(key)) sec.classList.add('collapsed');

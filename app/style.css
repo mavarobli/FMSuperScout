@@ -196,6 +196,8 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .fsec-head:hover::after { color: var(--accent2); }
 .fsec-head:has(.mini)::after { margin-left: 0; }
 .fsection.collapsed .fsec-head::after { content: '▸'; }
+/* actieve-filterstip op de sectiekop (vooral nuttig als de sectie is ingeklapt) */
+.fsection.f-on > .fsec-head::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); flex: 0 0 auto; }
 .fsection.collapsed .fsec-head { margin-bottom: 0; }
 .fsection.collapsed > :not(.fsec-head) { display: none; }
 .frow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
@@ -283,10 +285,6 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #btn-adv { width: 100%; margin-top: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--muted); border-radius: 7px; padding: 6px 8px; font-size: 12px; cursor: pointer; }
 #btn-adv:hover { color: var(--text); border-color: var(--accent); }
 #btn-adv.has-rules { color: var(--accent); border-color: var(--accent); }
-#adv-list { margin-top: 4px; }
-#adv-list .adv-li { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--accent); padding: 2px 2px 2px 6px; }
-#adv-list .adv-li-x { background: none; border: 0; color: var(--muted); cursor: pointer; display: inline-flex; padding: 2px; }
-#adv-list .adv-li-x:hover { color: var(--text); }
 .pm-card.adv-card { width: 460px; max-width: 92vw; max-height: 74vh; overflow: auto; }
 .adv-card .adv-head { display: flex; gap: 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
 .adv-card .adv-head .ah-attr { flex: 1; }
