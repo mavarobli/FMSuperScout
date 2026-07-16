@@ -424,4 +424,5 @@ Nog te doen vóór brede verspreiding:
   schermopname van de workflow (F9 → filteren → vergelijken) - levert sowieso een sterker beeld op
   dan een statische lijst.
 - Forumpost-concepten (fmscout.com FM26-tools, r/footballmanagergames, FM-Arena) staan klaar in
-  [`docs/marketing-drafts.md`](marketing-drafts.md). Alleen plaatsen na expliciet akkoord per post.
+  `private/marketing-drafts.md` (gitignored, bewust niet in de publieke repo). Alleen plaatsen
+  na expliciet akkoord per post.
