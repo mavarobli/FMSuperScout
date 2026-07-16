@@ -412,13 +412,16 @@ Marktonderzoek gedaan: zie de vergelijkingstabel in de README (Genie Scout 26 / 
 zijn de directe concurrenten; FMST 26 lanceerde zelf pas juli 2026 met vrijwel dezelfde belofte).
 Nog te doen vóór brede verspreiding:
 
+- **GitHub Release v1.0.0 - GEPUBLICEERD (15-07)**: repo op public, oude test-release
+  ("FmSuperScout V1.0", tag `stable-version`, 12-07) verwijderd, en v1.0.0 gepubliceerd met
+  `FMSuperScout-Setup.exe` + `.sha256` als assets en `docs/release-notes-v1.0.0.md` als tekst
+  (incl. SHA-256, VirusTotal-link, SmartScreen-uitleg, Epic/Xbox-beta-kanttekening). De .exe
+  is door mavarobli end-to-end getest (wizard, Steam-detectie, snelkoppelingen, F9); `gh` CLI
+  geïnstalleerd en gekoppeld (account mavarobli).
 - **Screenshot/GIF voor de README** - de app zelf werkt prima (getest tegen de echte dump, 48k+
   spelers), maar een geautomatiseerde browserscreenshot van de lokale server hing telkens vast
   (waarschijnlijk door de snelle status-poll-loop, niet door de app). mavarobli neemt zelf een korte
   schermopname van de workflow (F9 → filteren → vergelijken) - levert sowieso een sterker beeld op
   dan een statische lijst.
-- **Eerste GitHub Release** - `dist/FMSuperScout-Setup.zip` staat lokaal klaar maar is nooit
-  geüpload; zonder Release heeft geen enkele forumpost iets om naar te linken. `gh` CLI ontbreekt
-  nog op deze pc.
 - Forumpost-concepten (fmscout.com FM26-tools, r/footballmanagergames, FM-Arena) staan klaar in
   [`docs/marketing-drafts.md`](marketing-drafts.md). Alleen plaatsen na expliciet akkoord per post.

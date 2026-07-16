@@ -1,8 +1,8 @@
-# FMSuperScout 1.0.0 — release notes (concept voor de GitHub Release)
+# FMSuperScout 1.0.0 — release notes
 
-> Concept. Vóór publicatie: (1) checksum verifiëren tegen de definitieve build,
-> (2) de exe door VirusTotal halen en de scanlink invullen, (3) na Marks akkoord
-> publiceren met `dist/FMSuperScout-Setup.exe` + `.sha256` als assets.
+> Gepubliceerd 15-07-2026 als GitHub Release v1.0.0 (assets: FMSuperScout-Setup.exe
+> + .sha256). Dit bestand is de bron van de release-tekst; alles onder de streep
+> is de gepubliceerde inhoud.
 
 ---
 
@@ -46,7 +46,8 @@ Expected SHA-256:
 586b3a9225a5f6e38df751ca0fdf34cfec61cc9d648d27a2539e34003fc9bef3
 ```
 
-VirusTotal scan of this exact file: *(link invullen vóór publicatie)*
+VirusTotal scan of this exact file:
+https://www.virustotal.com/gui/file/586b3a9225a5f6e38df751ca0fdf34cfec61cc9d648d27a2539e34003fc9bef3
 
 The full source — including the installer build script — is in this repository,
 so you can audit or build everything yourself.

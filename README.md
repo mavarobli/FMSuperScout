@@ -47,18 +47,23 @@ search, filter and compare.
 
 ## Install (end users)
 
-No coding needed, and you don't need Node installed; it's bundled.
+One installer does everything: the viewer app, the BepInEx mod layer **and** the in-game plugin.
+No coding needed, nothing else to download.
 
-1. Download **`FMSuperScout-Setup.zip`** from the [Releases](https://github.com/mavarobli/FMSuperScout/releases) page.
-2. Unzip it anywhere and double-click **`Install FMSuperScout.cmd`**.
-3. Launch **FMSuperScout** from the Start menu or desktop shortcut. It opens in its own window.
-   Close the window and the background server stops by itself.
+1. Grab **`FMSuperScout-Setup.exe`** from the [Releases](https://github.com/mavarobli/FMSuperScout/releases) page.
+2. Windows SmartScreen may warn about an unknown publisher — the installer is not code-signed
+   (it's a free tool). Click **More info → Run anyway**. Want to verify first? Check the file's
+   SHA-256 against the release notes: `Get-FileHash .\FMSuperScout-Setup.exe -Algorithm SHA256`.
+3. Run it. The wizard finds your FM26 folder automatically (Steam — all libraries — plus Epic
+   and Xbox/Game Pass detection in beta) and installs everything. Already using BepInEx for
+   another mod? It is left untouched; only the plugin DLL is added.
+4. Start FM26. **The first launch takes 1–3 minutes longer** (a black console window is normal —
+   the mod layer is generating its bindings). Your antivirus may ask about BepInEx: that is the
+   standard FM26 mod loader, allow it.
+5. Load your save, press **F9**, and open **FMSuperScout** from the Start menu.
 
-To remove it: *Apps and features* → FMSuperScout, or run `Uninstall FMSuperScout.cmd`.
-
-> Note: the plugin that reads the game is installed separately into your FM folder (see *Getting
-> data out of Football Manager* below). A packaged one-click installer that also places the plugin
-> is on the roadmap.
+To remove it: *Apps and features* → FMSuperScout. That removes the viewer and the plugin DLL;
+BepInEx stays (other mods may use it).
 
 ## Run from source (developers)
 
@@ -69,12 +74,15 @@ node app/server.js       # then open http://localhost:8765
 npm test                 # run the model tests (zero dependency, node:test)
 ```
 
-Or double-click `Start FMSuperScout.cmd`. To build the shareable installer zip yourself:
+Or double-click `Start FMSuperScout.cmd`. To build the standalone installer yourself (requires
+Inno Setup 6 and a local FM26 install with BepInEx as the payload source):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File installer/build-package.ps1
-# -> dist/FMSuperScout-Setup.zip
+powershell -ExecutionPolicy Bypass -File installer/build-exe.ps1
+# -> dist/FMSuperScout-Setup.exe (+ .sha256)
 ```
+
+A viewer-only zip package is also available via `installer/build-package.ps1`.
 
 The plugin is C# (BepInEx 6, IL2CPP). It builds with a standard .NET SDK:
 
@@ -98,9 +106,9 @@ The app reads whatever the FMSuperScout plugin last dumped from your **active sa
 
 Data lives in `%LOCALAPPDATA%\FMSuperScout\` (`dump*.json`, `status.json`, `diagnostics.txt`).
 
-The plugin install/removal steps for the game itself are in [`docs/`](docs/) and the in-repo
-`Installeer plugin.cmd`. BepInEx only *adds* files to the FM folder, so it is fully reversible
-(or use Steam, Verify integrity of game files).
+The setup exe installs the plugin for you. For development, `Installeer plugin.cmd` copies a
+freshly built DLL into the game folder. BepInEx only *adds* files to the FM folder, so it is
+fully reversible (or use Steam, Verify integrity of game files).
 
 ## Accuracy
 
