@@ -278,18 +278,27 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #preset-modal.hidden { display: none; }
 #adv-modal { position: fixed; inset: 0; z-index: 320; background: rgba(6,9,13,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
 #adv-modal.hidden { display: none; }
-/* attribuutfilter: knop in de zijbalk + regel-rijen in de popup */
+/* Attribuutfilter: knop + actieve-regelslijst in de zijbalk, regel-rijen in de popup.
+   Selectors dubbel (.adv-card ...) zodat ze winnen van de generieke .pm-card-regels. */
 #btn-adv { width: 100%; margin-top: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--muted); border-radius: 7px; padding: 6px 8px; font-size: 12px; cursor: pointer; }
 #btn-adv:hover { color: var(--text); border-color: var(--accent); }
 #btn-adv.has-rules { color: var(--accent); border-color: var(--accent); }
-.adv-card { width: 440px; max-height: 74vh; overflow: auto; }
-.adv-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
-.adv-row select { flex: 1; min-width: 0; }
-.adv-row input { width: 56px; margin-bottom: 0 !important; }
-.adv-x { background: none; border: 0; color: var(--muted); cursor: pointer; display: inline-flex; padding: 4px; }
-.adv-x:hover { color: var(--text); }
-.adv-add { background: none; border: 1px dashed var(--border); color: var(--muted); border-radius: 7px; padding: 6px; width: 100%; cursor: pointer; margin: 4px 0 12px; font-size: 12px; }
-.adv-add:hover { color: var(--text); border-color: var(--accent); }
+#adv-list { margin-top: 4px; }
+#adv-list .adv-li { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--accent); padding: 2px 2px 2px 6px; }
+#adv-list .adv-li-x { background: none; border: 0; color: var(--muted); cursor: pointer; display: inline-flex; padding: 2px; }
+#adv-list .adv-li-x:hover { color: var(--text); }
+.pm-card.adv-card { width: 460px; max-width: 92vw; max-height: 74vh; overflow: auto; }
+.adv-card .adv-head { display: flex; gap: 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+.adv-card .adv-head .ah-attr { flex: 1; }
+.adv-card .adv-head .ah-mm { flex: 0 0 60px; }
+.adv-card .adv-head .ah-sp { flex: 0 0 22px; }
+.adv-card .adv-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+.adv-card .adv-row select { flex: 1; min-width: 0; }
+.adv-card .adv-row input { flex: 0 0 60px; width: 60px; margin-bottom: 0; }
+.adv-card .adv-x { flex: 0 0 22px; background: none; border: 0; color: var(--muted); cursor: pointer; display: inline-flex; padding: 4px 2px; justify-content: center; }
+.adv-card .adv-x:hover { color: var(--text); }
+.adv-card .adv-add { background: none; border: 1px dashed var(--border); color: var(--muted); border-radius: 7px; padding: 6px; width: 100%; cursor: pointer; margin: 4px 0 12px; font-size: 12px; }
+.adv-card .adv-add:hover { color: var(--text); border-color: var(--accent); }
 .pm-card {
   background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
   width: min(340px, 100%); padding: 16px 18px; box-shadow: 0 16px 48px rgba(0,0,0,.6);

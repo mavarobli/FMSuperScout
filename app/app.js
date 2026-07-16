@@ -38,10 +38,11 @@ const I18N = {
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
     origin: 'Herkomst', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
-    interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Haalbaar', listed: 'Op transferlijst',
+    interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Beschikbaar', listed: 'Op transferlijst',
+    attainHint: 'Kan hij weg bij zijn club? Op de transferlijst, aangeboden, clubloos of contract loopt binnen 12 maanden af (en niet "niet te koop"). Zegt niets over of hij naar JOU wil; dat is Interesse.',
     exp6: '< 6 mnd', exp12: '< 1 jaar', free: 'Clubloos', myclub: 'Mijn club', contractF: 'Contract',
     advBtn: 'Attribuutfilter', advTitle: 'Filter op attributen', advHint: 'Alle regels moeten kloppen (EN). Ook verborgen kenmerken en persoonlijkheid, tenzij verborgen stats uit staan.',
-    advAdd: '+ attribuut', advClear: 'Wissen', advDone: 'Klaar', advMin: 'min', advMax: 'max',
+    advAdd: '+ attribuut', advClear: 'Wissen', advDone: 'Klaar', advMin: 'min', advMax: 'max', advColAttr: 'Attribuut',
     onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: 'Nieuwe data',
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
@@ -117,10 +118,11 @@ const I18N = {
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
     origin: 'Origin', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
-    interestmin: 'Interest ≥', all: 'All', attainable: 'Attainable', listed: 'Transfer listed',
+    interestmin: 'Interest ≥', all: 'All', attainable: 'Available', listed: 'Transfer listed',
+    attainHint: 'Can he leave his club? Transfer listed, offered out, a free agent, or contract ends within 12 months (and not "not for sale"). Says nothing about whether he wants to join YOU; that is Interest.',
     exp6: '< 6 mo', exp12: '< 1 yr', free: 'Free agent', myclub: 'My club', contractF: 'Contract',
     advBtn: 'Attribute filter', advTitle: 'Filter on attributes', advHint: 'All rules must match (AND). Hidden characteristics and personality included, unless hidden stats are off.',
-    advAdd: '+ attribute', advClear: 'Clear', advDone: 'Done', advMin: 'min', advMax: 'max',
+    advAdd: '+ attribute', advClear: 'Clear', advDone: 'Done', advMin: 'min', advMax: 'max', advColAttr: 'Attribute',
     onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: 'New data',
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
@@ -636,14 +638,24 @@ const activeAdvRules = () => state.advF.filter(r => r.k && (r.min || r.max) && !
 const advChipTxt = r => `${advLabel(r.k)} ${r.min && r.max ? r.min + '–' + r.max : r.min ? '≥ ' + r.min : '≤ ' + r.max}`;
 function saveAdv() { localStorage.setItem('fmss_adv', JSON.stringify(state.advF)); updateAdvBtn(); }
 function updateAdvBtn() {
-  const n = activeAdvRules().length;
+  const rules = activeAdvRules();
   const b = $('btn-adv');
-  b.textContent = t('advBtn') + (n ? ` (${n})` : '') + '…';
-  b.classList.toggle('has-rules', n > 0);
+  b.textContent = t('advBtn') + '…';
+  b.classList.toggle('has-rules', rules.length > 0);
+  // Actieve regels direct zichtbaar in de filterbalk, elk met een eigen kruisje.
+  $('adv-list').innerHTML = rules.map(r =>
+    `<div class="adv-li"><span>${advChipTxt(r)}</span><button class="adv-li-x" title="${t('clear')}">${icon('x', 10)}</button></div>`).join('');
+  [...$('adv-list').querySelectorAll('.adv-li-x')].forEach((x, i) => x.onclick = () => {
+    state.advF = state.advF.filter(r => r !== rules[i]);
+    saveAdv(); applyFilters();
+  });
 }
 function advDialog() {
   const m = $('adv-modal');
-  const groups = [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', ATTR_GROUPS_GK[0][1]]];
+  // Keepersgroep alleen met de GK-specifieke attributen: gedeelde (FirstTouch, Passing,
+  // Technique) staan al onder Technisch, dubbel opnemen geeft dubbele selects.
+  const gkOnly = ATTR_GROUPS_GK[0][1].filter(k => !ATTR_GROUPS_OUTFIELD.some(([, ks]) => ks.includes(k)));
+  const groups = [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', gkOnly]];
   const optHtml = sel => {
     let h = groups.map(([g, keys]) => `<optgroup label="${t(g)}">` +
       keys.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${attrName(k)}</option>`).join('') + '</optgroup>').join('');
@@ -659,6 +671,7 @@ function advDialog() {
     m.innerHTML = `<div class="pm-card adv-card">
       <div class="pm-title">${t('advTitle')}</div>
       <div class="pm-body">${t('advHint')}</div>
+      <div class="adv-head"><span class="ah-attr">${t('advColAttr')}</span><span class="ah-mm">${t('advMin')}</span><span class="ah-mm">${t('advMax')}</span><span class="ah-sp"></span></div>
       <div id="adv-rows">` + state.advF.map((r, i) => `
         <div class="adv-row" data-i="${i}">
           <select class="adv-k">${optHtml(r.k)}</select>
@@ -1052,7 +1065,6 @@ function applyFilters() {
   const wage = parseMoney($('f-wage').value);
   const nat = $('f-nat').value.trim().toLowerCase();
   const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
-  const wantAttain = $('f-attain').checked;
   const minInterest = +$('f-interest').value || 0;
   const wantListed = $('f-listed').checked, contractF = $('f-contract').value;
   const onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
@@ -1094,7 +1106,6 @@ function applyFilters() {
       const m = monthsUntil(p.expires);
       if (m == null || m > (contractF === 'exp6' ? 6 : 12)) return false;
     }
-    if (wantAttain && !isAttainable(p)) return false;
     if (minInterest > 0) { const i = interestEstimate(p); if (!i || i.score < minInterest) return false; }
     if (wantListed && !p.listed) return false;
     for (const r of advRules) {
@@ -1141,7 +1152,6 @@ function buildChips() {
   if (v('f-nat')) add(`${t('nat')}: ${v('f-nat')}`, clearInput('f-nat'));
   if ($('f-eu').checked) add(t('euonly'), uncheck('f-eu'));
   if (+$('f-interest').value > 0) add(`${t('interestmin')} ${$('f-interest').selectedOptions[0].textContent}`, () => { $('f-interest').value = '0'; });
-  if ($('f-attain').checked) add(t('attainable'), uncheck('f-attain'));
   if ($('f-listed').checked) add(t('listed'), uncheck('f-listed'));
   if ($('f-contract').value) add(`${t('contractF')}: ${$('f-contract').selectedOptions[0].textContent}`, () => { $('f-contract').value = ''; });
   if (state.mode !== 'staff')
@@ -1164,7 +1174,7 @@ function renderChips(chips) {
 // Een preset is een momentopname van alle filtervelden (tekst, vinkjes, selects, posities
 // op het veld en de gekozen tactische rol). Bewaard in localStorage; zelfde naam = overschrijven.
 const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat', 'f-div'];
-const PRESET_CHECK_IDS = ['f-eu', 'f-attain', 'f-listed', 'f-myclub', 'f-shortlist'];
+const PRESET_CHECK_IDS = ['f-eu', 'f-listed', 'f-myclub', 'f-shortlist'];
 const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role', 'f-contract'];
 function loadPresets() { try { return JSON.parse(localStorage.getItem('fmss_presets') || '[]'); } catch { return []; } }
 function storePresets(list) { localStorage.setItem('fmss_presets', JSON.stringify(list)); }
@@ -1709,7 +1719,7 @@ function showDetail(p) {
   if (p.listed) flags.push(`<span class="pill warn">${t('tag_listed')}</span>`);
   if (p.setForRelease) flags.push(`<span class="pill warn">${t('tag_rel')}</span>`);
   if (p.notForSale) flags.push(`<span class="pill">${t('tag_nfs')}</span>`);
-  if (isAttainable(p)) flags.push(`<span class="pill good">${t('attainable')}</span>`);
+  if (isAttainable(p)) flags.push(`<span class="pill good" title="${t('attainHint')}">${t('attainable')}</span>`);
   if (flags.length) html += '<div>' + flags.join('') + '</div>';
 
   if (isPlayer) {
@@ -2143,7 +2153,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-cl
 ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
   let tm; $(id).addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(applyFilters, 150); });
 });
-['f-eu', 'f-myclub', 'f-attain', 'f-listed', 'f-contract', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
+['f-eu', 'f-myclub', 'f-listed', 'f-contract', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
 $('btn-adv').onclick = advDialog;
 $('f-staffrole').addEventListener('change', applyFilters);
 // Divisie-zoekbalk: filter terwijl je typt + eigen suggestie-dropdown (app-stijl, i.p.v.

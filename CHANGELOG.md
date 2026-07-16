@@ -17,6 +17,14 @@ new release is built, so the Unreleased section below is what the next release s
 - The three contract checkboxes (free agent, expiring within 6 months, within 1 year)
   merged into one contract status dropdown. Old presets that used the checkboxes still
   apply correctly.
+- The "Attainable" checkbox is gone: it only checked whether a player could leave his
+  club, which the contract dropdown and transfer-listed filter now cover, and its name
+  wrongly suggested "attainable for you" (that question is the Interest filter). The
+  green "Available" tag on player profiles stays, now with an explanatory tooltip.
+- Attribute filter polish: the selected attribute is actually visible now (a CSS clash
+  squeezed the dropdown to 17px), column headers in the popup, goalkeeper duplicates
+  removed from the list, and active rules show in the filter sidebar with their own
+  remove buttons.
 - Shorter, simpler meta score explanation in the tooltip (NL and EN).
 
 ### Fixed
