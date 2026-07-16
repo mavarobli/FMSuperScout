@@ -43,7 +43,7 @@ const I18N = {
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Waarde', c_fee: 'Vraagprijs', c_wage: 'Salaris p/w', c_expires: 'Contract tot', c_interest: 'Interesse',
-    c_status: 'Status', c_role: 'Rol', foot: 'Voet', height: 'Lengte', repLabel: 'Reputatie',
+    c_status: 'Status', c_role: 'Rol', foot: 'Voet', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Lengte', repLabel: 'Reputatie',
     c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.', c_div: 'Divisie',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
     int_big: 'Groot', int_ok: 'Redelijk', int_small: 'Klein', int_no: 'Nee', interestTitle: 'Interesse-inschatting',
@@ -120,7 +120,7 @@ const I18N = {
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Value', c_fee: 'Asking price', c_wage: 'Wage p/w', c_expires: 'Contract until', c_interest: 'Interest',
-    c_status: 'Status', c_role: 'Role', foot: 'Foot', height: 'Height', repLabel: 'Reputation',
+    c_status: 'Status', c_role: 'Role', foot: 'Foot', footR: 'Right', footL: 'Left', footB: 'Both', height: 'Height', repLabel: 'Reputation',
     c_clubrep: 'Club rep', c_worldrep: 'World rep', c_div: 'Division',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
     int_big: 'High', int_ok: 'Fair', int_small: 'Low', int_no: 'No', interestTitle: 'Interest estimate',
@@ -254,6 +254,47 @@ const EU_NATIONS = new Set([
 ].map(s => s.toLowerCase()));
 const isEu = p => (p.nat || []).some(n => EU_NATIONS.has((n || '').toLowerCase()));
 
+// Voet: de plugin schrijft NL ('Rechts'/'Links'/'Beide') in de dump → vertalen bij tonen.
+const FOOT_KEY = { rechts: 'footR', links: 'footL', beide: 'footB', right: 'footR', left: 'footL', both: 'footB' };
+const footLabel = p => { const k = FOOT_KEY[(p.foot || '').toLowerCase()]; return k ? t(k) : (p.foot || '–'); };
+
+// Landnamen komen in de gametaal uit het geheugen (NL bij een Nederlandse FM).
+// Bij app-taal EN vertalen we de bekende NL-namen; onbekend blijft zoals de game het gaf.
+// Alleen namen die NL/EN verschillen; identieke (Portugal, Ghana...) hoeven niet.
+const NATION_EN = {
+  'Nederland': 'Netherlands', 'België': 'Belgium', 'Duitsland': 'Germany', 'Frankrijk': 'France',
+  'Spanje': 'Spain', 'Italië': 'Italy', 'Engeland': 'England', 'Schotland': 'Scotland',
+  'Wales': 'Wales', 'Noord-Ierland': 'Northern Ireland', 'Ierland': 'Ireland',
+  'Oostenrijk': 'Austria', 'Zwitserland': 'Switzerland', 'Polen': 'Poland', 'Zweden': 'Sweden',
+  'Noorwegen': 'Norway', 'Denemarken': 'Denmark', 'Finland': 'Finland', 'IJsland': 'Iceland',
+  'Tsjechië': 'Czechia', 'Slowakije': 'Slovakia', 'Hongarije': 'Hungary', 'Roemenië': 'Romania',
+  'Bulgarije': 'Bulgaria', 'Griekenland': 'Greece', 'Kroatië': 'Croatia', 'Servië': 'Serbia',
+  'Bosnië en Herzegovina': 'Bosnia and Herzegovina', 'Slovenië': 'Slovenia',
+  'Noord-Macedonië': 'North Macedonia', 'Albanië': 'Albania', 'Montenegro': 'Montenegro',
+  'Kosovo': 'Kosovo', 'Turkije': 'Turkey', 'Rusland': 'Russia', 'Oekraïne': 'Ukraine',
+  'Wit-Rusland': 'Belarus', 'Litouwen': 'Lithuania', 'Letland': 'Latvia', 'Estland': 'Estonia',
+  'Georgië': 'Georgia', 'Armenië': 'Armenia', 'Azerbeidzjan': 'Azerbaijan', 'Moldavië': 'Moldova',
+  'Luxemburg': 'Luxembourg', 'Cyprus': 'Cyprus', 'Israël': 'Israel',
+  'Brazilië': 'Brazil', 'Argentinië': 'Argentina', 'Uruguay': 'Uruguay', 'Chili': 'Chile',
+  'Colombia': 'Colombia', 'Peru': 'Peru', 'Ecuador': 'Ecuador', 'Paraguay': 'Paraguay',
+  'Bolivia': 'Bolivia', 'Venezuela': 'Venezuela',
+  'Verenigde Staten': 'United States', 'Mexico': 'Mexico', 'Canada': 'Canada',
+  'Costa Rica': 'Costa Rica', 'Jamaica': 'Jamaica', 'Honduras': 'Honduras', 'Panama': 'Panama',
+  'Marokko': 'Morocco', 'Algerije': 'Algeria', 'Tunesië': 'Tunisia', 'Egypte': 'Egypt',
+  'Senegal': 'Senegal', 'Ivoorkust': 'Ivory Coast', 'Nigeria': 'Nigeria', 'Kameroen': 'Cameroon',
+  'Zuid-Afrika': 'South Africa', 'Kaapverdië': 'Cape Verde', 'Guinee': 'Guinea',
+  'Congo-Kinshasa': 'DR Congo', 'Democratische Republiek Congo': 'DR Congo',
+  'Japan': 'Japan', 'Zuid-Korea': 'South Korea', 'China': 'China', 'Australië': 'Australia',
+  'Nieuw-Zeeland': 'New Zealand', 'Saoedi-Arabië': 'Saudi Arabia', 'Iran': 'Iran', 'Irak': 'Iraq',
+  'Verenigde Arabische Emiraten': 'United Arab Emirates', 'Qatar': 'Qatar', 'Indonesië': 'Indonesia',
+};
+const natLabel = n => state.lang === 'en' ? (NATION_EN[n] || n) : n;
+const natsLabel = p => (p.nat || []).map(natLabel).join(', ');
+
+// Kolommen die onder de "verborgen stats"-toggle vallen: CA/PA zelf, plus meta-score en
+// vraagprijs (beide afgeleid van/verweven met verborgen data, Marks keuze).
+const hiddenStatCol = k => state.hideCapa && (k === 'ca' || k === 'pa' || k === 'meta' || k === 'fee');
+
 // ---------- geld ----------
 function fmtMoney(v) {
   if (v == null) return '–';
@@ -266,7 +307,12 @@ function fmtMoney(v) {
   if (abs >= 1e3) return sym + Math.round(val / 1e3) + 'K';
   return sym + Math.round(val);
 }
-const fmtDate = v => v ? String(v).slice(0, 10) : '–';
+// Dump levert ISO (yyyy-mm-dd); tonen als dd-mm-yyyy. CSV-export houdt bewust ISO
+// (sorteert/parset beter in spreadsheets).
+const fmtDate = v => {
+  const s = v ? String(v) : '';
+  return s.length >= 10 ? `${s.slice(8, 10)}-${s.slice(5, 7)}-${s.slice(0, 4)}` : (s || '–');
+};
 
 // ---------- leeftijd o.b.v. peiljaar ----------
 function getAge(p) {
@@ -305,7 +351,7 @@ const PLAYER_COLS = [
   { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => p.pos || '<span class="dim">–</span>', w: 95 },
   { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
   { key: 'div', label: 'c_div', get: p => p.div || '', render: p => p.div ? escHtml(p.div) : '<span class="dim">–</span>', defHidden: true, w: 170 },
-  { key: 'nat', label: 'c_nat', get: p => (p.nat || []).join(', '), w: 115 },
+  { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
   { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? `<span class="eu-yes">${icon('check', 12)}</span>` : '<span class="dim">–</span>', w: 42 },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa), w: 56 },
@@ -320,7 +366,7 @@ const PLAYER_COLS = [
   { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true, w: 85 },
   { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true, w: 85 },
   { key: 'height', label: 'height', num: true, get: p => p.height, fmt: v => v ? v + ' cm' : '–', defHidden: true, w: 70 },
-  { key: 'foot', label: 'foot', get: p => p.foot || '–', defHidden: true, w: 75 },
+  { key: 'foot', label: 'foot', get: p => footLabel(p), defHidden: true, w: 75 },
 ];
 const STAFF_COLS = [
   { key: 'sl', label: '★', star: true, w: 34 },
@@ -328,7 +374,7 @@ const STAFF_COLS = [
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p), w: 50 },
   { key: 'job', label: 'c_role', get: p => p.job || '–', w: 150 },
   { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
-  { key: 'nat', label: 'c_nat', get: p => (p.nat || []).join(', '), w: 115 },
+  { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa), w: 56 },
   { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney, w: 100 },
@@ -955,7 +1001,7 @@ function applyFilters() {
     if (price != null && (estValue(p).v ?? Infinity) > price) return false;
     if (fee != null && (feeEstimate(p).v ?? Infinity) > fee) return false;
     if (wage != null && (p.wage ?? Infinity) > wage) return false;
-    if (nat && !(p.nat || []).some(n => n.toLowerCase().includes(nat))) return false;
+    if (nat && !(p.nat || []).some(n => n.toLowerCase().includes(nat) || natLabel(n).toLowerCase().includes(nat))) return false;
     if (onlyEu && !isEu(p)) return false;
     // "Mijn club": toon eigen spelers + verhuurde (moederclub = mijn club, spelen elders)
     // + gehuurde (spelen bij mij, moederclub elders). Zie loanStatus() voor de kleuring.
@@ -1209,8 +1255,7 @@ function activeCols() {
   const sl = base.find(c => c.star);                     // ster-kolom altijd vooraan
   const name = base.find(c => c.name);
   const rc = state.mode !== 'staff' ? roleCol() : null;  // rol-kolom direct na naam
-  const capaHidden = k => state.hideCapa && (k === 'ca' || k === 'pa');
-  const rest = cf.order.filter(k => !hidden.has(k) && byKey[k] && !(rc && k === 'role') && !capaHidden(k)).map(k => byKey[k]);
+  const rest = cf.order.filter(k => !hidden.has(k) && byKey[k] && !(rc && k === 'role') && !hiddenStatCol(k)).map(k => byKey[k]);
   const out = [];
   if (sl) out.push(sl);
   for (const c of rest) { out.push(c); if (rc && c === name) out.push(rc); }
@@ -1325,7 +1370,8 @@ function openColMenu(x, y) {
   closeColMenu();
   const cf = colCfg();
   const hidden = new Set(cf.hidden);
-  const base = baseCols().filter(c => !c.star);
+  // Kolommen onder de verborgen-stats-toggle horen ook niet in dit menu als ze uit staan.
+  const base = baseCols().filter(c => !c.star && !hiddenStatCol(c.key));
   const menu = document.createElement('div');
   menu.id = 'colmenu';
   menu.innerHTML = `<div class="cm-head">${t('colsTitle')}</div>` +
@@ -1445,15 +1491,15 @@ function exportShortlist() {
   const ids = state.shortlist;
   const all = [...state.players, ...state.staff].filter(p => ids.has(p.id));
   if (!all.length) { showToast('Shortlist leeg'); return; }
-  const withCapa = !state.hideCapa;
+  const withCapa = !state.hideCapa;   // vraagprijs valt ook onder de verborgen-stats-toggle
   const cols = ['Name', 'Position', 'Age', 'Club', 'Nationality',
-    ...(withCapa ? ['CA', 'PA'] : []), 'Value(GBP)', 'AskingPrice(GBP)', 'Wage(GBP)', 'Contract', 'Interest'];
+    ...(withCapa ? ['CA', 'PA'] : []), 'Value(GBP)', ...(withCapa ? ['AskingPrice(GBP)'] : []), 'Wage(GBP)', 'Contract', 'Interest'];
   const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
   const lines = [cols.join(',')];
   for (const p of all) {
     const i = interestEstimate(p);
-    lines.push([p.name, p.pos || p.job || '', getAge(p), p.club || '', (p.nat || []).join('/'),
-      ...(withCapa ? [p.ca, p.pa] : []), estValue(p).v ?? '', feeEstimate(p).v ?? '', p.wage ?? '', p.expires || '', i ? i.label : ''].map(esc).join(','));
+    lines.push([p.name, p.pos || p.job || '', getAge(p), p.club || '', (p.nat || []).map(natLabel).join('/'),
+      ...(withCapa ? [p.ca, p.pa] : []), estValue(p).v ?? '', ...(withCapa ? [feeEstimate(p).v ?? ''] : []), p.wage ?? '', p.expires || '', i ? i.label : ''].map(esc).join(','));
   }
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
@@ -1555,17 +1601,17 @@ function showDetail(p) {
   let html = `<h2>${escHtml(p.name)} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${starSvg(18)}</span>
     <button class="copybtn" title="Kopieer naam">${icon('clipboard', 13)}</button>
     <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">${icon('compare', 13)}</button></h2>
-  <div class="sub">${getAge(p)} · ${(p.nat || []).join(', ')}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
+  <div class="sub">${getAge(p)} · ${natsLabel(p)}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
   ${gauge}
   <div class="kv">
-    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${p.pos || '–'}</div><div><b>${t('foot')}</b> ${p.foot || '–'}</div>` : `<div><b>${t('c_role')}</b> ${p.job || '–'}</div>`}
+    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${p.pos || '–'}</div><div><b>${t('foot')}</b> ${footLabel(p)}</div>` : `<div><b>${t('c_role')}</b> ${p.job || '–'}</div>`}
     <div><b>${t('estval')}</b> ${valTxt}</div>
-    ${feeEstimate(p).v > 0 ? `<div><b>${t('c_fee')}</b> ${fmtMoney(feeEstimate(p).v * 0.85)} – ${fmtMoney(feeEstimate(p).v * 1.15)}</div>` : ''}
+    ${!state.hideCapa && feeEstimate(p).v > 0 ? `<div><b>${t('c_fee')}</b> ${fmtMoney(feeEstimate(p).v * 0.85)} – ${fmtMoney(feeEstimate(p).v * 1.15)}</div>` : ''}
     <div><b>${t('wageLabel')}</b> ${fmtMoney(p.wage)}</div>
     ${p.worldRep ? `<div><b>${t('repLabel')}</b> ${p.worldRep}</div>` : ''}
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
     ${p.height ? `<div><b>${t('height')}</b> ${p.height} cm</div>` : ''}
-    ${isPlayer && metaScore(p) != null ? `<div title="${t('metaHint')}"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
+    ${isPlayer && !state.hideCapa && metaScore(p) != null ? `<div title="${t('metaHint')}"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
   </div>`;
 
   const flags = [];
@@ -1786,15 +1832,16 @@ function openCompare() {
   if (!state.hideCapa) {
     body += row('CA', players.map(p => p.ca));
     body += row('PA', players.map(p => p.pa));
+    body += row(t('c_meta'), players.map(p => metaScore(p)), { fmt: v => v.toFixed(1) });
   }
-  body += row(t('c_meta'), players.map(p => metaScore(p)), { fmt: v => v.toFixed(1) });
   body += row(t('cmpValue'), players.map(p => estValue(p).v), { fmt: fmtMoney, hi: null });
-  body += row(t('c_fee'), players.map(p => { const f = feeEstimate(p); return f.v > 0 ? f.v : null; }), { fmt: fmtMoney, hi: false });
+  if (!state.hideCapa)
+    body += row(t('c_fee'), players.map(p => { const f = feeEstimate(p); return f.v > 0 ? f.v : null; }), { fmt: fmtMoney, hi: false });
   body += row(t('wageLabel'), players.map(p => p.wage), { fmt: fmtMoney, hi: false });
   body += row(t('c_age'), players.map(p => getAge(p)), { hi: false });
   body += row(t('height'), players.map(p => p.height || null), { fmt: v => v + ' cm', hi: null });
   body += textRow(t('contractLabel'), players.map(p => fmtDate(p.expires)));
-  body += textRow(t('foot'), players.map(p => p.foot));
+  body += textRow(t('foot'), players.map(p => footLabel(p)));
   const roles = players.map(bestRoleScore);
   body += `<div class="cmp-row"><div class="cmp-lbl">${t('cmpTopRole')}</div>` +
     roles.map(r => `<div class="cmp-cell">${r ? `${r.name}<br><b class="${roleClass(r.score)}">${r.score.toFixed(1)}</b>` : '<span class="dim">·</span>'}</div>`).join('') +
@@ -2113,9 +2160,9 @@ $('sel-lang').addEventListener('change', () => {
 // CA/PA verbergen (anti-"spieken"). Past de hele tool consistent aan.
 function applyHideCapa() {
   document.body.classList.toggle('hide-capa', state.hideCapa);
-  if (state.hideCapa) {                       // CA/PA-filters leegmaken zodat ze niet stiekem filteren
-    ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max'].forEach(id => { $(id).value = ''; });
-    if (state.sortKey === 'ca' || state.sortKey === 'pa') { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
+  if (state.hideCapa) {   // bijbehorende filters leegmaken zodat ze niet stiekem filteren (ook meta/vraagprijs)
+    ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-fee'].forEach(id => { const e = $(id); if (e) e.value = ''; });
+    if (hiddenStatCol(state.sortKey)) { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
   }
   if (state.mode === 'analysis') renderAnalysis(); else applyFilters();
   if (state.selected) showDetail(state.selected);
