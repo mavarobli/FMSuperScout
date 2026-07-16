@@ -140,24 +140,31 @@ by the model tests in [`test/`](test/).
 
 ## How it compares
 
-There's a healthy little ecosystem of FM26 tools that read hidden data from memory. Here's how
-FMSuperScout stacks up, as of July 2026:
+There's a healthy little ecosystem of FM26 tools that read hidden data from memory: Genie Scout,
+FMST 26 and FMRTE all do it well, and Genie Scout has been the default recommendation since 2009
+for good reason. It also has role ratings and player comparison of its own, so here's an honest
+picture of where FMSuperScout actually earns its place (as of July 2026):
 
-| | FMSuperScout | FM Genie Scout 26 | FMST 26 | FMRTE 26 |
-|---|---|---|---|---|
-| Price | Free, no ads | Free (ads) or €6+ for ad-free | Free | Free to scout, paid to save edits |
-| Open source | Yes | No | No | No |
-| Live from memory | Yes | Yes | Yes | Yes |
-| Tactical role ratings | 19 FM roles, sortable | – | – | – |
-| Player comparison | Up to 3, side-by-side | – | – | – |
-| Squad needs analysis | Depth/aging/succession, 1-click scout | – | – | – |
-| Saved filter presets | Yes | – | – | – |
-| Hide hidden stats toggle | Yes, one click | – | – | – |
-| Statistics depth | Core scouting fields | Extensive | 100+ columns, xG/p90 | Extensive (editor-first) |
+**Speed is the main one.** Press F9 and the full loaded database (45k+ players) is pulled from
+your save in about 10 seconds, with a progress bar. After that everything is instant: search
+while you type, sort 48k rows, stack filters, no loading pauses between clicks. It runs as a
+modern web app, so it feels closer to a fast website than to classic desktop tooling.
 
-No shade to the others. Genie Scout has been the default recommendation since 2009 for good
-reason. FMSuperScout aims at a different gap: fast squad-management workflow (compare, find gaps,
-save your filters) rather than a raw stats dump or a save editor.
+Beyond that:
+
+- **Squad needs analysis**: depth, aging and succession per position group, one click to scout
+  candidates for the gap. Built for the "what does my squad actually need" question.
+- **Comparison the way FM shows it**: up to 3 players with FM-style bars, hidden stats and
+  personality included.
+- **Complete filter setups as presets**: pitch positions, role, all criteria, saved under one name.
+- **A one-click toggle to hide CA/PA and all hidden stats**, for people who consider reading
+  them cheating.
+- **Open source and free, no ads**: the only one in this list where you can read exactly what
+  it does with your system.
+
+And to be fair, the others win elsewhere. Genie Scout and FMST 26 go deeper on raw statistics
+(FMST does 100+ columns with xG and per-90s), FMRTE is the tool if you want to *edit* your save,
+and all three have a longer track record. If that's what you need, use them, they're good.
 
 ## Support
 
