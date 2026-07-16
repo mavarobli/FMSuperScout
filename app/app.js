@@ -31,6 +31,8 @@ const I18N = {
     showHidden: 'Verborgen stats tonen',
     donateBtn: 'Steun FMSuperScout', donateTitle: 'Lekker aan het scouten?',
     donateBody: 'FMSuperScout is gratis en blijft gratis. Als het je een uur turen in traag menu bespaart, is een koffie welkom. Zo niet, draait ie ook gewoon door.',
+    donateTitle2: '500 profielen gescout', donateBody2: 'Als FMSuperScout een scout was, had ie nu een contractverlenging verdiend. Een koffie mag ook. Blijft verder gewoon gratis.',
+    donateTitle3: '2000 profielen. Respect.', donateBody3: 'Dit is de laatste keer dat we het vragen, beloofd. Bevalt de tool? Een koffie houdt de ontwikkeling warm.',
     donateCta: '☕ Koffie', donateLater: 'Later',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
@@ -106,6 +108,8 @@ const I18N = {
     showHidden: 'Show hidden stats',
     donateBtn: 'Support FMSuperScout', donateTitle: 'Found your next signing?',
     donateBody: 'FMSuperScout is free and stays free. If it beat squinting at slow menus, a coffee helps. If not, it keeps working anyway.',
+    donateTitle2: 'That is 500 profiles scouted', donateBody2: 'If FMSuperScout were a scout, it would have earned a contract extension by now. A coffee works too. Free either way.',
+    donateTitle3: '2000 profiles. Respect.', donateBody3: 'Last time we ask, promise. If the tool earns its place in your saves, a coffee keeps development going.',
     donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
@@ -1650,17 +1654,26 @@ function showDetail(p) {
 // ---------- steun (Ko-fi), sympathiek en niet-opdringerig ----------
 const KOFI = 'https://ko-fi.com/fmsuperscout';
 function openKofi() { window.open(KOFI, '_blank', 'noopener'); }
-// Eénmalige, wegklikbare nudge na echt gebruik (25 bekeken profielen). Daarna nooit meer.
+// Wegklikbare nudges op mijlpalen van echt gebruik (25/500/2000 bekeken profielen),
+// max 3 ooit en daarna definitief stil. Minimaal 14 dagen tussen twee nudges, zodat
+// een marathonsessie er nooit twee achter elkaar triggert. 'fmss_donate' telt hoeveel
+// er getoond zijn (oude installs met '1' vallen automatisch in fase 2).
+const DONATE_MILESTONES = [25, 500, 2000];
 function maybeDonateNudge() {
-  if (localStorage.getItem('fmss_donate')) return;
+  const stage = +localStorage.getItem('fmss_donate') || 0;
+  if (stage >= DONATE_MILESTONES.length) return;
   const n = (+localStorage.getItem('fmss_uses') || 0) + 1;
   localStorage.setItem('fmss_uses', String(n));
-  if (n < 25) return;
-  localStorage.setItem('fmss_donate', '1');
+  if (n < DONATE_MILESTONES[stage]) return;
+  const last = +localStorage.getItem('fmss_donate_at') || 0;
+  if (stage > 0 && Date.now() - last < 14 * 864e5) return;
+  localStorage.setItem('fmss_donate', String(stage + 1));
+  localStorage.setItem('fmss_donate_at', String(Date.now()));
+  const sfx = stage === 0 ? '' : String(stage + 1);   // '', '2', '3' → donateTitle/donateTitle2/...
   const el = $('donate-nudge');
   el.innerHTML = `<button class="dn-x" title="${t('donateLater')}">${icon('x', 12)}</button>
-    <div class="dn-title">☕ ${t('donateTitle')}</div>
-    <div class="dn-text">${t('donateBody')}</div>
+    <div class="dn-title">☕ ${t('donateTitle' + sfx)}</div>
+    <div class="dn-text">${t('donateBody' + sfx)}</div>
     <div class="dn-actions"><a class="dn-cta" href="${KOFI}" target="_blank" rel="noopener">${t('donateCta')}</a>
       <button class="dn-later">${t('donateLater')}</button></div>`;
   el.classList.remove('hidden');
