@@ -1,55 +1,55 @@
-# .fmf shortlist-formaat: onderzoeksbevindingen
+# .fmf shortlist format: research findings
 
-Doel: FMSuperScout-shortlists exporteren als `.fmf` die FM26 rechtstreeks kan inladen
-(in plaats van CSV). Status: **nog niet haalbaar** met de huidige info. Hieronder wat we weten.
+Goal: export FMSuperScout shortlists as `.fmf` files that FM26 can load directly
+(instead of CSV). Status: **not yet feasible** with the current information. Below is what we know.
 
-## Containerstructuur (ontcijferd)
+## Container structure (decoded)
 
-Voorbeeldbestand `TEST.fmf` (521 bytes, 1 speler) is een SI-resource-archief:
+Sample file `TEST.fmf` (521 bytes, 1 player) is an SI resource archive:
 
 ```
-offset 0 : 02 01                     versie/vlaggen ("97% van .fmf begint met 02 01")
-offset 2 : "afe."                    dataregio-tag (archive front end)
-...      : per-bestand payloads       (image.img, TEST.slf, _data/details.aom)
-offset389: "fmf."                    index-tag
-offset396: 28 b5 2f fd ...           zstd-frame = de index (decomprimeert schoon)
+offset 0 : 02 01                     version/flags ("97% of .fmf files start with 02 01")
+offset 2 : "afe."                    data-region tag (archive front end)
+...      : per-file payloads          (image.img, TEST.slf, _data/details.aom)
+offset389: "fmf."                    index tag
+offset396: 28 b5 2f fd ...           zstd frame = the index (decompresses cleanly)
 ```
 
-De **index** decomprimeert probleemloos met standaard zstd en bevat:
+The **index** decompresses cleanly with standard zstd and contains:
 - root "TEST", 2 children
-- `image.img`, `TEST.slf` (de eigenlijke shortlist), `_data/details.aom`
-- per bestand: naam, extensie, offset/grootte-velden en een timestamp-achtige trailer.
+- `image.img`, `TEST.slf` (the actual shortlist), `_data/details.aom`
+- per file: name, extension, offset/size fields and a timestamp-like trailer.
 
-## Waarom export (nog) niet lukt
+## Why export does not work (yet)
 
-De **payloads** in de `afe.`-regio zijn NIET met standaard codecs te lezen:
-- Brute-force over inflate/inflateRaw/gunzip/brotli/zstd op elk startpunt: geen enkele
-  echte match (alleen één 11-byte false-positive).
-- Entropie ~7.1 bits/byte: SI-eigen codec of versleuteling.
+The **payloads** in the `afe.` region cannot be read with standard codecs:
+- Brute force over inflate/inflateRaw/gunzip/brotli/zstd at every starting point: not a single
+  real match (just one 11-byte false positive).
+- Entropy ~7.1 bits/byte: an SI-proprietary codec or encryption.
 
-Dit klopt met wat de community meldt: `.fmf` is een gesloten SI-formaat dat je alleen met
-de meegeleverde **Football Manager Resource Archiver** (Steam-tool) kunt openen/maken.
-Zonder die codec + het interne `.slf`-schema kunnen we geen bestand maken dat FM accepteert,
-en we kunnen het resultaat hier ook niet in de game verifiëren.
+This matches what the community reports: `.fmf` is a closed SI format that can only be
+opened/created with the bundled **Football Manager Resource Archiver** (Steam tool).
+Without that codec plus the internal `.slf` schema we cannot produce a file FM accepts,
+and we cannot verify the result in the game here either.
 
-## Definitieve conclusie (na 3 extra samples: test1=1 speler, test2=2, test3=3)
+## Final conclusion (after 3 extra samples: test1=1 player, test2=2, test3=3)
 
-Met samples van oplopende grootte is het formaat nu vér genoeg ontleed om een harde
-conclusie te trekken:
+With samples of increasing size the format has now been dissected far enough to draw a hard
+conclusion:
 
-- **`.slf` = kop + 4 bytes per speler.** De index-groottes groeien exact +4 bytes per
-  extra speler (uncompressed 84→88→92, compressed 31→35→39 voor 1→2→3 spelers). Dat is
-  één `uint32` speler-ID per shortlist-item. Het schema is dus opgelost.
-- **De index is publieke zstd** (98% identiek tussen bestanden), daarom leest die wél.
-- **De payloads zijn versleuteld met een per-bestand willekeurige nonce.** Bewijs: alle drie
-  de shortlists bevatten dezelfde standaard-afbeelding (`image.img`), maar die bytes zijn in
-  elk bestand totaal verschillend; slechts 15% van de dataregio komt overeen en dat is enkel
-  de framing/lengte-kop. Identieke input → verschillende output = versleuteling, geen compressie.
+- **`.slf` = header + 4 bytes per player.** The index sizes grow by exactly +4 bytes per
+  extra player (uncompressed 84→88→92, compressed 31→35→39 for 1→2→3 players). That is
+  one `uint32` player ID per shortlist item. So the schema is solved.
+- **The index is public zstd** (98% identical between files), which is why it does read.
+- **The payloads are encrypted with a random per-file nonce.** Evidence: all three
+  shortlists contain the same default image (`image.img`), yet those bytes are completely
+  different in each file; only 15% of the data region matches and that is just
+  the framing/length header. Identical input → different output = encryption, not compression.
 
-**Gevolg: een geldige `.fmf` schrijven is niet haalbaar.** Meer samples helpen niet meer,
-de sleutel zit in `GameAssembly.dll` en is niet uit ciphertext af te leiden. De enige echte
-route zou zijn: de encryptie-routine + sleutel uit de game-binary halen (grote, aparte RE-klus,
-niet te verifiëren zonder de game), of SI's eigen Resource Archiver aanroepen.
+**Consequence: writing a valid `.fmf` is not feasible.** More samples will not help,
+the key sits in `GameAssembly.dll` and cannot be derived from ciphertext. The only real
+route would be extracting the encryption routine plus key from the game binary (a large, separate RE job,
+unverifiable without the game), or invoking SI's own Resource Archiver.
 
-Praktisch alternatief om spelers te delen: de leesbare export (naam/club/positie) waarmee je
-ze via FM-zoeken weer toevoegt. Zie [[dump-fields]] en het projectgeheugen.
+Practical alternative for sharing players: the readable export (name/club/position) which lets you
+re-add them via FM search. See [[dump-fields]] and the project memory.

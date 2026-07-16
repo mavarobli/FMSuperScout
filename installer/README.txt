@@ -1,26 +1,26 @@
-FMSuperScout - Football Manager 26 scout-tool
+FMSuperScout - Football Manager 26 scouting tool
 =============================================
 
-INSTALLEREN
+INSTALL
 -----------
-1. Pak dit hele mapje uit (als je een zip kreeg).
-2. Dubbelklik op "Install FMSuperScout.cmd".
-3. Je krijgt een snelkoppeling in het Startmenu en op je bureaublad.
+1. Extract this whole folder (if you received a zip).
+2. Double-click "Install FMSuperScout.cmd".
+3. You get a shortcut in the Start menu and on your desktop.
 
-Node is meegeleverd; je hoeft niets anders te installeren.
+Node is bundled; you don't need to install anything else.
 
-STARTEN
+START
 -------
-Dubbelklik op de FMSuperScout-snelkoppeling. De tool opent in een eigen venster.
-Sluit je het venster, dan stopt de achtergrond-server vanzelf.
+Double-click the FMSuperScout shortcut. The tool opens in its own window.
+Close the window and the background server stops automatically.
 
-DATA UIT FOOTBALL MANAGER
+DATA FROM FOOTBALL MANAGER
 -------------------------
-FMSuperScout leest de data die de FMSuperScout-plugin uit je actieve save dumpt.
-Start FM26, laad je save en druk op F9 (of klik in de tool op "Nieuwe data").
+FMSuperScout reads the data the FMSuperScout plugin dumps from your active save.
+Start FM26, load your save and press F9 (or click "New data" in the tool).
 
-VERWIJDEREN
+UNINSTALL
 -----------
-Via "Apps en onderdelen" (zoek op FMSuperScout), of draai "Uninstall FMSuperScout.cmd".
+Via "Apps & features" (search for FMSuperScout), or run "Uninstall FMSuperScout.cmd".
 
-Vragen? Deel gerust feedback met mavarobli.
+Questions? Feel free to share feedback with mavarobli.

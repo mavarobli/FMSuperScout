@@ -1,8 +1,8 @@
 # FMSuperScout 1.0.0, release notes
 
-> Gepubliceerd 15-07-2026 als GitHub Release v1.0.0 (assets: FMSuperScout-Setup.exe
-> + .sha256). Dit bestand is de bron van de release-tekst; alles onder de streep
-> is de gepubliceerde inhoud.
+> Published 15-07-2026 as GitHub Release v1.0.0 (assets: FMSuperScout-Setup.exe
+> + .sha256). This file is the source of the release text; everything below the
+> line is the published content.
 
 ---
 
