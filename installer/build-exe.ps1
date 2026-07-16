@@ -25,8 +25,9 @@ if (-not (Test-Path (Join-Path $GameDir 'BepInEx\core\BepInEx.Core.dll'))) {
 $dll = Join-Path $repo 'plugin\dist\FMSuperScout.dll'
 if (-not (Test-Path $dll)) { throw 'plugin\dist\FMSuperScout.dll ontbreekt - bouw de plugin eerst.' }
 
-# ---- icoon (opnieuw) genereren ----
+# ---- icoon + wizard-afbeeldingen (opnieuw) genereren ----
 node (Join-Path $PSScriptRoot 'make-icon.js')
+node (Join-Path $PSScriptRoot 'make-wizard-images.js')
 
 # ---- schone stage ----
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }

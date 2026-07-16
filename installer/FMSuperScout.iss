@@ -29,6 +29,17 @@ SolidCompression=yes
 WizardStyle=modern
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
+; App-stijl branding (gegenereerd door make-wizard-images.js; Inno kiest per DPI)
+WizardImageFile=wizard-side.bmp,wizard-side-2x.bmp
+WizardSmallImageFile=wizard-small.bmp,wizard-small-2x.bmp
+; Nette exe-metadata: zichtbaar in Eigenschappen/UAC/AV-scanners — oogt legitiem
+AppCopyright=(c) 2026 mavarobli
+VersionInfoVersion={#MyAppVersion}
+VersionInfoCompany=FMSuperScout
+VersionInfoDescription=FMSuperScout Setup - scout-tool voor Football Manager 26
+VersionInfoCopyright=(c) 2026 mavarobli
+AppSupportURL=https://github.com/mavarobli/FMSuperScout/issues
+AppUpdatesURL=https://github.com/mavarobli/FMSuperScout/releases
 
 [Languages]
 Name: "nl"; MessagesFile: "compiler:Languages\Dutch.isl"

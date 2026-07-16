@@ -16,3 +16,5 @@ scratchpad/
 # OS
 Thumbs.db
 desktop.ini
+installer/wizard-*.bmp
+installer/_preview-*.png
