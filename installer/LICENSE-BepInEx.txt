@@ -1,0 +1,28 @@
+FMSuperScout bundelt de volgende third-party componenten / bundles the
+following third-party components:
+
+BepInEx 6 (Bleeding Edge, IL2CPP x64)
+  Copyright (c) 2018-2026 BepInEx contributors
+  Gelicenseerd onder / licensed under LGPL-2.1
+  Broncode / source: https://github.com/BepInEx/BepInEx
+  Licentietekst / license text: https://github.com/BepInEx/BepInEx/blob/master/LICENSE
+
+Il2CppInterop
+  Gelicenseerd onder / licensed under LGPL-3.0
+  Broncode / source: https://github.com/BepInEx/Il2CppInterop
+  Bevat de aanpassing uit het BepInExPack voor Football Manager 26
+  (GenericMethodGetMethodHook verwijderd i.v.m. een crash) /
+  contains the FM26 BepInExPack modification (GenericMethodGetMethodHook
+  removed to fix a crash).
+
+Node.js (node.exe)
+  Gelicenseerd onder / licensed under de MIT-licentie
+  https://github.com/nodejs/node/blob/main/LICENSE
+
+.NET Runtime (dotnet-map, onderdeel van de BepInEx-loader)
+  Copyright (c) .NET Foundation, MIT-licentie
+  https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
+
+FMSuperScout zelf is geen product van en niet verbonden aan Sports
+Interactive of SEGA. / FMSuperScout is not affiliated with Sports
+Interactive or SEGA.

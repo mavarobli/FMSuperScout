@@ -2,31 +2,36 @@
 
 Status-overzicht van wat af is, wat open staat, en ideeën. Nog niet gebouwd waar "backlog" staat.
 
-## 1. Volledige standalone installer (.exe) - UITGESTELD tot na goed doortesten
+## 1. Volledige standalone installer (.exe) - GEBOUWD (15-07); door mavarobli te testen
 
-Doel: één `.exe` die je op Reddit deelt; gebruiker dubbelklikt, alles wordt geïnstalleerd
-(viewer + plugin + BepInEx), en het draait als een echt Windows-programma. Nu is het een zip
-met alleen de viewer; de plugin en BepInEx ontbreken, dus een downloader ziet een lege tool.
+**Inno Setup 6-installer** (`installer/FMSuperScout.iss`, bouwen met `installer/build-exe.ps1`
+→ `dist/FMSuperScout-Setup.exe`, ~48 MB). Eén .exe die alles installeert:
 
-**Opties (onderzocht):**
-- **Electron + electron-builder → NSIS .exe** (aanbevolen voor snelste "echt programma"-gevoel).
-  Levert een echte installer met Start-menu-item, uninstaller en een eigen venster (Chromium
-  ingebakken, dus geen afhankelijkheid van Edge). Nadeel: ~90 MB (vergelijkbaar met onze huidige
-  zip die node.exe al bundelt). Code blijft JS; onze `app/` gaat vrijwel ongewijzigd mee.
-- **Tauri + Node-sidecar → NSIS/MSI**. Veel kleiner (~5-10 MB + gecompileerde node-sidecar),
-  gebruikt de systeem-WebView2 (aanwezig op Win11). Nadeel: Rust-toolchain nodig, meer setup.
-- **Node SEA + NSIS/Inno**. Compileer `server.js` tot één .exe (Node 24 SEA) en verpak met een
-  NSIS/Inno-installer. Houdt de huidige "Edge --app"-aanpak. Vereist makensis/Inno (nu niet
-  geïnstalleerd).
+- **Viewer** (app + gebundelde node.exe + launcher-vbs) → `Program Files\FMSuperScout`,
+  Start-menu + optioneel bureaublad-snelkoppeling, nette uninstaller in "Apps en onderdelen".
+- **FM26-map automatisch gedetecteerd**, met handmatige mapkiezer (validatie op `fm.exe`) als
+  vangnet: **Steam** (register `HKLM32\SOFTWARE\Valve\Steam` → álle libraries via
+  `steamapps/libraryfolders.vdf` parsen → library met `appmanifest_3551340.acf`, ook
+  `installdir` gelezen), **Epic** (launcher-manifests `ProgramData\Epic\...\Manifests\*.item`,
+  JSON `InstallLocation`), **Xbox/Game Pass PC** (`<schijf>:\XboxGames\Football Manager 26\
+  Content`, C t/m L).
+- **BepInEx-payload gebundeld** (de bewezen set uit Marks installatie = Thunderstore-pack
+  BepInEx 6 BE 6.0.738 IL2CPP x64 incl. gepatchte Il2CppInterop): rootloader (winhttp.dll,
+  doorstop), core, config, unity-libs én de dotnet-runtime (~79 MB). `interop/` en `cache/`
+  bewust niet — die genereert BepInEx bij de eerste start lokaal (patch-bestendig). Staat er
+  al een BepInEx in de gamemap, dan wordt die **niet** overschreven (Check gecachet — anders
+  zou de check halverwege de kopie omslaan). LGPL-notice (`LICENSE-BepInEx.txt`) mee.
+- **Plugin-DLL** → `BepInEx\plugins`. Draaiende `fm.exe` wordt gedetecteerd (WMI) met een
+  "sluit de game"-retry-dialoog. Gamemap wordt in `HKLM\Software\FMSuperScout` onthouden;
+  de uninstaller haalt alléén onze DLL weg (BepInEx blijft staan voor andere mods).
+- Tweetalig (NL/EN), afsluitpagina waarschuwt voor de trage eerste start (interop-generatie,
+  1-3 min zwart consolevenster) en mogelijke antivirus-melding op BepInEx.
 
-**Onderdeel van deze installer:**
-- Bij installatie **FM26-map detecteren** (Steam-pad via register: `HKCU/HKLM ... Steam App 2252570`
-  of de standaard Steam-library) en **BepInEx + `FMSuperScout.dll`** erin kopiëren (game dicht).
-  BepInEx is LGPL, herdistribueerbaar. Risico: pad-/versiedetectie moet op echte machines getest.
-- Uninstaller die de viewer verwijdert en de plugin-DLL optioneel uit de FM-map haalt.
-
-**Belangrijk:** de plugin-installatie kan hier niet end-to-end getest worden (geen draaiende FM);
-mavarobli moet de eindstroom op zijn eigen game natrekken vóór brede verspreiding.
+**Nog te doen vóór release:**
+- **mavarobli test de .exe end-to-end** op de eigen machine (wizard, detectie, snelkoppeling, F9).
+- Epic/Xbox-detectie is **onbeproefd** (hier alleen Steam) → in de release als bèta markeren.
+- Ongesigneerd → SmartScreen-melding "onbekende uitgever" ("Meer info → Toch uitvoeren");
+  code-signing (~€200+/jr of Azure Trusted Signing) pas overwegen als de tool aanslaat.
 
 ## 2. In-app data ophalen met FM-detectie - GEDAAN
 
