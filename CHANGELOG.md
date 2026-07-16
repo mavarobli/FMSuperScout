@@ -29,6 +29,8 @@ new release is built, so the Unreleased section below is what the next release s
   financial, origin and competition merged into one, availability) start collapsed,
   your own open/closed clicks are remembered as before, and section headers get a dot
   when a filter inside them is active, so nothing hides silently.
+- The small "clear" button next to the Position header is gone; the position chip above
+  the table and Clear filters already cover it.
 - Shorter, simpler meta score explanation in the tooltip (NL and EN).
 
 ### Fixed

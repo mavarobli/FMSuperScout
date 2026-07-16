@@ -2201,7 +2201,6 @@ $('f-role').addEventListener('change', () => {
   applyFilters();
   if (state.selected) showDetail(state.selected);
 });
-$('pos-clear').onclick = () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); applyFilters(); };
 
 $('btn-clear').onclick = () => {
   document.querySelectorAll('#filters input[type=text], #filters input[type=number]').forEach(i => i.value = '');
@@ -2225,8 +2224,7 @@ const collapsedSecs = new Set(rawSecs ? JSON.parse(rawSecs) : ['presets', 'role'
 document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
   const key = sec.dataset.sec;
   if (collapsedSecs.has(key)) sec.classList.add('collapsed');
-  sec.querySelector('.fsec-head').addEventListener('click', e => {
-    if (e.target.closest('.mini')) return;
+  sec.querySelector('.fsec-head').addEventListener('click', () => {
     sec.classList.toggle('collapsed');
     if (sec.classList.contains('collapsed')) collapsedSecs.add(key); else collapsedSecs.delete(key);
     localStorage.setItem('fmss_secs', JSON.stringify([...collapsedSecs]));

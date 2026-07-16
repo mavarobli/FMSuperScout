@@ -167,8 +167,6 @@ body.sidebar-collapsed #filters { margin-left: -252px; }
 
 .fgroup { margin-bottom: 12px; }
 .fgroup > label { display: flex; align-items: center; justify-content: space-between; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 4px; }
-.mini { background: var(--bg3); border: 1px solid var(--border); color: var(--muted); font-size: 10px; padding: 1px 6px; border-radius: 4px; cursor: pointer; text-transform: none; }
-.mini:hover { color: var(--text); }
 input[type=text], input[type=number], select {
   background: var(--bg); border: 1px solid var(--border); color: var(--text);
   padding: 6px 8px; border-radius: 5px; font-size: 13px;
@@ -185,7 +183,6 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 /* filtersecties (inklapbaar) */
 .fsection { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 .fsec-head { display: flex; align-items: center; gap: 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--accent); margin-bottom: 8px; font-weight: 700; cursor: pointer; user-select: none; }
-.fsec-head .mini { margin-left: auto; }
 .fsec-head::after { content: '▾'; margin-left: auto; color: var(--muted); font-size: 10px; }
 /* teamchips onder "Mijn club" (1e / 2e / jeugd) */
 #myteam-chips { display: flex; gap: 4px; flex-wrap: wrap; margin: 2px 0 6px 22px; }
@@ -194,7 +191,6 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .mt-chip.on { background: var(--accent); border-color: var(--accent); color: #0c1117; font-weight: 700; }
 .fsec-head:hover { color: var(--accent2); }
 .fsec-head:hover::after { color: var(--accent2); }
-.fsec-head:has(.mini)::after { margin-left: 0; }
 .fsection.collapsed .fsec-head::after { content: '▸'; }
 /* actieve-filterstip op de sectiekop (vooral nuttig als de sectie is ingeklapt) */
 .fsection.f-on > .fsec-head::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); flex: 0 0 auto; }
