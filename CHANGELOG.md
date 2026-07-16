@@ -6,8 +6,18 @@ new release is built, so the Unreleased section below is what the next release s
 ## [Unreleased]
 
 ### Added
+- Attribute filter: filter on any attribute with min/max thresholds ("Pace >= 15"),
+  including hidden characteristics and personality. Opens as a popup from the filter
+  sidebar, rules combine with AND, active rules show as removable chips and are saved
+  in filter presets. Hidden-data rules pause while hidden stats are off.
 - Ko-fi nudge now has usage milestones: 25, 500 and 2000 viewed profiles, 3 times ever,
   at least 14 days apart. Was a single nudge at 25.
+
+### Changed
+- The three contract checkboxes (free agent, expiring within 6 months, within 1 year)
+  merged into one contract status dropdown. Old presets that used the checkboxes still
+  apply correctly.
+- Shorter, simpler meta score explanation in the tooltip (NL and EN).
 
 ### Fixed
 - Foot value (Right/Left/Both) now follows the app language instead of always Dutch.
@@ -19,9 +29,6 @@ new release is built, so the Unreleased section below is what the next release s
 - The column picker no longer lists CA, PA, Meta and Asking price while hidden stats
   are off.
 - Contract dates display as dd-mm-yyyy. CSV export keeps ISO dates for spreadsheets.
-
-### Changed
-- Shorter, simpler meta score explanation in the tooltip (NL and EN).
 
 ## [1.0.0] - 2026-07-15
 

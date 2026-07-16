@@ -94,6 +94,7 @@
       <div class="frow capa-row"><span>CA</span><div class="range2"><input type="number" id="f-ca-min" placeholder="–">–<input type="number" id="f-ca-max" placeholder="–"></div></div>
       <div class="frow capa-row"><span>PA</span><div class="range2"><input type="number" id="f-pa-min" placeholder="–">–<input type="number" id="f-pa-max" placeholder="–"></div></div>
       <div class="frow capa-row" id="f-meta-row"><span>Meta <span class="col-help" data-help="metaHint">?</span></span><div class="range2"><input type="number" id="f-meta-min" placeholder="–">–<input type="number" id="f-meta-max" placeholder="–"></div></div>
+      <button id="btn-adv" type="button"></button>
     </div>
 
     <div class="fsection" data-sec="financial">
@@ -131,9 +132,13 @@
         </select></div>
       <label class="chk"><input type="checkbox" id="f-attain"> <span data-i18n="attainable">Haalbaar</span></label>
       <label class="chk"><input type="checkbox" id="f-listed"> <span data-i18n="listed">Op transferlijst</span></label>
-      <label class="chk"><input type="checkbox" id="f-exp6"> <span data-i18n="exp6">Contract &lt; 6 mnd</span></label>
-      <label class="chk"><input type="checkbox" id="f-exp12"> <span data-i18n="exp12">Contract &lt; 1 jaar</span></label>
-      <label class="chk"><input type="checkbox" id="f-free"> <span data-i18n="free">Clubloos</span></label>
+      <div class="frow"><span data-i18n="contractF">Contract</span>
+        <select id="f-contract">
+          <option value="" data-i18n="all">Alle</option>
+          <option value="free" data-i18n="free">Clubloos</option>
+          <option value="exp6" data-i18n="exp6">&lt; 6 mnd</option>
+          <option value="exp12" data-i18n="exp12">&lt; 1 jaar</option>
+        </select></div>
       <label class="chk"><input type="checkbox" id="f-myclub"> <span data-i18n="myclub">Mijn club</span></label>
       <div id="myteam-chips" style="display:none"></div>
       <label class="chk"><input type="checkbox" id="f-shortlist"> <span data-i18n="onlyshortlist">Alleen shortlist</span></label>
@@ -184,6 +189,7 @@
 
 <div id="donate-nudge" class="hidden"></div>
 <div id="preset-modal" class="hidden"></div>
+<div id="adv-modal" class="hidden"></div>
 <div id="compare-tray" class="hidden"></div>
 <div id="compare-modal" class="hidden"><div id="compare-inner"></div></div>
 <div id="toast" class="hidden"></div>

@@ -20,6 +20,7 @@ const state = {
   shortlist: new Set(JSON.parse(localStorage.getItem('fmss_shortlist') || '[]')),
   colCfg: JSON.parse(localStorage.getItem('fmss_cols') || '{}'),  // per modus: {order:[], hidden:[]}
   colW: JSON.parse(localStorage.getItem('fmss_colw') || '{}'),    // per modus: {kolomkey: breedte px}
+  advF: (() => { try { return JSON.parse(localStorage.getItem('fmss_adv') || '[]'); } catch { return []; } })(),  // attribuutfilter-regels [{k,min,max}]
 };
 const GBP_TO_EUR = 1.16;
 
@@ -38,7 +39,9 @@ const I18N = {
     age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
     origin: 'Herkomst', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
     interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Haalbaar', listed: 'Op transferlijst',
-    exp6: 'Contract < 6 mnd', exp12: 'Contract < 1 jaar', free: 'Clubloos', myclub: 'Mijn club',
+    exp6: '< 6 mnd', exp12: '< 1 jaar', free: 'Clubloos', myclub: 'Mijn club', contractF: 'Contract',
+    advBtn: 'Attribuutfilter', advTitle: 'Filter op attributen', advHint: 'Alle regels moeten kloppen (EN). Ook verborgen kenmerken en persoonlijkheid, tenzij verborgen stats uit staan.',
+    advAdd: '+ attribuut', advClear: 'Wissen', advDone: 'Klaar', advMin: 'min', advMax: 'max',
     onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: 'Nieuwe data',
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
@@ -115,7 +118,9 @@ const I18N = {
     age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
     origin: 'Origin', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
     interestmin: 'Interest ≥', all: 'All', attainable: 'Attainable', listed: 'Transfer listed',
-    exp6: 'Contract < 6 mo', exp12: 'Contract < 1 yr', free: 'Free agent', myclub: 'My club',
+    exp6: '< 6 mo', exp12: '< 1 yr', free: 'Free agent', myclub: 'My club', contractF: 'Contract',
+    advBtn: 'Attribute filter', advTitle: 'Filter on attributes', advHint: 'All rules must match (AND). Hidden characteristics and personality included, unless hidden stats are off.',
+    advAdd: '+ attribute', advClear: 'Clear', advDone: 'Done', advMin: 'min', advMax: 'max',
     onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: 'New data',
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
@@ -618,6 +623,73 @@ function isAttainable(p) {
   return p.listed || p.setForRelease || isFree(p) || (m != null && m <= 12);
 }
 
+// ---------- geavanceerd attribuutfilter ----------
+// Regels [{k, min, max}] over zichtbare attributen, verborgen kenmerken en persoonlijkheid,
+// EN-gecombineerd. Persoonlijkheid leeft op het speler-object zelf, de rest in p.attrs.
+// Regels op verborgen data doen niet mee zolang "verborgen stats" uit staat.
+const ADV_HIDDEN_KEYS = ['Consistency', 'ImportantMatches', 'Versatility', 'InjuryProneness', 'Dirtiness'];
+const ADV_PERS_KEYS = ['ambition', 'professionalism', 'loyalty', 'pressure', 'temperament', 'sportsmanship', 'adaptability', 'controversy'];
+const advIsHidden = k => ADV_HIDDEN_KEYS.includes(k) || ADV_PERS_KEYS.includes(k);
+const advLabel = k => ADV_PERS_KEYS.includes(k) ? t(k) : ADV_HIDDEN_KEYS.includes(k) ? t('a_' + k) : attrName(k);
+const advValue = (p, k) => ADV_PERS_KEYS.includes(k) ? (p[k] || null) : (p.attrs ? p.attrs[k] : null);
+const activeAdvRules = () => state.advF.filter(r => r.k && (r.min || r.max) && !(state.hideCapa && advIsHidden(r.k)));
+const advChipTxt = r => `${advLabel(r.k)} ${r.min && r.max ? r.min + '–' + r.max : r.min ? '≥ ' + r.min : '≤ ' + r.max}`;
+function saveAdv() { localStorage.setItem('fmss_adv', JSON.stringify(state.advF)); updateAdvBtn(); }
+function updateAdvBtn() {
+  const n = activeAdvRules().length;
+  const b = $('btn-adv');
+  b.textContent = t('advBtn') + (n ? ` (${n})` : '') + '…';
+  b.classList.toggle('has-rules', n > 0);
+}
+function advDialog() {
+  const m = $('adv-modal');
+  const groups = [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', ATTR_GROUPS_GK[0][1]]];
+  const optHtml = sel => {
+    let h = groups.map(([g, keys]) => `<optgroup label="${t(g)}">` +
+      keys.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${attrName(k)}</option>`).join('') + '</optgroup>').join('');
+    if (!state.hideCapa) {
+      h += `<optgroup label="${t('hiddenTitle')}">` + ADV_HIDDEN_KEYS.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${t('a_' + k)}</option>`).join('') + '</optgroup>';
+      h += `<optgroup label="${t('personaTitle')}">` + ADV_PERS_KEYS.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${t(k)}</option>`).join('') + '</optgroup>';
+    }
+    return h;
+  };
+  const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  const close = () => { m.classList.add('hidden'); document.removeEventListener('keydown', esc, true); };
+  const render = () => {
+    m.innerHTML = `<div class="pm-card adv-card">
+      <div class="pm-title">${t('advTitle')}</div>
+      <div class="pm-body">${t('advHint')}</div>
+      <div id="adv-rows">` + state.advF.map((r, i) => `
+        <div class="adv-row" data-i="${i}">
+          <select class="adv-k">${optHtml(r.k)}</select>
+          <input type="number" class="adv-min" min="1" max="20" placeholder="${t('advMin')}" value="${r.min || ''}">
+          <input type="number" class="adv-max" min="1" max="20" placeholder="${t('advMax')}" value="${r.max || ''}">
+          <button class="adv-x" title="${t('clear')}">${icon('x', 12)}</button>
+        </div>`).join('') + `</div>
+      <button class="adv-add">${t('advAdd')}</button>
+      <div class="pm-actions">
+        <button class="pm-cancel">${t('advClear')}</button>
+        <button class="pm-ok">${t('advDone')}</button>
+      </div>
+    </div>`;
+    m.querySelectorAll('.adv-row').forEach(row => {
+      const r = state.advF[+row.dataset.i];
+      row.querySelector('.adv-k').onchange = e => { r.k = e.target.value; saveAdv(); applyFilters(); };
+      row.querySelector('.adv-min').oninput = e => { r.min = +e.target.value || 0; saveAdv(); applyFilters(); };
+      row.querySelector('.adv-max').oninput = e => { r.max = +e.target.value || 0; saveAdv(); applyFilters(); };
+      row.querySelector('.adv-x').onclick = () => { state.advF.splice(+row.dataset.i, 1); saveAdv(); applyFilters(); render(); };
+    });
+    m.querySelector('.adv-add').onclick = () => { state.advF.push({ k: 'Pace', min: 0, max: 0 }); saveAdv(); render(); };
+    m.querySelector('.pm-cancel').onclick = () => { state.advF = []; saveAdv(); applyFilters(); render(); };
+    m.querySelector('.pm-ok').onclick = close;
+  };
+  document.addEventListener('keydown', esc, true);
+  m.onclick = e => { if (e.target === m) close(); };
+  if (!state.advF.length) state.advF.push({ k: 'Pace', min: 0, max: 0 });
+  render();
+  m.classList.remove('hidden');
+}
+
 // ---------- tactische rollen (rolgeschiktheid) ----------
 // Per rol: welke posities passen, plus KEY-attributen (zwaar) en PREF-attributen (licht),
 // naar het model van FM's groen/blauw gemarkeerde eigenschappen. Score = gewogen gemiddelde
@@ -982,8 +1054,9 @@ function applyFilters() {
   const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
   const wantAttain = $('f-attain').checked;
   const minInterest = +$('f-interest').value || 0;
-  const wantListed = $('f-listed').checked, wantExp6 = $('f-exp6').checked, wantExp12 = $('f-exp12').checked;
-  const wantFree = $('f-free').checked, onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
+  const wantListed = $('f-listed').checked, contractF = $('f-contract').value;
+  const onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
+  const advRules = state.mode === 'staff' ? [] : activeAdvRules();   // staf heeft geen veld-attributen
   const staffRole = $('f-staffrole').value;
   const divVal = $('f-div').value.trim().toLowerCase();   // zoekbalk: substring, hoofdletterongevoelig
   const myClub = (state.meta.myClub || '').toLowerCase();
@@ -1016,12 +1089,20 @@ function applyFilters() {
       if (state.myTeam === 'res' && !(tt >= 1 && tt <= 9)) return false;
       if (state.myTeam === 'youth' && !(tt >= 10)) return false;
     }
-    if (wantFree && !isFree(p)) return false;
+    if (contractF === 'free' && !isFree(p)) return false;
+    if (contractF === 'exp6' || contractF === 'exp12') {
+      const m = monthsUntil(p.expires);
+      if (m == null || m > (contractF === 'exp6' ? 6 : 12)) return false;
+    }
     if (wantAttain && !isAttainable(p)) return false;
     if (minInterest > 0) { const i = interestEstimate(p); if (!i || i.score < minInterest) return false; }
     if (wantListed && !p.listed) return false;
-    if (wantExp6) { const m = monthsUntil(p.expires); if (m == null || m > 6) return false; }
-    if (wantExp12) { const m = monthsUntil(p.expires); if (m == null || m > 12) return false; }
+    for (const r of advRules) {
+      const av = advValue(p, r.k);
+      if (av == null || av <= 0) return false;   // onbekend attribuut telt als geen match
+      if (r.min && av < r.min) return false;
+      if (r.max && av > r.max) return false;
+    }
     if (activePos.size && !(p.posArr || []).some(x => activePos.has(x))) return false;
     if (state.mode === 'staff' && staffRole && p.job !== staffRole) return false;
     if (divVal && !(p.div || '').toLowerCase().includes(divVal)) return false;
@@ -1062,9 +1143,9 @@ function buildChips() {
   if (+$('f-interest').value > 0) add(`${t('interestmin')} ${$('f-interest').selectedOptions[0].textContent}`, () => { $('f-interest').value = '0'; });
   if ($('f-attain').checked) add(t('attainable'), uncheck('f-attain'));
   if ($('f-listed').checked) add(t('listed'), uncheck('f-listed'));
-  if ($('f-exp6').checked) add(t('exp6'), uncheck('f-exp6'));
-  if ($('f-exp12').checked) add(t('exp12'), uncheck('f-exp12'));
-  if ($('f-free').checked) add(t('free'), uncheck('f-free'));
+  if ($('f-contract').value) add(`${t('contractF')}: ${$('f-contract').selectedOptions[0].textContent}`, () => { $('f-contract').value = ''; });
+  if (state.mode !== 'staff')
+    for (const r of activeAdvRules()) add(advChipTxt(r), () => { state.advF = state.advF.filter(x => x !== r); saveAdv(); });
   if ($('f-myclub').checked) add(t('myclub'), uncheck('f-myclub'));
   if ($('f-shortlist').checked && state.mode !== 'shortlist') add(t('onlyshortlist'), uncheck('f-shortlist'));
   return chips;
@@ -1083,8 +1164,8 @@ function renderChips(chips) {
 // Een preset is een momentopname van alle filtervelden (tekst, vinkjes, selects, posities
 // op het veld en de gekozen tactische rol). Bewaard in localStorage; zelfde naam = overschrijven.
 const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat', 'f-div'];
-const PRESET_CHECK_IDS = ['f-eu', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-myclub', 'f-shortlist'];
-const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role'];
+const PRESET_CHECK_IDS = ['f-eu', 'f-attain', 'f-listed', 'f-myclub', 'f-shortlist'];
+const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role', 'f-contract'];
 function loadPresets() { try { return JSON.parse(localStorage.getItem('fmss_presets') || '[]'); } catch { return []; } }
 function storePresets(list) { localStorage.setItem('fmss_presets', JSON.stringify(list)); }
 function snapshotFilters() {
@@ -1092,15 +1173,24 @@ function snapshotFilters() {
   for (const id of PRESET_TEXT_IDS) { const v = $(id).value.trim(); if (v) s.text[id] = v; }
   for (const id of PRESET_CHECK_IDS) if ($(id).checked) s.check[id] = true;
   for (const id of PRESET_SELECT_IDS) { const v = $(id).value; if (v && v !== '0') s.select[id] = v; }
+  const adv = state.advF.filter(r => r.k && (r.min || r.max));
+  if (adv.length) s.adv = adv.map(r => ({ ...r }));
   return s;
 }
-const presetIsEmpty = s => !s.pos.length && !Object.keys(s.text).length && !Object.keys(s.check).length && !Object.keys(s.select).length;
+const presetIsEmpty = s => !s.pos.length && !Object.keys(s.text).length && !Object.keys(s.check).length && !Object.keys(s.select).length && !(s.adv || []).length;
 function applyPreset(s) {
   $('btn-clear').onclick();                       // schone lei
   $('f-role').value = '';                         // rol hoort bij de preset, niet bij de vorige zoektocht
   for (const [id, v] of Object.entries(s.text || {})) if ($(id)) $(id).value = v;
   for (const id of Object.keys(s.check || {})) if ($(id)) $(id).checked = true;
   for (const [id, v] of Object.entries(s.select || {})) if ($(id)) $(id).value = v;
+  // Oude presets (vóór de contractstatus-select) sloegen dit op als losse checkboxes.
+  const oc = s.check || {};
+  if (oc['f-free']) $('f-contract').value = 'free';
+  else if (oc['f-exp6']) $('f-contract').value = 'exp6';
+  else if (oc['f-exp12']) $('f-contract').value = 'exp12';
+  state.advF = (s.adv || []).map(r => ({ ...r }));
+  saveAdv();
   const codes = new Set(s.pos || []);
   activePos.clear();
   document.querySelectorAll('.pos-node').forEach(n => {
@@ -2053,7 +2143,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-cl
 ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
   let tm; $(id).addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(applyFilters, 150); });
 });
-['f-eu', 'f-myclub', 'f-attain', 'f-listed', 'f-exp6', 'f-exp12', 'f-free', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
+['f-eu', 'f-myclub', 'f-attain', 'f-listed', 'f-contract', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
+$('btn-adv').onclick = advDialog;
 $('f-staffrole').addEventListener('change', applyFilters);
 // Divisie-zoekbalk: filter terwijl je typt + eigen suggestie-dropdown (app-stijl, i.p.v.
 // de native datalist die als lichte "wolk" uit de donkere UI viel).
@@ -2091,7 +2182,8 @@ $('pos-clear').onclick = () => { activePos.clear(); document.querySelectorAll('.
 $('btn-clear').onclick = () => {
   document.querySelectorAll('#filters input[type=text], #filters input[type=number]').forEach(i => i.value = '');
   document.querySelectorAll('#filters input[type=checkbox]').forEach(i => i.checked = false);
-  $('f-staffrole').value = ''; $('f-interest').value = '0';
+  $('f-staffrole').value = ''; $('f-interest').value = '0'; $('f-contract').value = '';
+  state.advF = []; saveAdv();
   activePos.clear();
   document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on'));
   state.presetSel = null; renderPresets();   // dropdown-label terug naar de placeholder
@@ -2164,6 +2256,7 @@ function applyHideCapa() {
     ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-fee'].forEach(id => { const e = $(id); if (e) e.value = ''; });
     if (hiddenStatCol(state.sortKey)) { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
   }
+  updateAdvBtn();   // regels op verborgen data tellen niet mee zolang de toggle uit staat
   if (state.mode === 'analysis') renderAnalysis(); else applyFilters();
   if (state.selected) showDetail(state.selected);
 }
@@ -2207,6 +2300,7 @@ function applyLang() {
   document.querySelectorAll('[data-help]').forEach(el => el.title = t(el.dataset.help));   // ?-tooltips
   $('f-name').placeholder = t('searchph');
   $('btn-coffee').title = t('donateBtn');
+  updateAdvBtn();
   renderDumpInfo();
   renderClubBadge();
   renderVerWarn();
