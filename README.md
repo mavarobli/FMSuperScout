@@ -23,6 +23,8 @@ leaves your PC.
 
 - **Search and filter**: name/club, age, CA, PA, value, asking price, wage, nationality, EU/EEA,
   contract status, division (with smart search). Pick positions on a clickable pitch.
+- **Attribute filter**: min/max thresholds on any attribute ("Pace 15+"), hidden characteristics
+  and personality included. Rules combine, show as removable chips and save into presets.
 - **Tactical role ratings**: 19 FM roles scored from the key attributes; sortable column plus a
   "best roles" panel per profile.
 - **Player comparison**: up to 3 side by side, FM-style bars, hidden stats included.
@@ -37,6 +39,8 @@ leaves your PC.
 - **Shortlist** (★) with its own tab and CSV export.
 - **Settings**: NL/EN, GBP/EUR, and a toggle to hide all hidden stats at once for those who
   consider them cheating.
+- **Update aware**: the app checks the latest release about once a day and shows a dismissible
+  link when a newer version is out. No auto-install, no tracking.
 
 ## Install (end users)
 

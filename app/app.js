@@ -108,7 +108,7 @@ const I18N = {
     saveBtn: 'Opslaan', deleteBtn: 'Verwijderen', cancelBtn: 'Annuleren',
     c_meta: 'Meta', metaLabel: 'Meta-score',
     metaHint: 'Meta-score (1-20): gewogen gemiddelde van de attributen die volgens FM-Arena\'s match-engine-tests wedstrijden winnen. Snelheid en Versnelling tellen veruit het zwaarst, daarna Sprongkracht en Dribbelen.\n\n15+ elite, 13-15 sterk, 11-13 degelijk.\n\nTwee spelers met gelijke CA? Die met de hoogste Meta presteert meestal beter op het veld. Positie en rol tellen niet mee; keepers krijgen geen score.',
-    verWarn: 'FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x — data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
+    verWarn: 'FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x. Data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -189,7 +189,7 @@ const I18N = {
     saveBtn: 'Save', deleteBtn: 'Delete', cancelBtn: 'Cancel',
     c_meta: 'Meta', metaLabel: 'Meta score',
     metaHint: 'Meta score (1-20): a weighted average of the attributes that win matches according to FM-Arena\'s match-engine tests. Pace and Acceleration count heaviest by far, then Jumping Reach and Dribbling.\n\n15+ elite, 13-15 strong, 11-13 decent.\n\nTwo players with equal CA? The one with the higher Meta score usually performs better on the pitch. Position and role are ignored; goalkeepers get no score.',
-    verWarn: 'FM version {v} detected; memory reading is calibrated for {s}.x — data may be unreliable until FMSuperScout is updated.',
+    verWarn: 'FM version {v} detected; memory reading is calibrated for {s}.x. Data may be unreliable until FMSuperScout is updated.',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
