@@ -39,11 +39,11 @@ new release is built, so the Unreleased section below is what the next release s
   when a filter inside them is active, so nothing hides silently.
 - The small "clear" button next to the Position header is gone; the position chip above
   the table and Clear filters already cover it.
-- The attribute filter popup now uses a search field with an always-visible, scrollable
-  list of all attributes, grouped per category. Type to filter ("kop" shows Heading),
-  Enter adds the top match and focus jumps straight to the min field. Prefix matches
-  rank first, attributes already in use disappear from the list, and the popup is
-  wider. Replaces the long dropdowns.
+- The attribute picker in the popup is now a combobox: your active rules sit at the
+  top, click the attribute field and the full grouped list drops down, or just type
+  to filter it ("kop" shows Heading, Enter picks the top match). Attributes already
+  in use disappear from the list, "+ attribute" adds a row with the picker already
+  open, and the popup is roomier (space for about 5 rules).
 - Shorter, simpler meta score explanation in the tooltip (NL and EN).
 
 ### Fixed

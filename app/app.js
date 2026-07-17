@@ -44,8 +44,8 @@ const I18N = {
     interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Beschikbaar', listed: 'Op transferlijst',
     attainHint: 'Kan hij weg bij zijn club? Op de transferlijst, aangeboden, clubloos of contract loopt binnen 12 maanden af (en niet "niet te koop"). Zegt niets over of hij naar JOU wil; dat is Interesse.',
     exp6: '< 6 mnd', exp12: '< 1 jaar', free: 'Clubloos', myclub: 'Mijn club', contractF: 'Contract',
-    advBtn: 'Attribuutfilter', advTitle: 'Filter op attributen', advSearch: 'Zoek een attribuut…',
-    advClear: 'Wissen', advDone: 'Klaar', advMin: 'min', advMax: 'max', advColAttr: 'Attribuut',
+    advBtn: 'Attribuutfilter', advTitle: 'Filter op attributen', advSearch: 'Kies of typ een attribuut…',
+    advAdd: '+ attribuut', advClear: 'Wissen', advDone: 'Klaar', advMin: 'min', advMax: 'max', advColAttr: 'Attribuut',
     reportBug: 'Probleem melden…', esReportHint: 'F9 gedrukt maar geen data?', updateAvail: 'Update {v} beschikbaar',
     onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: 'Nieuwe data',
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
@@ -125,8 +125,8 @@ const I18N = {
     interestmin: 'Interest ≥', all: 'All', attainable: 'Available', listed: 'Transfer listed',
     attainHint: 'Can he leave his club? Transfer listed, offered out, a free agent, or contract ends within 12 months (and not "not for sale"). Says nothing about whether he wants to join YOU; that is Interest.',
     exp6: '< 6 mo', exp12: '< 1 yr', free: 'Free agent', myclub: 'My club', contractF: 'Contract',
-    advBtn: 'Attribute filter', advTitle: 'Filter on attributes', advSearch: 'Search an attribute…',
-    advClear: 'Clear', advDone: 'Done', advMin: 'min', advMax: 'max', advColAttr: 'Attribute',
+    advBtn: 'Attribute filter', advTitle: 'Filter on attributes', advSearch: 'Pick or type an attribute…',
+    advAdd: '+ attribute', advClear: 'Clear', advDone: 'Done', advMin: 'min', advMax: 'max', advColAttr: 'Attribute',
     reportBug: 'Report a problem…', esReportHint: 'Pressed F9 but no data?', updateAvail: 'Update {v} available',
     onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: 'New data',
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
@@ -662,20 +662,34 @@ function advDialog() {
     for (const k of ADV_HIDDEN_KEYS) catalog.push({ k, label: t('a_' + k), group: t('hiddenTitle') });
     for (const k of ADV_PERS_KEYS) catalog.push({ k, label: t(k), group: t('personaTitle') });
   }
-  const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
-  const close = () => { m.classList.add('hidden'); document.removeEventListener('keydown', esc, true); };
+  // Escape sluit eerst een open attributen-dropdown, daarna pas de popup zelf.
+  const esc = e => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    const dd = m.querySelector('.adv-dd:not(.hidden)');
+    if (dd) dd.classList.add('hidden'); else close();
+  };
+  const close = () => {
+    state.advF = state.advF.filter(r => r.k);   // lege (nog niet gekozen) rijen opruimen
+    saveAdv();
+    m.classList.add('hidden');
+    document.removeEventListener('keydown', esc, true);
+  };
   const render = () => {
     m.innerHTML = `<div class="pm-card adv-card">
       <div class="pm-title">${t('advTitle')}</div>
-      <div class="adv-search"><input type="text" id="adv-q" placeholder="${t('advSearch')}" autocomplete="off"><div id="adv-sug" class="hidden"></div></div>
-      ${state.advF.length ? `<div class="adv-head"><span class="ah-attr">${t('advColAttr')}</span><span class="ah-mm">${t('advMin')}</span><span class="ah-mm">${t('advMax')}</span><span class="ah-sp"></span></div>` : ''}
+      <div class="adv-head"><span class="ah-attr">${t('advColAttr')}</span><span class="ah-mm">${t('advMin')}</span><span class="ah-mm">${t('advMax')}</span><span class="ah-sp"></span></div>
       <div id="adv-rows">` + state.advF.map((r, i) => `
         <div class="adv-row" data-i="${i}">
-          <span class="adv-name">${advLabel(r.k)}</span>
+          <div class="adv-kwrap">
+            <input type="text" class="adv-kin" value="${r.k ? escHtml(advLabel(r.k)) : ''}" placeholder="${t('advSearch')}" autocomplete="off">
+            <div class="adv-dd hidden"></div>
+          </div>
           <input type="number" class="adv-min" min="1" max="20" placeholder="${t('advMin')}" value="${r.min || ''}">
           <input type="number" class="adv-max" min="1" max="20" placeholder="${t('advMax')}" value="${r.max || ''}">
           <button class="adv-x" title="${t('clear')}">${icon('x', 12)}</button>
         </div>`).join('') + `</div>
+      <button class="adv-add">${t('advAdd')}</button>
       <div class="pm-actions">
         <button class="pm-cancel">${t('advClear')}</button>
         <button class="pm-ok">${t('advDone')}</button>
@@ -683,48 +697,56 @@ function advDialog() {
     </div>`;
     m.querySelectorAll('.adv-row').forEach(row => {
       const r = state.advF[+row.dataset.i];
+      const kin = row.querySelector('.adv-kin'), dd = row.querySelector('.adv-dd');
+      // Combobox: klikken opent de volledige (gegroepeerde) lijst, typen filtert hem.
+      const buildDd = termRaw => {
+        const term = (termRaw || '').trim().toLowerCase();
+        const used = new Set(state.advF.filter(x => x !== r && x.k).map(x => x.k));
+        const hits = catalog.filter(c => !used.has(c.k) && (!term || c.label.toLowerCase().includes(term)));
+        if (term) hits.sort((a, b) => a.label.toLowerCase().indexOf(term) - b.label.toLowerCase().indexOf(term));
+        let html = '', lastG = null;
+        for (const c of hits) {
+          if (!term && c.group !== lastG) { html += `<div class="asg-h">${c.group}</div>`; lastG = c.group; }
+          html += `<div class="adv-sug-i" data-k="${c.k}"><span>${c.label}</span><span class="asg">${c.group}</span></div>`;
+        }
+        dd.innerHTML = html || `<div class="asg-h">–</div>`;
+        // mousedown (niet click): vóór de blur van het invoerveld
+        dd.querySelectorAll('.adv-sug-i').forEach(el => el.onmousedown = e => { e.preventDefault(); pick(el.dataset.k); });
+      };
+      const pick = k => {
+        const fresh = !r.k;
+        r.k = k; saveAdv(); applyFilters();
+        kin.value = advLabel(k);
+        dd.classList.add('hidden');
+        if (fresh || (!r.min && !r.max)) row.querySelector('.adv-min').focus();
+      };
+      kin.onfocus = () => { buildDd(''); dd.classList.remove('hidden'); kin.select(); };
+      kin.oninput = () => { buildDd(kin.value); dd.classList.remove('hidden'); };
+      kin.onblur = () => setTimeout(() => { dd.classList.add('hidden'); kin.value = r.k ? advLabel(r.k) : ''; }, 120);
+      kin.onkeydown = e => {
+        if (e.key === 'Enter') { const f = dd.querySelector('.adv-sug-i'); if (f) pick(f.dataset.k); }
+      };
       row.querySelector('.adv-min').oninput = e => { r.min = +e.target.value || 0; saveAdv(); applyFilters(); };
       row.querySelector('.adv-max').oninput = e => { r.max = +e.target.value || 0; saveAdv(); applyFilters(); };
-      row.querySelector('.adv-x').onclick = () => { state.advF.splice(+row.dataset.i, 1); saveAdv(); applyFilters(); render(); $('adv-q').focus(); };
+      row.querySelector('.adv-x').onclick = () => { state.advF.splice(+row.dataset.i, 1); saveAdv(); applyFilters(); render(); };
     });
-    // Zoekveld met altijd zichtbare, scrollbare lijst van álle attributen (gegroepeerd).
-    // Typen filtert de lijst live; klik of Enter voegt de regel toe en zet de focus op
-    // het min-veld van de nieuwe rij.
-    const q = $('adv-q'), sug = $('adv-sug');
-    const addRule = k => {
-      state.advF.push({ k, min: 0, max: 0 });
-      saveAdv(); render();
-      const mins = m.querySelectorAll('.adv-min');
-      mins[mins.length - 1].focus();
+    m.querySelector('.adv-add').onclick = () => {
+      state.advF.push({ k: '', min: 0, max: 0 });
+      render();
+      const kins = m.querySelectorAll('.adv-kin');
+      const last = kins[kins.length - 1];
+      last.focus(); last.onfocus();   // dropdown meteen open, ook als het focus-event niet vuurt
     };
-    const showSug = () => {
-      const term = q.value.trim().toLowerCase();
-      const used = new Set(state.advF.map(r => r.k));
-      // Prefix-matches eerst: "sne" → Snelheid boven Versnelling, zodat Enter goed pakt.
-      const hits = catalog.filter(c => !used.has(c.k) && (!term || c.label.toLowerCase().includes(term)));
-      if (term) hits.sort((a, b) => a.label.toLowerCase().indexOf(term) - b.label.toLowerCase().indexOf(term));
-      let html = '', lastGroup = null;
-      for (const c of hits) {
-        if (!term && c.group !== lastGroup) { html += `<div class="asg-h">${c.group}</div>`; lastGroup = c.group; }
-        html += `<div class="adv-sug-i" data-k="${c.k}"><span>${c.label}</span><span class="asg">${c.group}</span></div>`;
-      }
-      sug.innerHTML = html || `<div class="asg-h">–</div>`;
-      // mousedown (niet click): vóór de blur van het zoekveld
-      sug.querySelectorAll('.adv-sug-i').forEach(el => el.onmousedown = e => { e.preventDefault(); addRule(el.dataset.k); });
-    };
-    q.oninput = showSug;
-    q.onkeydown = e => {
-      if (e.key === 'Enter') { const f = sug.querySelector('.adv-sug-i'); if (f) addRule(f.dataset.k); }
-    };
-    showSug();   // lijst staat er meteen, ook zonder te typen
     m.querySelector('.pm-cancel').onclick = () => { state.advF = []; saveAdv(); applyFilters(); render(); };
     m.querySelector('.pm-ok').onclick = close;
   };
   document.addEventListener('keydown', esc, true);
   m.onclick = e => { if (e.target === m) close(); };
+  if (!state.advF.length) state.advF.push({ k: '', min: 0, max: 0 });
   render();
   m.classList.remove('hidden');   // eerst zichtbaar, anders pakt focus() niet
-  $('adv-q').focus();
+  const firstEmpty = [...m.querySelectorAll('.adv-row')].find(row => !state.advF[+row.dataset.i].k);
+  if (firstEmpty) { const k = firstEmpty.querySelector('.adv-kin'); k.focus(); k.onfocus(); }
 }
 
 // ---------- tactische rollen (rolgeschiktheid) ----------
