@@ -297,14 +297,15 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #btn-adv { width: 100%; margin-top: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--muted); border-radius: 7px; padding: 6px 8px; font-size: 12px; cursor: pointer; }
 #btn-adv:hover { color: var(--text); border-color: var(--accent); }
 #btn-adv.has-rules { color: var(--accent); border-color: var(--accent); }
-.pm-card.adv-card { width: 460px; max-width: 92vw; max-height: 74vh; overflow: auto; }
-.adv-card .adv-search { position: relative; margin-bottom: 12px; }
-.adv-card .adv-search input { width: 100%; margin-bottom: 0; }
-.adv-card #adv-sug { position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 30; max-height: 240px; overflow-y: auto; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
-.adv-card #adv-sug.hidden { display: none; }
-.adv-card .adv-sug-i { display: flex; justify-content: space-between; gap: 10px; padding: 6px 10px; cursor: pointer; font-size: 12.5px; }
+.pm-card.adv-card { width: 560px; max-width: 94vw; max-height: 84vh; overflow: auto; display: flex; flex-direction: column; }
+.adv-card .adv-search { margin-bottom: 10px; }
+.adv-card .adv-search input { width: 100%; margin-bottom: 8px; }
+/* altijd zichtbare, scrollbare attributenlijst onder het zoekveld */
+.adv-card #adv-sug { height: 240px; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+.adv-card .adv-sug-i { display: flex; justify-content: space-between; gap: 10px; padding: 5px 10px; cursor: pointer; font-size: 12.5px; }
 .adv-card .adv-sug-i:hover { background: var(--bg3); }
 .adv-card .adv-sug-i .asg { color: var(--muted); font-size: 11px; }
+.adv-card .asg-h { padding: 7px 10px 3px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); font-weight: 700; }
 .adv-card .adv-head { display: flex; gap: 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
 .adv-card .adv-head .ah-attr { flex: 1; }
 .adv-card .adv-head .ah-mm { flex: 0 0 60px; }

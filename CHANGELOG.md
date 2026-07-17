@@ -3,7 +3,7 @@
 Notable changes per release. The installer only picks up app and plugin changes when a
 new release is built, so the Unreleased section below is what the next release ships.
 
-## [Unreleased]
+## [1.1.0] - 2026-07-17
 
 ### Added
 - Update notification: the app checks the latest GitHub release about once a day and
@@ -39,10 +39,11 @@ new release is built, so the Unreleased section below is what the next release s
   when a filter inside them is active, so nothing hides silently.
 - The small "clear" button next to the Position header is gone; the position chip above
   the table and Clear filters already cover it.
-- The attribute filter popup now uses a search field instead of long dropdowns: type
-  "pac" and hit Enter to add a Pace rule, focus jumps straight to the min field. Prefix
-  matches rank first, attributes already in use are hidden from the suggestions, and
-  the helper text is gone.
+- The attribute filter popup now uses a search field with an always-visible, scrollable
+  list of all attributes, grouped per category. Type to filter ("kop" shows Heading),
+  Enter adds the top match and focus jumps straight to the min field. Prefix matches
+  rank first, attributes already in use disappear from the list, and the popup is
+  wider. Replaces the long dropdowns.
 - Shorter, simpler meta score explanation in the tooltip (NL and EN).
 
 ### Fixed

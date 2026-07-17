@@ -687,8 +687,9 @@ function advDialog() {
       row.querySelector('.adv-max').oninput = e => { r.max = +e.target.value || 0; saveAdv(); applyFilters(); };
       row.querySelector('.adv-x').onclick = () => { state.advF.splice(+row.dataset.i, 1); saveAdv(); applyFilters(); render(); $('adv-q').focus(); };
     });
-    // Zoekveld: typen filtert de catalogus, klik of Enter voegt de regel toe en zet de
-    // focus op het min-veld van de nieuwe rij.
+    // Zoekveld met altijd zichtbare, scrollbare lijst van álle attributen (gegroepeerd).
+    // Typen filtert de lijst live; klik of Enter voegt de regel toe en zet de focus op
+    // het min-veld van de nieuwe rij.
     const q = $('adv-q'), sug = $('adv-sug');
     const addRule = k => {
       state.advF.push({ k, min: 0, max: 0 });
@@ -700,20 +701,22 @@ function advDialog() {
       const term = q.value.trim().toLowerCase();
       const used = new Set(state.advF.map(r => r.k));
       // Prefix-matches eerst: "sne" → Snelheid boven Versnelling, zodat Enter goed pakt.
-      const hits = catalog.filter(c => !used.has(c.k) && (!term || c.label.toLowerCase().includes(term)))
-        .sort((a, b) => a.label.toLowerCase().indexOf(term) - b.label.toLowerCase().indexOf(term))
-        .slice(0, 10);
-      sug.innerHTML = hits.map(c => `<div class="adv-sug-i" data-k="${c.k}"><span>${c.label}</span><span class="asg">${c.group}</span></div>`).join('');
-      sug.classList.toggle('hidden', !hits.length);
+      const hits = catalog.filter(c => !used.has(c.k) && (!term || c.label.toLowerCase().includes(term)));
+      if (term) hits.sort((a, b) => a.label.toLowerCase().indexOf(term) - b.label.toLowerCase().indexOf(term));
+      let html = '', lastGroup = null;
+      for (const c of hits) {
+        if (!term && c.group !== lastGroup) { html += `<div class="asg-h">${c.group}</div>`; lastGroup = c.group; }
+        html += `<div class="adv-sug-i" data-k="${c.k}"><span>${c.label}</span><span class="asg">${c.group}</span></div>`;
+      }
+      sug.innerHTML = html || `<div class="asg-h">–</div>`;
       // mousedown (niet click): vóór de blur van het zoekveld
       sug.querySelectorAll('.adv-sug-i').forEach(el => el.onmousedown = e => { e.preventDefault(); addRule(el.dataset.k); });
     };
     q.oninput = showSug;
-    q.onfocus = showSug;
-    q.onblur = () => setTimeout(() => sug.classList.add('hidden'), 120);
     q.onkeydown = e => {
       if (e.key === 'Enter') { const f = sug.querySelector('.adv-sug-i'); if (f) addRule(f.dataset.k); }
     };
+    showSug();   // lijst staat er meteen, ook zonder te typen
     m.querySelector('.pm-cancel').onclick = () => { state.advF = []; saveAdv(); applyFilters(); render(); };
     m.querySelector('.pm-ok').onclick = close;
   };
