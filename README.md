@@ -58,6 +58,9 @@ No coding needed, nothing else to download.
 To remove it: *Apps and features* → FMSuperScout. That removes the viewer and the plugin DLL;
 BepInEx stays (other mods may use it).
 
+Something not working (no players loaded, no console window)? See
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md), or use **Report a problem** in the app's settings menu.
+
 ## Run from source (developers)
 
 Requires [Node.js](https://nodejs.org) (any recent version; no dependencies to install).

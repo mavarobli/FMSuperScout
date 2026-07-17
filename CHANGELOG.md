@@ -6,6 +6,14 @@ new release is built, so the Unreleased section below is what the next release s
 ## [Unreleased]
 
 ### Added
+- Update notification: the app checks the latest GitHub release about once a day and
+  shows a dismissible pill in the top bar when a newer version exists. No auto-install,
+  just a link; fails silently when offline.
+- Report a problem: button in the settings menu and on the empty screen. Opens a
+  GitHub issue with app, plugin and game versions pre-filled, plus instructions on
+  which diagnostic files to attach. The dump now includes the plugin version
+  (plugin v0.1.34) and there is a TROUBLESHOOTING.md for the common "no players
+  loaded" causes (antivirus quarantining the BepInEx loader is the usual one).
 - Attribute filter: filter on any attribute with min/max thresholds ("Pace >= 15"),
   including hidden characteristics and personality. Opens as a popup from the filter
   sidebar, rules combine with AND, active rules show as removable chips and are saved

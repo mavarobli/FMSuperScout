@@ -129,6 +129,22 @@ body {
 /* CA/PA verbergen: filterrijen uit de zijbalk halen */
 body.hide-capa .capa-row { display: none; }
 
+/* update-melding in de topbar */
+#update-pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(74,163,255,.12); border: 1px solid var(--accent2); border-radius: 999px; padding: 3px 6px 3px 10px; font-size: 11.5px; }
+#update-pill.hidden { display: none; }
+#update-pill a { color: var(--accent2); text-decoration: none; font-weight: 600; }
+#update-pill a:hover { text-decoration: underline; }
+#update-pill button { background: none; border: 0; color: var(--muted); cursor: pointer; display: inline-flex; padding: 2px; }
+#update-pill button:hover { color: var(--text); }
+
+/* probleem melden (instellingen + lege staat) */
+.set-report { width: 100%; margin-top: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--muted); border-radius: 7px; padding: 6px 8px; font-size: 12.5px; cursor: pointer; }
+.set-report:hover { color: var(--text); border-color: var(--accent2); }
+#settings-menu #set-version { padding-top: 8px; color: #5c6b7d; font-size: 10.5px; text-align: center; }
+.es-help { margin-top: 18px; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 10px; justify-content: center; }
+.es-help button { background: none; border: 1px solid var(--border); color: var(--accent2); border-radius: 7px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+.es-help button:hover { border-color: var(--accent2); }
+
 /* zoekveld met icoon + sneltoets-hint */
 .search-wrap { position: relative; }
 .search-ico { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); pointer-events: none; }

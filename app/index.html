@@ -23,6 +23,7 @@
     <button id="tab-analysis" class="tab" data-i18n="analysis">Analyse</button>
   </nav>
   <div id="club-badge" title="Klik = filter op jouw club"></div>
+  <span id="update-pill" class="hidden"></span>
   <div id="dump-info"></div>
   <div id="game-date"></div>
   <button id="btn-fetch" title="Vraag FM om een nieuwe dump">
@@ -45,6 +46,8 @@
     <select id="sel-cur"><option value="£">£ GBP</option><option value="€">€ EUR</option></select></div>
   <label class="set-row set-toggle"><span data-i18n="showHidden">Verborgen stats tonen</span>
     <input type="checkbox" id="set-hidecapa"></label>
+  <button id="btn-report" class="set-report" data-i18n="reportBug">Probleem melden…</button>
+  <div class="set-note" id="set-version"></div>
 </div>
 
 <div id="banner" class="hidden"></div>
@@ -171,6 +174,8 @@
         <li data-i18n-html="step2"></li>
         <li data-i18n-html="step3"></li>
       </ol>
+      <div class="es-help"><span data-i18n="esReportHint">F9 gedrukt maar geen data?</span>
+        <button id="es-report" data-i18n="reportBug">Probleem melden…</button></div>
     </div>
   </section>
 

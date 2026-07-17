@@ -23,6 +23,9 @@ const state = {
   advF: (() => { try { return JSON.parse(localStorage.getItem('fmss_adv') || '[]'); } catch { return []; } })(),  // attribuutfilter-regels [{k,min,max}]
 };
 const GBP_TO_EUR = 1.16;
+// App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
+const APP_VERSION = '1.1.0';
+const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
 const I18N = {
@@ -43,6 +46,7 @@ const I18N = {
     exp6: '< 6 mnd', exp12: '< 1 jaar', free: 'Clubloos', myclub: 'Mijn club', contractF: 'Contract',
     advBtn: 'Attribuutfilter', advTitle: 'Filter op attributen', advSearch: 'Zoek een attribuut…',
     advClear: 'Wissen', advDone: 'Klaar', advMin: 'min', advMax: 'max', advColAttr: 'Attribuut',
+    reportBug: 'Probleem melden…', esReportHint: 'F9 gedrukt maar geen data?', updateAvail: 'Update {v} beschikbaar',
     onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: 'Nieuwe data',
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
@@ -123,6 +127,7 @@ const I18N = {
     exp6: '< 6 mo', exp12: '< 1 yr', free: 'Free agent', myclub: 'My club', contractF: 'Contract',
     advBtn: 'Attribute filter', advTitle: 'Filter on attributes', advSearch: 'Search an attribute…',
     advClear: 'Clear', advDone: 'Done', advMin: 'min', advMax: 'max', advColAttr: 'Attribute',
+    reportBug: 'Report a problem…', esReportHint: 'Pressed F9 but no data?', updateAvail: 'Update {v} available',
     onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: 'New data',
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
@@ -1832,6 +1837,53 @@ function showDetail(p) {
   if (p.id !== state._donLast) { state._donLast = p.id; maybeDonateNudge(); }   // telt per nieuw profiel
 }
 
+// ---------- update-melding ----------
+// Checkt hooguit 1x per ~20 uur de laatste GitHub-release (API staat CORS toe) en toont
+// een wegklikbaar pilletje in de topbar bij een nieuwere versie. Offline/fout = stil.
+async function checkUpdate() {
+  try {
+    let chk = {};
+    try { chk = JSON.parse(localStorage.getItem('fmss_updchk') || '{}'); } catch { }
+    if (!chk.at || Date.now() - chk.at > 20 * 3600e3) {
+      const res = await fetch('https://api.github.com/repos/mavarobli/FMSuperScout/releases/latest');
+      if (!res.ok) return;
+      chk = { at: Date.now(), tag: (await res.json()).tag_name };
+      localStorage.setItem('fmss_updchk', JSON.stringify(chk));
+    }
+    if (!chk.tag) return;
+    const norm = v => String(v).replace(/^v/, '').split('.').map(n => parseInt(n) || 0);
+    const [l, c] = [norm(chk.tag), norm(APP_VERSION)];
+    const newer = l[0] !== c[0] ? l[0] > c[0] : l[1] !== c[1] ? l[1] > c[1] : (l[2] || 0) > (c[2] || 0);
+    if (!newer || localStorage.getItem('fmss_upd_dismiss') === chk.tag) return;
+    const el = $('update-pill');
+    el.innerHTML = `<a href="${REPO_URL}/releases/latest" target="_blank" rel="noopener">${tf('updateAvail', { v: chk.tag })}</a>
+      <button title="${t('donateLater')}">${icon('x', 10)}</button>`;
+    el.classList.remove('hidden');
+    el.querySelector('button').onclick = () => { localStorage.setItem('fmss_upd_dismiss', chk.tag); el.classList.add('hidden'); };
+  } catch { }
+}
+
+// ---------- probleem melden ----------
+// Opent een voorgevuld GitHub-issue met de omgevingsinfo die we hebben; de gebruiker
+// hoeft alleen het verhaal en de diagnostiekbestanden toe te voegen.
+function reportBug() {
+  const m = state.meta || {};
+  const body = [
+    '### What happened?', '', '_Describe the problem here._', '',
+    '### Environment (auto-filled)',
+    `- FMSuperScout app: v${APP_VERSION}`,
+    `- Plugin: ${m.pluginVersion || 'unknown (dump predates v0.1.34 or no dump loaded)'}`,
+    `- FM game version: ${m.gameVersion || 'unknown'} (supported: ${m.supportedVersion || '?'}, ok: ${m.versionOk ?? '?'})`,
+    `- Players/staff loaded: ${state.players.length} / ${state.staff.length}`,
+    `- Platform: Steam / Epic / Game Pass? _(fill in)_`,
+    '',
+    '### Attach these files (important!)',
+    'From `%LOCALAPPDATA%\\FMSuperScout\\`: `diagnostics.txt` and `status.json`.',
+    'From your FM folder: `BepInEx\\LogOutput.log` (if it exists).',
+  ].join('\n');
+  window.open(`${REPO_URL}/issues/new?title=${encodeURIComponent('[bug] ')}&body=${encodeURIComponent(body)}`, '_blank', 'noopener');
+}
+
 // ---------- steun (Ko-fi), sympathiek en niet-opdringerig ----------
 const KOFI = 'https://ko-fi.com/fmsuperscout';
 function openKofi() { window.open(KOFI, '_blank', 'noopener'); }
@@ -2236,6 +2288,9 @@ $('btn-clear').onclick = () => {
 $('btn-sidebar').onclick = () => document.body.classList.toggle('sidebar-collapsed');
 $('btn-export').onclick = exportShortlist;
 $('btn-coffee').onclick = openKofi;
+$('btn-report').onclick = reportBug;
+$('es-report').onclick = reportBug;
+checkUpdate();
 
 // inklapbare filtersecties (voorkeur onthouden)
 // Eerste gebruik (geen opgeslagen stand): secundaire secties dicht zodat de zijbalk op
@@ -2346,6 +2401,7 @@ function applyLang() {
   document.querySelectorAll('[data-help]').forEach(el => el.title = t(el.dataset.help));   // ?-tooltips
   $('f-name').placeholder = t('searchph');
   $('btn-coffee').title = t('donateBtn');
+  $('set-version').textContent = 'FMSuperScout v' + APP_VERSION;
   updateAdvBtn();
   renderDumpInfo();
   renderClubBadge();

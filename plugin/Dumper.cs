@@ -733,6 +733,7 @@ internal static class Dumper
             j.Prop("gameDateSource", "derived");
         }
         j.Prop("gameYear", gy);
+        j.Prop("pluginVersion", Plugin.Version);
         j.Prop("gameVersion", GameVersion);
         j.Prop("supportedVersion", Fields.SUPPORTED_VERSION);
         j.Prop("versionOk", VersionOk);
