@@ -26,6 +26,9 @@ internal static class Dumper
     internal static Dictionary<uint, int> DateVotes = new();
     // Fase-timing (ms per stap) — om te zien waar de scan-tijd heen gaat.
     internal static List<string> PhaseLog = new();
+    // Speler/staf-ontdubbeling: ruwe staftelling en hoeveel daarvan óók als speler voorkwam.
+    internal static int DiagStaffRaw;
+    internal static int DiagStaffAlsoPlayer;
 
     private const int ChunkSize = 32 * 1024 * 1024; // 32 MB leesblokken
 
@@ -405,6 +408,19 @@ internal static class Dumper
         FindGameDate(mem, players.Values, staff.Values);
         Phase("koppeling + datum + seizoensjaar");
 
+        // ---- Speler/staf-ontdubbeling ----
+        // Elke Person draagt náást speler-data ook een non-player/coaching-facet (class-offset
+        // 0x100). Daardoor werd vrijwel elke speler óók via die facet opgepikt en als "staf"
+        // dubbel geteld: totaal ≈ 2× de database. Echte staf (coaches, scouts, fysio's) heeft
+        // geen speler-facet en blijft dus staan. We meten eerst de overlap (diagnose) en
+        // verwijderen dan alle uids uit de staflijst die al een speler zijn. Speler-coaches
+        // (offset 0x380) tellen al als speler, dus die verdwijnen niet uit beeld.
+        DiagStaffRaw = staff.Count;
+        var staffAlsoPlayer = staff.Keys.Where(uid => players.ContainsKey(uid)).ToList();
+        DiagStaffAlsoPlayer = staffAlsoPlayer.Count;
+        foreach (var uid in staffAlsoPlayer) staff.Remove(uid);
+        Plugin.Log.LogInfo($"Speler/staf-ontdubbeling: staf ruw {DiagStaffRaw}, ook speler {DiagStaffAlsoPlayer}, netto staf {staff.Count}.");
+
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
         WriteStatus("scanning", players.Count, staff.Count, null, 0.90);
@@ -771,7 +787,6 @@ internal static class Dumper
         j.BeginObj();
         j.Prop("id", p.Uid);
         j.Prop("name", p.Name ?? "?");
-        j.Prop("searchName", p.Name ?? "");
         j.Prop("age", p.Age);
         if (p.BirthYear > 0) { j.Prop("dob", $"{p.BirthYear:D4}"); j.Prop("birthYear", p.BirthYear); j.Prop("birthDoy", p.BirthDoy); }
         j.Key("nat"); j.BeginArr(); foreach (var n in p.Nat) j.Val(n); j.EndArr();
@@ -834,6 +849,7 @@ internal static class Dumper
             w.WriteLine($"game_plugin.dll:  {m.GpBase:X}-{m.GpEnd:X}");
             w.WriteLine($"Kandidaten: {candidates:N0}  (vtable in game_plugin: {VtGp:N0})");
             w.WriteLine($"Spelers: {players.Count}  Staf: {staff.Count}  Tijd: {ms} ms");
+            w.WriteLine($"Staf ruw: {DiagStaffRaw}  ·  ook speler (verwijderd als dubbel): {DiagStaffAlsoPlayer}  ·  netto staf: {staff.Count}");
             w.WriteLine("Fasen: " + string.Join(" · ", PhaseLog));
             w.WriteLine();
             // Health-check: de grote pieken horen speler=0x288 en staf=0x100 te zijn. Wijkt dit

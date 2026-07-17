@@ -3,6 +3,38 @@
 Notable changes per release. The installer only picks up app and plugin changes when a
 new release is built, so the Unreleased section below is what the next release ships.
 
+## [1.1.1] - 2026-07-17
+
+Plugin: v0.1.35.
+
+### Fixed
+- Huge dumps (600+ MB, saves with 100+ playable leagues) now load fast and reliably.
+  Repeated strings (club, division, contract dates, positions) are deduplicated while
+  parsing and the parser yields to the UI every 8 MB instead of every 32 MB: a 611 MB
+  test dump with 635k people now loads in about 17 seconds with a ~520 MB memory peak,
+  where it previously froze the app for 90+ seconds. The plugin (v0.1.35) also stops
+  writing the unused searchName field, which shrinks every dump.
+- If loading still crashes the app window (out of memory on machines where FM26 uses
+  most of the RAM), the app now detects the crashed attempt on the next start and shows
+  a hint (close FM26, the dump is already on disk) with a Try again button, instead of
+  silently crash-looping on every start.
+- "New data" no longer hangs forever when FM26 does not pick up the request. The plugin
+  (v0.1.35) now polls the web-app trigger on its own background thread instead of inside
+  Unity's Update loop, which in some game sessions never ticks for injected plugins (F9
+  died along with it). The app also shows a hint after 15 seconds if the scan has not
+  started, instead of an endless "reading player data" banner.
+- Player/staff double-count (plugin v0.1.35): every person carries a non-player/coaching
+  facet next to its player data, so nearly every player was also picked up as "staff" and
+  counted twice, roughly doubling the dump on large saves. Staff now excludes any uid that
+  is already a player (player-coaches keep showing as players); real coaches, scouts and
+  physios are unaffected. diagnostics.txt reports raw staff, the overlap removed, and net
+  staff. This also roughly halves the dump size on big saves.
+- A dump that fails to load (parse or out-of-memory, seen on very large saves with many
+  leagues loaded) no longer leaves a silent empty screen with the misleading "press F9"
+  steps. The empty screen now shows the failure, the dump size on disk and the error
+  detail, with Try again and Report a problem buttons. The bug report now also includes
+  the dump size on disk and the load error, so those reports are actionable at a glance.
+
 ## [1.1.0] - 2026-07-17
 
 ### Added

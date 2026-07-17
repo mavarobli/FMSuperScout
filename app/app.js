@@ -24,7 +24,7 @@ const state = {
 };
 const GBP_TO_EUR = 1.16;
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -68,6 +68,7 @@ const I18N = {
     dumping: 'Spelersdata inlezen…', dumpReady: 'Nieuwe data klaar, klik om te laden',
     dumpLoaded: 'Nieuwe data geladen',
     dumpError: 'Uitlezen mislukt', fmNotRunning: 'Start eerst Football Manager 26 en laad je save.',
+    reqNoPickup: 'FM26 pikt het verzoek niet op. Is je save geladen? Probeer anders F9 in de game, of herstart FM26.',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
@@ -75,6 +76,11 @@ const I18N = {
     clearAll: 'alles wissen', chipSearch: 'Zoek',
     loading: 'Data laden…',
     parsing: 'Data verwerken…',
+    esErrTitle: 'De dump kon niet geladen worden',
+    esErrBig: 'Er staat wél een dump op schijf, maar de app kon hem niet inlezen. Dit gebeurt vooral bij een heel grote save (veel competities geladen tegelijk). Meld het met de knop hieronder, dan kijken we ernaar.',
+    esErrSize: 'Dump op schijf: {mb} MB',
+    esErrReload: 'Opnieuw proberen',
+    esErrCrash: 'De vorige laadpoging is vastgelopen, waarschijnlijk door te weinig vrij geheugen. Tip: sluit FM26 (de dump staat al op schijf, de game is niet nodig om te kijken) en klik daarna op Opnieuw proberen.',
     step1: 'Start <b>FM26</b> en laad je save',
     step2: 'Druk in de game op <kbd>F9</kbd>, of klik hier op <b>Nieuwe data</b>',
     step3: 'De data laadt vanzelf zodra de dump klaar is',
@@ -149,6 +155,7 @@ const I18N = {
     dumping: 'Reading player data…', dumpReady: 'New data ready, click to load',
     dumpLoaded: 'New data loaded',
     dumpError: 'Read failed', fmNotRunning: 'Start Football Manager 26 and load your save first.',
+    reqNoPickup: 'FM26 is not picking up the request. Is your save loaded? Try F9 in the game, or restart FM26.',
     tag_free: 'free', tag_listed: 'listed', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
@@ -156,6 +163,11 @@ const I18N = {
     clearAll: 'clear all', chipSearch: 'Search',
     loading: 'Loading data…',
     parsing: 'Processing data…',
+    esErrTitle: 'The dump could not be loaded',
+    esErrBig: 'There is a dump on disk, but the app could not read it. This mostly happens with a very large save (many leagues loaded at once). Report it with the button below and we will look into it.',
+    esErrSize: 'Dump on disk: {mb} MB',
+    esErrReload: 'Try again',
+    esErrCrash: 'The previous load attempt crashed, most likely because the system ran out of free memory. Tip: close FM26 (the dump is already on disk, the game is not needed for viewing), then click Try again.',
     step1: 'Start <b>FM26</b> and load your save',
     step2: 'Press <kbd>F9</kbd> in-game, or click <b>New data</b> here',
     step3: 'The data loads automatically once the dump is ready',
@@ -870,39 +882,133 @@ function buildPitch() {
 }
 
 // ---------- data laden ----------
-async function loadDump() {
+// Streamende dump-parser: knipt meta/speler-/stafobjecten één voor één uit de bytestroom.
+// Nodig omdat een dump van een volledig geladen database (600k+ personen, honderden MB's)
+// niet in één JavaScript-string of JSON.parse past (V8-limiet ~512 MB per string).
+// Leunt op de vaste plugin-structuur: {"meta":{...},"players":[{...}...],"staff":[{...}...]}.
+// String-interning: JSON.parse maakt voor elke voorkomen een nieuw string-object, ook
+// als de inhoud identiek is. Club-, divisie- en datumwaarden komen in een grote dump
+// honderdduizenden keren voor; één canonieke instantie per waarde scheelt honderden MB
+// piekgeheugen bij mega-dumps (600k+ personen).
+const INTERN_KEYS = ['club', 'ownerClub', 'div', 'pos', 'foot', 'expires', 'dob', 'job'];
+function internStrings(obj, pool) {
+  for (const k of INTERN_KEYS) {
+    const v = obj[k];
+    if (typeof v === 'string') { const c = pool.get(v); if (c !== undefined) obj[k] = c; else pool.set(v, v); }
+  }
+  for (const arrK of ['nat', 'posArr']) {
+    const a = obj[arrK];
+    if (a) for (let i = 0; i < a.length; i++) { const c = pool.get(a[i]); if (c !== undefined) a[i] = c; else pool.set(a[i], a[i]); }
+  }
+}
+
+async function parseDumpStream(resp, total, onProgress) {
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  const data = { meta: {}, players: [], staff: [] };
+  const pool = new Map();
+  let buf = '', pos = 0;            // onverwerkte staart + scanpositie daarin
+  let depth = 0, inStr = false, esc = false;
+  let key = '', keyStart = -1;      // top-level sleutel (op diepte 1)
+  let curKey = null;                // actieve sectie: meta | players | staff
+  let elemStart = -1, elemDepth = 0;
+  let got = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    got += value.length;
+    onProgress(got);
+    buf += dec.decode(value, { stream: true });
+    for (; pos < buf.length; pos++) {
+      const c = buf.charCodeAt(pos);
+      if (inStr) {
+        if (esc) esc = false;
+        else if (c === 92) esc = true;                          // \
+        else if (c === 34) {                                    // sluitende "
+          inStr = false;
+          if (keyStart >= 0) { key = buf.slice(keyStart, pos); keyStart = -1; }
+        }
+      } else if (c === 34) {                                    // openende "
+        inStr = true;
+        if (depth === 1 && elemStart < 0) keyStart = pos + 1;
+      } else if (c === 58) {                                    // :
+        if (depth === 1 && key) { curKey = key; key = ''; }
+      } else if (c === 123 || c === 91) {                       // { of [
+        depth++;
+        if (elemStart < 0 && c === 123 &&
+            ((curKey === 'meta' && depth === 2) ||
+             ((curKey === 'players' || curKey === 'staff') && depth === 3))) {
+          elemStart = pos; elemDepth = depth;
+        }
+      } else if (c === 125 || c === 93) {                       // } of ]
+        if (elemStart >= 0 && depth === elemDepth) {
+          const obj = JSON.parse(buf.slice(elemStart, pos + 1));
+          if (curKey === 'meta') data.meta = obj;
+          else { internStrings(obj, pool); data[curKey].push(obj); }
+          elemStart = -1;
+        }
+        depth--;
+      }
+    }
+    // Verwerkte deel weggooien; loopt er nog een element of sleutel, dan vanaf daar bewaren.
+    const cut = Math.min(elemStart >= 0 ? elemStart : buf.length, keyStart >= 0 ? keyStart - 1 : buf.length, pos);
+    if (cut > 0) {
+      buf = buf.slice(cut);
+      pos -= cut;
+      if (elemStart >= 0) elemStart -= cut;
+      if (keyStart >= 0) keyStart -= cut;
+    }
+    // De parse-lus blokkeert de UI; regelmatig een frame vrijgeven voor de voortgangsbalk
+    // en de GC (elke 8 MB — bij mega-dumps bleef de UI anders tientallen seconden bevroren).
+    if (got % (1 << 23) < value.length) await new Promise(r => setTimeout(r, 0));
+  }
+  return data;
+}
+
+// Laatst opgehaalde /api/status (voor het probleemrapport: dump-grootte op schijf) en
+// de laatste laadfout, indien er wél een dump ligt maar hij niet ingelezen kon worden.
+let lastStatus = null;
+let loadError = null;
+
+async function loadDump(force = false) {
+  let st = null;
   try {
-    const st = await (await fetch('/api/status')).json();
+    st = await (await fetch('/api/status')).json();
+    lastStatus = st;
     if (!st.hasDump) {
       $('dump-info').textContent = '';
-      return;
+      loadError = null; renderEmptyState();
+      return false;
     }
+    // Crash-detector: de marker wordt vóór het parsen gezet en alleen bij succes of een
+    // nette fout weer verwijderd. Staat hij er bij de start nog, dan is de vorige poging
+    // hard gecrasht (tab-OOM bij een mega-dump laat geen JS-fout achter). Dan niet blind
+    // opnieuw proberen, maar een hint tonen; "Opnieuw proberen" forceert alsnog een load.
+    if (!force && localStorage.getItem('fmss_loadmark')) {
+      localStorage.removeItem('fmss_loadmark');
+      loadError = { msg: t('esErrCrash'), size: st.dumpSize, crash: true };
+      $('empty-state').classList.remove('hidden');
+      renderEmptyState();
+      return false;
+    }
+    localStorage.setItem('fmss_loadmark', '1');
     const b = $('banner');
     b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('loading')); b.onclick = null;
-    // Streamend binnenhalen met echte voortgang (bytes ontvangen / Content-Length).
+    // Streamend binnenhalen én parsen, met echte voortgang (bytes / Content-Length).
     const resp = await fetch('/api/dump');
     const total = Number(resp.headers.get('Content-Length')) || 0;
     let data;
     if (resp.body && total > 0) {
-      const reader = resp.body.getReader();
-      const chunks = []; let got = 0, lastUi = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value); got += value.length;
+      let lastUi = 0;
+      data = await parseDumpStream(resp, total, got => {
         const now = performance.now();
         if (now - lastUi > 100) {   // UI hooguit 10×/s verversen
           lastUi = now;
           const mb = `${t('loading')} ${(got / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB`;
           b.innerHTML = bannerProgress('hourglass', mb, got / total);
         }
-      }
-      const buf = new Uint8Array(got); let o = 0;
-      for (const c of chunks) { buf.set(c, o); o += c.length; }
-      // JSON.parse blokkeert de UI even; eerst de banner laten schilderen.
-      b.innerHTML = bannerMsg('hourglass', t('parsing'));
-      await new Promise(r => setTimeout(r, 30));
-      data = JSON.parse(new TextDecoder().decode(buf));
+      });
     } else {
       data = await resp.json();
     }
@@ -921,15 +1027,64 @@ async function loadDump() {
       state.refYear = state.meta.gameYear;
     }
     state.dumpStamp = st.dumpTime;
+    localStorage.removeItem('fmss_loadmark');   // geladen: geen crash
     renderDumpInfo();
     renderClubBadge();
     renderVerWarn();
     renderMyTeamChips();
+    loadError = null; renderEmptyState();
     $('empty-state').classList.add('hidden');
     buildStaffRoles();
     buildDivisions();   // divisiefilter vullen zodra er dump-data met divisies is
     applyFilters();
-  } catch (e) { $('dump-info').textContent = 'fout'; console.error(e); }
+    return true;
+  } catch (e) {
+    console.error(e);
+    localStorage.removeItem('fmss_loadmark');   // nette fout, geen crash: marker weg
+    $('dump-info').textContent = 'fout';
+    // Er ligt (waarschijnlijk) wél een dump, maar het inlezen faalde. Maak dat zichtbaar
+    // op het lege scherm i.p.v. het stil weg te slikken; anders blijft de gebruiker met
+    // een leeg scherm en de misleidende "druk op F9"-stappen achter.
+    if (st && st.hasDump) {
+      loadError = { msg: String((e && e.message) || e), size: st.dumpSize };
+      const b = $('banner');
+      b.className = 'scanning error'; b.onclick = null;
+      b.innerHTML = bannerMsg('warning', t('esErrTitle'));
+      $('empty-state').classList.remove('hidden');
+    }
+    renderEmptyState();
+    return false;
+  }
+}
+
+// Toont op het lege scherm ofwel de normale "nog geen data"-stappen, ofwel — als er een
+// dump op schijf staat die niet ingelezen kon worden — een foutblok met de oorzaak, de
+// dump-grootte en knoppen om opnieuw te proberen of het te melden. Zo is een mislukte
+// load nooit meer een stil, onverklaard leeg scherm.
+function renderEmptyState() {
+  const normal = $('es-normal'), errBox = $('es-error');
+  if (!errBox) return;
+  if (!loadError) {
+    errBox.classList.add('hidden');
+    if (normal) normal.classList.remove('hidden');
+    return;
+  }
+  if (normal) normal.classList.add('hidden');
+  const sizeLine = loadError.size
+    ? `<p class="es-err-size">${tf('esErrSize', { mb: (loadError.size / 1048576).toFixed(0) })}</p>` : '';
+  // Crash (tab-OOM): de melding ís de uitleg + tip; er is geen technisch foutdetail.
+  errBox.innerHTML =
+    `<h2>${escHtml(t('esErrTitle'))}</h2>` +
+    `<p class="es-err-msg">${escHtml(loadError.crash ? loadError.msg : t('esErrBig'))}</p>` +
+    sizeLine +
+    (loadError.crash ? '' : `<pre class="es-err-detail">${escHtml(loadError.msg)}</pre>`) +
+    `<div class="es-help">` +
+      `<button id="es-err-reload">${escHtml(t('esErrReload'))}</button>` +
+      `<button id="es-err-report">${escHtml(t('reportBug'))}</button>` +
+    `</div>`;
+  errBox.classList.remove('hidden');
+  $('es-err-reload').onclick = () => loadDump(true);   // force: langs de crash-detector
+  $('es-err-report').onclick = reportBug;
 }
 function renderDumpInfo() {
   const gd = $('game-date');
@@ -1904,6 +2059,9 @@ function reportBug() {
     `- Plugin: ${m.pluginVersion || 'unknown (dump predates v0.1.34 or no dump loaded)'}`,
     `- FM game version: ${m.gameVersion || 'unknown'} (supported: ${m.supportedVersion || '?'}, ok: ${m.versionOk ?? '?'})`,
     `- Players/staff loaded: ${state.players.length} / ${state.staff.length}`,
+    ...(lastStatus && lastStatus.dumpSize
+      ? [`- Dump on disk: ${(lastStatus.dumpSize / 1048576).toFixed(0)} MB (${lastStatus.dumpFile || 'dump.json'})`] : []),
+    ...(loadError ? [`- Load error: ${loadError.msg}`] : []),
     `- Platform: Steam / Epic / Game Pass? _(fill in)_`,
     '',
     '### Attach these files (important!)',
@@ -2412,6 +2570,7 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('settings-menu').classList.add('hidden'); });
 
 // nieuwe data ophalen (trigger de plugin)
+let fetchTimeout = null;
 $('btn-fetch').onclick = async () => {
   const b = $('banner');
   try {
@@ -2419,6 +2578,19 @@ $('btn-fetch').onclick = async () => {
     if (!st.running) { b.className = 'scanning error'; b.innerHTML = bannerMsg('warning', t('fmNotRunning')); b.onclick = null; return; }
     await fetch('/api/refresh', { method: 'POST' });
     b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('reqSent')); b.onclick = null;
+    // Vangnet: pikt de plugin het verzoek niet op (state wordt nooit 'scanning'), dan
+    // een duidelijke hint i.p.v. een eeuwige zandloper. poll() annuleert deze time-out
+    // zodra de scan echt start.
+    clearTimeout(fetchTimeout);
+    fetchTimeout = setTimeout(async () => {
+      try {
+        const s2 = await (await fetch('/api/status')).json();
+        if (s2.plugin && s2.plugin.state === 'scanning') return;   // toch nog gestart
+        b.className = 'scanning error';
+        b.innerHTML = bannerMsg('warning', t('reqNoPickup'));
+        b.onclick = () => { b.className = 'hidden'; };
+      } catch { }
+    }, 15000);
   } catch { showToast('!'); }
 };
 
@@ -2507,6 +2679,7 @@ async function poll() {
     const b = $('banner');
     const pl = st.plugin;
     if (pl && pl.state === 'scanning') {
+      clearTimeout(fetchTimeout);   // plugin heeft het verzoek opgepikt
       b.className = 'scanning';
       // Plugin v0.1.2+ schrijft echte scanvoortgang (0..1) in status.json; oudere
       // plugins niet — dan de oude tekstbanner zonder balk.
@@ -2523,7 +2696,8 @@ async function poll() {
       if ((st.dumpTime && st.dumpTime !== lastDumpTime && lastDumpTime !== null) || lastPluginState === 'scanning') {
         // Nieuwe dump klaar → automatisch laden; de groene balk is alleen nog een
         // korte bevestiging (verdwijnt vanzelf), geen klik meer nodig.
-        loadDump().then(() => {
+        loadDump().then(ok => {
+          if (!ok) return;   // laadfout: loadDump toont zelf het foutscherm en de foutbanner
           b.className = 'done';
           b.innerHTML = bannerMsg('check', `${t('dumpLoaded')} (${pl.players.toLocaleString()} · ${pl.staff.toLocaleString()})`);
           b.onclick = () => { b.className = 'hidden'; };

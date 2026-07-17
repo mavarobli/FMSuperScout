@@ -168,14 +168,17 @@
           <path d="M32 22V8 M42 29.5 55.5 24.5 M38 41l8.5 11 M26 41l-8.5 11 M22 29.5 8.5 24.5"/>
         </svg>
       </div>
-      <h2 data-i18n="nodata">Nog geen data geladen</h2>
-      <ol class="es-steps">
-        <li data-i18n-html="step1"></li>
-        <li data-i18n-html="step2"></li>
-        <li data-i18n-html="step3"></li>
-      </ol>
-      <div class="es-help"><span data-i18n="esReportHint">F9 gedrukt maar geen data?</span>
-        <button id="es-report" data-i18n="reportBug">Probleem melden…</button></div>
+      <div id="es-normal">
+        <h2 data-i18n="nodata">Nog geen data geladen</h2>
+        <ol class="es-steps">
+          <li data-i18n-html="step1"></li>
+          <li data-i18n-html="step2"></li>
+          <li data-i18n-html="step3"></li>
+        </ol>
+        <div class="es-help"><span data-i18n="esReportHint">F9 gedrukt maar geen data?</span>
+          <button id="es-report" data-i18n="reportBug">Probleem melden…</button></div>
+      </div>
+      <div id="es-error" class="hidden"></div>
     </div>
   </section>
 

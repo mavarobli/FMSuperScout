@@ -577,6 +577,19 @@ td.exp-year { color: #d8c88a; }
 }
 .es-steps b { color: var(--text); font-weight: 600; }
 
+/* Foutvariant van het lege scherm: dump ligt er wel, maar inlezen faalde. */
+#es-normal.hidden { display: none; }
+#es-error { max-width: 460px; margin: 0 auto; }
+#es-error.hidden { display: none; }
+#es-error > * + * { margin-top: 10px; }
+.es-err-msg { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 0; }
+.es-err-size { font-size: 12.5px; color: var(--muted); margin: 0; }
+.es-err-detail {
+  margin: 0; padding: 8px 10px; text-align: left; white-space: pre-wrap;
+  word-break: break-word; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 7px; font: 11.5px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; color: var(--text);
+}
+
 /* ---------- detailpaneel ---------- */
 #detail {
   width: 440px; flex: 0 0 auto; background: var(--bg2);
