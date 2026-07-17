@@ -252,6 +252,9 @@ const ATTR_LABEL = {
   },
 };
 const attrName = k => (ATTR_LABEL[state.lang][k] ?? k);
+// FM sorteert attributen binnen een groep alfabetisch in de taal van de game; wij dus ook,
+// op de vertaalde naam. Gebruikt door profiel, vergelijking en het attribuutfilter.
+const sortByLabel = keys => [...keys].sort((a, b) => attrName(a).localeCompare(attrName(b), state.lang));
 
 // ---------- EU/EEA-landen ----------
 const EU_NATIONS = new Set([
@@ -657,10 +660,11 @@ function advDialog() {
   const gkOnly = ATTR_GROUPS_GK[0][1].filter(k => !ATTR_GROUPS_OUTFIELD.some(([, ks]) => ks.includes(k)));
   const catalog = [];
   for (const [g, keys] of [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', gkOnly]])
-    for (const k of keys) catalog.push({ k, label: attrName(k), group: t(g) });
+    for (const k of sortByLabel(keys)) catalog.push({ k, label: attrName(k), group: t(g) });
   if (!state.hideCapa) {
-    for (const k of ADV_HIDDEN_KEYS) catalog.push({ k, label: t('a_' + k), group: t('hiddenTitle') });
-    for (const k of ADV_PERS_KEYS) catalog.push({ k, label: t(k), group: t('personaTitle') });
+    const byT = (a, b) => a.localeCompare(b, state.lang);
+    for (const k of [...ADV_HIDDEN_KEYS].sort((a, b) => byT(t('a_' + a), t('a_' + b)))) catalog.push({ k, label: t('a_' + k), group: t('hiddenTitle') });
+    for (const k of [...ADV_PERS_KEYS].sort((a, b) => byT(t(a), t(b)))) catalog.push({ k, label: t(k), group: t('personaTitle') });
   }
   // Escape sluit eerst een open attributen-dropdown, daarna pas de popup zelf.
   const esc = e => {
@@ -1815,7 +1819,7 @@ function showDetail(p) {
     const proj = state.showPot ? projectAttrs(p) : null;
     const col = {};
     for (const [gk, keys] of groups) {
-      const rows = keys.filter(k => p.attrs[k] != null);
+      const rows = sortByLabel(keys).filter(k => p.attrs[k] != null);
       col[gk] = !rows.length ? '' : `<div class="attr-col"><h3>${t(gk)}</h3>` + rows.map((k, idx) => {
         const raw = p.attrs[k];
         const shown = proj ? (proj[k] ?? raw) : raw;
@@ -2085,7 +2089,7 @@ function openCompare() {
   };
   const panel = (title, rowsHtml) => rowsHtml ? `<div class="cmpg"><h3>${title}</h3>${rowsHtml}</div>` : '';
   const buildGroup = (gkey, keys) => {
-    const present = (keys || []).filter(k => players.some(p => p.attrs && p.attrs[k] != null));
+    const present = sortByLabel(keys || []).filter(k => players.some(p => p.attrs && p.attrs[k] != null));
     if (!present.length) return '';
     let rows = present.map(k =>
       attrPanelRow(attrName(k), players.map(p => p.attrs ? p.attrs[k] : null))).join('');

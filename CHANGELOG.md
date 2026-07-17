@@ -44,6 +44,9 @@ new release is built, so the Unreleased section below is what the next release s
   to filter it ("kop" shows Heading, Enter picks the top match). Attributes already
   in use disappear from the list, "+ attribute" adds a row with the picker already
   open, and the popup is roomier (space for about 5 rules).
+- Attributes within each group are now sorted alphabetically in the app language,
+  the way FM itself orders them. Applies to the player profile, the comparison
+  panels and the attribute filter list.
 - Shorter, simpler meta score explanation in the tooltip (NL and EN).
 
 ### Fixed
