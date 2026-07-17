@@ -1,7 +1,7 @@
 # FMSuperScout 1.1.0, release notes
 
-> Bron voor GitHub Release v1.1.0. VirusTotal-link invullen na Marks scan,
-> daarna publiceren met FMSuperScout-Setup.exe + .sha256 als assets.
+> Gepubliceerd 17-07-2026 als GitHub Release v1.1.0 (assets: FMSuperScout-Setup.exe
+> + .sha256). Dit bestand is de bron van de release-tekst.
 
 ---
 
@@ -56,7 +56,8 @@ Expected SHA-256:
 c393728e7977338e75b7f49dfa15da66329d53d6b55ec3e6056d2fae042f0c19
 ```
 
-VirusTotal scan of this exact file: *(link invullen vóór publicatie)*
+VirusTotal scan of this exact file:
+https://www.virustotal.com/gui/file/c393728e7977338e75b7f49dfa15da66329d53d6b55ec3e6056d2fae042f0c19
 
 Full changelog: https://github.com/mavarobli/FMSuperScout/blob/main/CHANGELOG.md
 Issues and ideas: https://github.com/mavarobli/FMSuperScout/issues
