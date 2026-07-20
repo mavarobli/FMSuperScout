@@ -72,7 +72,7 @@ e2f596522cac984798c63f31b2573151c80933dd87afc0c40b44b0d1006299af
 ```
 
 VirusTotal scan of this exact file:
-https://www.virustotal.com/gui/file/e2f596522cac984798c63f31b2573151c80933dd87afc0c40b44b0d1006299af
+https://www.virustotal.com/gui/file-analysis/ZTU4NjQ0NTMzNjRmZGVhZGQzMmQ1ZjFkOTRhNjU0NjQ6MTc4NDU0Mjg4Nw==
 
 Full changelog: https://github.com/mavarobli/FMSuperScout/blob/main/CHANGELOG.md
 Issues and ideas: https://github.com/mavarobli/FMSuperScout/issues
