@@ -13,18 +13,25 @@ const state = {
   showPot: false,
   myTeam: 'all',   // teamchip bij "Mijn club": all | first | res | youth
   hideCapa: localStorage.getItem('fmss_hidecapa') === '1',
+  hideMeta: localStorage.getItem('fmss_hidemeta') === '1',   // meta-score los van de overige verborgen stats
   role: localStorage.getItem('fmss_role') || '',
   compare: [],
   refYear: new Date().getFullYear(),
   refDoy: 183,
-  shortlist: new Set(JSON.parse(localStorage.getItem('fmss_shortlist') || '[]')),
-  colCfg: JSON.parse(localStorage.getItem('fmss_cols') || '{}'),  // per modus: {order:[], hidden:[]}
-  colW: JSON.parse(localStorage.getItem('fmss_colw') || '{}'),    // per modus: {kolomkey: breedte px}
-  advF: (() => { try { return JSON.parse(localStorage.getItem('fmss_adv') || '[]'); } catch { return []; } })(),  // attribuutfilter-regels [{k,min,max}]
+  shortlist: new Set(jread('fmss_shortlist', [])),
+  colCfg: jread('fmss_cols', {}),  // per modus: {order:[], hidden:[]}
+  colW: jread('fmss_colw', {}),    // per modus: {kolomkey: breedte px}
+  advF: jread('fmss_adv', []),     // attribuutfilter-regels [{k,min,max}]
 };
+// Beschadigde browseropslag (één ongeldige JSON-waarde) mag de app nooit vóór het
+// foutscherm laten crashen: kapotte sleutel → standaardwaarde, opslag opgeruimd.
+function jread(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+  catch { try { localStorage.removeItem(key); } catch { } return fallback; }
+}
 const GBP_TO_EUR = 1.16;
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -32,7 +39,10 @@ const I18N = {
   nl: {
     players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: 'Zoek naam of club',
     settings: 'Instellingen', langLabel: 'Taal', curLabel: 'Valuta',
-    showHidden: 'Verborgen stats tonen',
+    showHidden: 'Verborgen stats tonen', showMeta: 'Meta-score tonen',
+    profileMode: 'Spelersprofiel', profSide: 'Rechts', profPopup: 'Popup',
+    devTitle: 'Ontwikkeling',
+    cardBtnTip: 'Spelerskaart opslaan (PNG)', cardSaved: 'Kaart opgeslagen in Downloads',
     donateBtn: 'Steun FMSuperScout', donateTitle: 'Lekker aan het scouten?',
     donateBody: 'FMSuperScout is gratis en blijft gratis. Als het je een uur turen in traag menu bespaart, is een koffie welkom. Zo niet, draait ie ook gewoon door.',
     donateTitle2: '500 profielen gescout', donateBody2: 'Als FMSuperScout een scout was, had ie nu een contractverlenging verdiend. Een koffie mag ook. Blijft verder gewoon gratis.',
@@ -42,11 +52,15 @@ const I18N = {
     age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
     origin: 'Herkomst', originComp: 'Herkomst & competitie', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
     interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Beschikbaar', listed: 'Op transferlijst',
+    tstatus: 'Transferstatus', tsSale: 'Te koop', tsLoan: 'Te huur', tsAny: 'Te koop of te huur',
     attainHint: 'Kan hij weg bij zijn club? Op de transferlijst, aangeboden, clubloos of contract loopt binnen 12 maanden af (en niet "niet te koop"). Zegt niets over of hij naar JOU wil; dat is Interesse.',
     exp6: '< 6 mnd', exp12: '< 1 jaar', free: 'Clubloos', myclub: 'Mijn club', contractF: 'Contract',
     advBtn: 'Attribuutfilter', advTitle: 'Filter op attributen', advSearch: 'Kies of typ een attribuut…',
     advAdd: '+ attribuut', advClear: 'Wissen', advDone: 'Klaar', advMin: 'min', advMax: 'max', advColAttr: 'Attribuut',
     reportBug: 'Probleem melden…', esReportHint: 'F9 gedrukt maar geen data?', updateAvail: 'Update {v} beschikbaar',
+    updDl: 'Update downloaden… {pct}%', updVerify: 'Download controleren…',
+    updLaunch: 'Installer gestart. Volg de stappen; de app start daarna opnieuw.',
+    updErr: 'Updaten mislukt. Open de downloadpagina',
     onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: 'Nieuwe data',
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
@@ -62,14 +76,18 @@ const I18N = {
     hiddenTitle: 'Verborgen kenmerken', a_Consistency: 'Constantheid', a_ImportantMatches: 'Grote wedstrijden',
     a_InjuryProneness: 'Blessuregevoeligheid', a_Versatility: 'Veelzijdigheid', a_Dirtiness: 'Vals spel',
     showPot: 'Toon geschatte potentie', potNote: 'geschatte waarden op potentieel (PA)',
-    loanOut: 'verhuurd aan {c}', loanIn: 'gehuurd van {c}',
+    loanOut: 'verhuurd aan {c}', loanIn: 'gehuurd van {c}', ownerLabel: 'Moederclub',
     clubless: 'clubloos', clubUnknown: 'onbekende club', copied: 'Gekopieerd',
+    copyNameTip: 'Klik = kopieer naam', slEmpty: 'Shortlist leeg',
+    copyBtnTip: 'Kopieer naam', clubNotRead: 'Club niet uitgelezen (rep {r})',
     reqSent: 'Spelersdata inlezen…',
     dumping: 'Spelersdata inlezen…', dumpReady: 'Nieuwe data klaar, klik om te laden',
     dumpLoaded: 'Nieuwe data geladen',
     dumpError: 'Uitlezen mislukt', fmNotRunning: 'Start eerst Football Manager 26 en laad je save.',
+    dumpIncomplete: 'De dump is onvolledig (FM26 was er waarschijnlijk nog mee bezig). Probeer het zo opnieuw.',
     reqNoPickup: 'FM26 pikt het verzoek niet op. Is je save geladen? Probeer anders F9 in de game, of herstart FM26.',
-    tag_free: 'clubloos', tag_listed: 'transferlijst', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
+    serverGone: 'Geen verbinding met de lokale server. Sluit dit venster en start FMSuperScout opnieuw.',
+    tag_free: 'clubloos', tag_listed: 'transferlijst', tag_loan: 'te huur', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
     staffAttrs: 'Staf-attributen',
@@ -119,7 +137,10 @@ const I18N = {
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
     settings: 'Settings', langLabel: 'Language', curLabel: 'Currency',
-    showHidden: 'Show hidden stats',
+    showHidden: 'Show hidden stats', showMeta: 'Show meta score',
+    profileMode: 'Player profile', profSide: 'Right side', profPopup: 'Popup',
+    devTitle: 'Development',
+    cardBtnTip: 'Save player card (PNG)', cardSaved: 'Card saved to Downloads',
     donateBtn: 'Support FMSuperScout', donateTitle: 'Found your next signing?',
     donateBody: 'FMSuperScout is free and stays free. If it beat squinting at slow menus, a coffee helps. If not, it keeps working anyway.',
     donateTitle2: 'That is 500 profiles scouted', donateBody2: 'If FMSuperScout were a scout, it would have earned a contract extension by now. A coffee works too. Free either way.',
@@ -129,11 +150,15 @@ const I18N = {
     age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
     origin: 'Origin', originComp: 'Origin & competition', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
     interestmin: 'Interest ≥', all: 'All', attainable: 'Available', listed: 'Transfer listed',
+    tstatus: 'Transfer status', tsSale: 'For sale', tsLoan: 'For loan', tsAny: 'For sale or loan',
     attainHint: 'Can he leave his club? Transfer listed, offered out, a free agent, or contract ends within 12 months (and not "not for sale"). Says nothing about whether he wants to join YOU; that is Interest.',
     exp6: '< 6 mo', exp12: '< 1 yr', free: 'Free agent', myclub: 'My club', contractF: 'Contract',
     advBtn: 'Attribute filter', advTitle: 'Filter on attributes', advSearch: 'Pick or type an attribute…',
     advAdd: '+ attribute', advClear: 'Clear', advDone: 'Done', advMin: 'min', advMax: 'max', advColAttr: 'Attribute',
     reportBug: 'Report a problem…', esReportHint: 'Pressed F9 but no data?', updateAvail: 'Update {v} available',
+    updDl: 'Downloading update… {pct}%', updVerify: 'Verifying download…',
+    updLaunch: 'Installer started. Follow the steps; the app restarts afterwards.',
+    updErr: 'Update failed. Open the download page',
     onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: 'New data',
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
@@ -149,14 +174,18 @@ const I18N = {
     hiddenTitle: 'Hidden', a_Consistency: 'Consistency', a_ImportantMatches: 'Big matches',
     a_InjuryProneness: 'Injury proneness', a_Versatility: 'Versatility', a_Dirtiness: 'Dirtiness',
     showPot: 'Show estimated potential', potNote: 'estimated values at potential (PA)',
-    loanOut: 'on loan at {c}', loanIn: 'on loan from {c}',
+    loanOut: 'on loan at {c}', loanIn: 'on loan from {c}', ownerLabel: 'Parent club',
     clubless: 'free agent', clubUnknown: 'unknown club', copied: 'Copied',
+    copyNameTip: 'Click = copy name', slEmpty: 'Shortlist is empty',
+    copyBtnTip: 'Copy name', clubNotRead: 'Club not resolved (rep {r})',
     reqSent: 'Reading player data…',
     dumping: 'Reading player data…', dumpReady: 'New data ready, click to load',
     dumpLoaded: 'New data loaded',
     dumpError: 'Read failed', fmNotRunning: 'Start Football Manager 26 and load your save first.',
+    dumpIncomplete: 'The dump is incomplete (FM26 was probably still writing it). Try again in a moment.',
     reqNoPickup: 'FM26 is not picking up the request. Is your save loaded? Try F9 in the game, or restart FM26.',
-    tag_free: 'free', tag_listed: 'listed', tag_rel: 'released', tag_nfs: 'not for sale',
+    serverGone: 'Lost connection to the local server. Close this window and start FMSuperScout again.',
+    tag_free: 'free', tag_listed: 'listed', tag_loan: 'for loan', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
     staffAttrs: 'Staff attributes',
@@ -220,6 +249,7 @@ const ICON_PATHS = {
   compare: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
   arrowRight: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  card: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
 };
 const icon = (name, size = 14) =>
   `<svg class="ic" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
@@ -320,7 +350,7 @@ const natsLabel = p => (p.nat || []).map(natLabel).join(', ');
 
 // Kolommen die onder de "verborgen stats"-toggle vallen: CA/PA zelf, plus meta-score en
 // vraagprijs (beide afgeleid van/verweven met verborgen data, Marks keuze).
-const hiddenStatCol = k => state.hideCapa && (k === 'ca' || k === 'pa' || k === 'meta' || k === 'fee');
+const hiddenStatCol = k => (state.hideCapa && (k === 'ca' || k === 'pa' || k === 'fee')) || (state.hideMeta && k === 'meta');
 
 // ---------- geld ----------
 function fmtMoney(v) {
@@ -428,7 +458,7 @@ const isFree = p => !p.club && !(p.clubRep > 0);
 // niet kon uitlezen (bekende beperking), of "clubloos" bij een echte transfervrije speler.
 function clubLabel(p) {
   if (p.club) return escHtml(p.club);
-  if (p.clubRep > 0) return `<span class="dim" title="Club niet uitgelezen (rep ${p.clubRep})">${t('clubUnknown')}</span>`;
+  if (p.clubRep > 0) return `<span class="dim" title="${tf('clubNotRead', { r: p.clubRep })}">${t('clubUnknown')}</span>`;
   // Transfervrij: streepje met tooltip (de status-pill "clubloos" vertelt het al).
   return `<span class="dim" title="${t('clubless')}">–</span>`;
 }
@@ -627,6 +657,7 @@ function statusHtml(p) {
   let h = '';
   if (isFree(p)) h += `<span class="tag free">${t('tag_free')}</span>`;
   if (p.listed) h += `<span class="tag listed">${t('tag_listed')}</span>`;
+  if (p.loanListed) h += `<span class="tag listed">${t('tag_loan')}</span>`;
   if (p.setForRelease) h += `<span class="tag rel">${t('tag_rel')}</span>`;
   if (p.notForSale) h += `<span class="tag nfs">${t('tag_nfs')}</span>`;
   return h || '<span class="dim">–</span>';
@@ -847,7 +878,7 @@ function metaScore(p) {
 }
 function metaHtml(p) {
   const s = metaScore(p);
-  return s == null ? '<span class="dim">·</span>' : `<span class="${roleClass(s)}" title="${t('metaLabel')}">${s.toFixed(1)}</span>`;
+  return s == null ? '<span class="dim">–</span>' : `<span class="${roleClass(s)}" title="${t('metaLabel')}">${s.toFixed(1)}</span>`;
 }
 
 // ---------- posities & veld ----------
@@ -963,6 +994,9 @@ async function parseDumpStream(resp, total, onProgress) {
     // en de GC (elke 8 MB — bij mega-dumps bleef de UI anders tientallen seconden bevroren).
     if (got % (1 << 23) < value.length) await new Promise(r => setTimeout(r, 0));
   }
+  // Volledig = de buitenste accolade is netjes gesloten (diepte terug op 0) en er kwam
+  // überhaupt data binnen. Een afgebroken stream of half geschreven bestand faalt hier.
+  data._complete = depth === 0 && !inStr && got > 0;
   return data;
 }
 
@@ -997,6 +1031,7 @@ async function loadDump(force = false) {
     b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('loading')); b.onclick = null;
     // Streamend binnenhalen én parsen, met echte voortgang (bytes / Content-Length).
     const resp = await fetch('/api/dump');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const total = Number(resp.headers.get('Content-Length')) || 0;
     let data;
     if (resp.body && total > 0) {
@@ -1011,7 +1046,12 @@ async function loadDump(force = false) {
       });
     } else {
       data = await resp.json();
+      data._complete = true;   // JSON.parse gooit zelf al bij een afgekapt bestand
     }
+    // Volledigheidscheck: een dump die midden in het schrijven is gelezen (of afgebroken
+    // stream) mag nooit stilletjes als geldige — maar halve — spelerslijst doorgaan.
+    if (!data._complete || !data.meta || !data.meta.pluginVersion)
+      throw new Error(t('dumpIncomplete'));
     b.className = 'hidden';
     state.players = data.players || [];
     state.staff = data.staff || [];
@@ -1037,6 +1077,7 @@ async function loadDump(force = false) {
     buildStaffRoles();
     buildDivisions();   // divisiefilter vullen zodra er dump-data met divisies is
     applyFilters();
+    setTimeout(postHistorySnapshot, 100);   // trends bijwerken, buiten het laadpad om
     return true;
   } catch (e) {
     console.error(e);
@@ -1055,6 +1096,25 @@ async function loadDump(force = false) {
     renderEmptyState();
     return false;
   }
+}
+
+// ---------- ontwikkel-historie (trends) ----------
+// Stuurt na elke geladen dump een compacte momentopname (id → [ca, pa, waarde]) naar de
+// server, die delta-only opslaat (zie server.js). Best effort en buiten het laadpad om;
+// per dump maar één keer (herladen van dezelfde dump slaat niets dubbel op).
+async function postHistorySnapshot() {
+  try {
+    const gd = state.meta.gameDate;
+    if (!gd || !state.players.length) return;
+    if (localStorage.getItem('fmss_hist_at') === String(state.dumpStamp)) return;
+    const compact = {};
+    for (const p of state.players) compact[p.id] = [p.ca ?? 0, p.pa ?? 0, p.value ?? null];
+    const r = await fetch('/api/history', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ manager: state.meta.manager || 'default', gameDate: gd, players: compact }),
+    });
+    if (r.ok) localStorage.setItem('fmss_hist_at', String(state.dumpStamp));
+  } catch { /* historie is nice-to-have, nooit het laden storen */ }
 }
 
 // Toont op het lege scherm ofwel de normale "nog geen data"-stappen, ofwel — als er een
@@ -1120,13 +1180,14 @@ function renderVerWarn() {
 }
 function renderClubBadge() {
   const mgr = state.meta.manager, club = state.meta.myClub, rep = state.meta.myClubRep;
-  $('club-badge').innerHTML = (mgr || club) ? `${mgr ? mgr + ' · ' : ''}<b>${club || '?'}</b>` : '';
+  // FM-data (namen uit het geheugen) altijd escapen vóór innerHTML.
+  $('club-badge').innerHTML = (mgr || club) ? `${mgr ? escHtml(mgr) + ' · ' : ''}<b>${escHtml(club || '?')}</b>` : '';
   $('club-badge').title = t('clickClubFilter') + (rep ? ` · ${t('repWord')} ${rep}` : '');
 }
 function buildStaffRoles() {
   const cur = $('f-staffrole').value;
   const jobs = [...new Set(state.staff.map(s => s.job).filter(Boolean))].sort();
-  $('f-staffrole').innerHTML = `<option value="">${t('all')}</option>` + jobs.map(j => `<option>${j}</option>`).join('');
+  $('f-staffrole').innerHTML = `<option value="">${t('all')}</option>` + jobs.map(j => `<option>${escHtml(j)}</option>`).join('');
   $('f-staffrole').value = cur;
 }
 // Divisie-select: vult zich uit de aanwezige div-waarden; blijft verborgen zolang de
@@ -1271,7 +1332,7 @@ function applyFilters() {
   const nat = $('f-nat').value.trim().toLowerCase();
   const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
   const minInterest = +$('f-interest').value || 0;
-  const wantListed = $('f-listed').checked, contractF = $('f-contract').value;
+  const tstatus = $('f-tstatus').value, contractF = $('f-contract').value;
   const onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
   const advRules = state.mode === 'staff' ? [] : activeAdvRules();   // staf heeft geen veld-attributen
   const staffRole = $('f-staffrole').value;
@@ -1312,7 +1373,10 @@ function applyFilters() {
       if (m == null || m > (contractF === 'exp6' ? 6 : 12)) return false;
     }
     if (minInterest > 0) { const i = interestEstimate(p); if (!i || i.score < minInterest) return false; }
-    if (wantListed && !p.listed) return false;
+    // Transferstatus: te koop (transferlijst), te huur (huurlijst, plugin v0.1.36+) of allebei goed.
+    if (tstatus === 'sale' && !p.listed) return false;
+    if (tstatus === 'loan' && !p.loanListed) return false;
+    if (tstatus === 'any' && !p.listed && !p.loanListed) return false;
     for (const r of advRules) {
       const av = advValue(p, r.k);
       if (av == null || av <= 0) return false;   // onbekend attribuut telt als geen match
@@ -1340,7 +1404,7 @@ function updateSecDots() {
     quality: ['f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max'].some(id => val(id)) || activeAdvRules().length > 0,
     financial: ['f-price', 'f-fee', 'f-wage'].some(id => val(id)),
     origin: !!(val('f-nat') || $('f-eu').checked || val('f-div')),
-    availability: +$('f-interest').value > 0 || $('f-listed').checked || !!$('f-contract').value || $('f-myclub').checked || $('f-shortlist').checked,
+    availability: +$('f-interest').value > 0 || !!$('f-tstatus').value || !!$('f-contract').value || $('f-myclub').checked || $('f-shortlist').checked,
   };
   document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
     const k = sec.dataset.sec;
@@ -1376,7 +1440,7 @@ function buildChips() {
   if (v('f-nat')) add(`${t('nat')}: ${v('f-nat')}`, clearInput('f-nat'));
   if ($('f-eu').checked) add(t('euonly'), uncheck('f-eu'));
   if (+$('f-interest').value > 0) add(`${t('interestmin')} ${$('f-interest').selectedOptions[0].textContent}`, () => { $('f-interest').value = '0'; });
-  if ($('f-listed').checked) add(t('listed'), uncheck('f-listed'));
+  if ($('f-tstatus').value) add(`${t('tstatus')}: ${$('f-tstatus').selectedOptions[0].textContent}`, () => { $('f-tstatus').value = ''; });
   if ($('f-contract').value) add(`${t('contractF')}: ${$('f-contract').selectedOptions[0].textContent}`, () => { $('f-contract').value = ''; });
   if (state.mode !== 'staff')
     for (const r of activeAdvRules()) add(advChipTxt(r), () => { state.advF = state.advF.filter(x => x !== r); saveAdv(); });
@@ -1398,8 +1462,8 @@ function renderChips(chips) {
 // Een preset is een momentopname van alle filtervelden (tekst, vinkjes, selects, posities
 // op het veld en de gekozen tactische rol). Bewaard in localStorage; zelfde naam = overschrijven.
 const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat', 'f-div'];
-const PRESET_CHECK_IDS = ['f-eu', 'f-listed', 'f-myclub', 'f-shortlist'];
-const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role', 'f-contract'];
+const PRESET_CHECK_IDS = ['f-eu', 'f-myclub', 'f-shortlist'];
+const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role', 'f-contract', 'f-tstatus'];
 function loadPresets() { try { return JSON.parse(localStorage.getItem('fmss_presets') || '[]'); } catch { return []; } }
 function storePresets(list) { localStorage.setItem('fmss_presets', JSON.stringify(list)); }
 function snapshotFilters() {
@@ -1423,6 +1487,8 @@ function applyPreset(s) {
   if (oc['f-free']) $('f-contract').value = 'free';
   else if (oc['f-exp6']) $('f-contract').value = 'exp6';
   else if (oc['f-exp12']) $('f-contract').value = 'exp12';
+  // Idem vóór de transferstatus-select (v1.2): transferlijst-checkbox → "te koop".
+  if (oc['f-listed']) $('f-tstatus').value = 'sale';
   state.advF = (s.adv || []).map(r => ({ ...r }));
   saveAdv();
   const codes = new Set(s.pos || []);
@@ -1600,13 +1666,21 @@ function sortRows() {
   const col = activeCols().find(c => c.key === state.sortKey) || activeCols()[1];
   if (col.star) return;
   const dir = state.sortDir;
-  state.filtered.sort((a, b) => {
-    const va = col.get(a), vb = col.get(b);
+  // Sorteersleutel één keer per rij berekenen i.p.v. per vergelijking (n i.p.v. n·log n):
+  // scheelt bij berekende kolommen (meta, waardeschatting) en mega-dumps een orde van
+  // grootte. Strings via één hergebruikte Collator (veel sneller dan losse localeCompare).
+  const rows = state.filtered;
+  const keys = rows.map(col.get);
+  const idx = rows.map((_, i) => i);
+  const coll = new Intl.Collator(state.lang);
+  idx.sort((ia, ib) => {
+    const va = keys[ia], vb = keys[ib];
     if (va == null && vb == null) return 0;
     if (va == null) return 1; if (vb == null) return -1;
     if (typeof va === 'number') return (va - vb) * dir;
-    return String(va).localeCompare(String(vb)) * dir;
+    return coll.compare(va, vb) * dir;
   });
+  state.filtered = idx.map(i => rows[i]);
 }
 
 // ---------- gevirtualiseerde tabel ----------
@@ -1639,7 +1713,7 @@ function renderTable() {
     const stick = c.star ? 'c-sticky' : c.name ? 'c-sticky stick-end' : '';
     const w = ` style="width:${wOf(c)}px"`;
     const grip = c.star ? '' : '<span class="col-resize"></span>';   // sleepgreep rechts
-    const help = c.help ? `<span class="col-help" title="${t(c.help)}">?</span>` : '';
+    const help = c.help ? `<span class="col-help" data-help="${c.help}">?</span>` : '';
     return `<th data-key="${c.key}" draggable="${c.star ? 'false' : 'true'}"${w} class="${stick} ${c.key === state.sortKey ? 'sorted' : ''}">${colLabel(c)}${help}${c.key === state.sortKey ? (state.sortDir < 0 ? ' ▼' : ' ▲') : ''}${grip}</th>`;
   }).join('');
   $('grid-head').querySelectorAll('th').forEach(th => {
@@ -1719,16 +1793,17 @@ function openColMenu(x, y) {
 function closeColMenu() { const m = $('colmenu'); if (m) m.remove(); }
 document.addEventListener('click', e => { if (!e.target.closest('#colmenu')) closeColMenu(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeColMenu(); });
-// Huurstatus t.o.v. mijn club — alleen relevant onder het "Mijn club"-filter (Marks keuze),
-// dus daarbuiten geen kleuring. loan-out = verhuurd (rood), loan-in = gehuurd (blauw).
+// Huurstatus voor de naamkleuring. Elke gehuurde speler (moederclub ≠ huidige club,
+// bv. eigendom Man City maar spelend bij Nordsjælland) kleurt blauw (loan-in). Onder het
+// "Mijn club"-filter geldt bovendien: eigen spelers die elders gestald zijn = rood (loan-out).
 function loanStatus(p) {
-  if (!$('f-myclub').checked) return '';
-  const my = (state.meta.myClub || '').toLowerCase();
-  if (!my) return '';
   const cl = (p.club || '').toLowerCase(), ow = (p.ownerClub || '').toLowerCase();
-  if (ow === my && cl && cl !== my) return 'loan-out';
-  if (cl === my && ow && ow !== my) return 'loan-in';
-  return '';
+  if (!ow || !cl || ow === cl) return '';
+  if ($('f-myclub').checked) {
+    const my = (state.meta.myClub || '').toLowerCase();
+    if (my && ow === my && cl !== my) return 'loan-out';
+  }
+  return 'loan-in';
 }
 function renderVisible() {
   const wrap = $('table-wrap'), cols = activeCols();
@@ -1757,7 +1832,7 @@ function renderVisible() {
         const ls = loanStatus(p);
         const lt = ls === 'loan-out' ? ` · ${tf('loanOut', { c: p.club || '?' })}`
           : ls === 'loan-in' ? ` · ${tf('loanIn', { c: p.ownerClub || '?' })}` : '';
-        return `<td class="pname ${ls} ${stick}" title="Klik = kopieer naam${lt}">${v ? escHtml(v) : '?'}</td>`;
+        return `<td class="pname ${ls} ${stick}" title="${t('copyNameTip')}${lt}">${v ? escHtml(v) : '?'}</td>`;
       }
       if (c.dimNull && !v) return `<td class="dim">–</td>`;
       if (c.fmt) v = c.fmt(v);
@@ -1814,7 +1889,7 @@ function toggleShortlist(id) {
 function exportShortlist() {
   const ids = state.shortlist;
   const all = [...state.players, ...state.staff].filter(p => ids.has(p.id));
-  if (!all.length) { showToast('Shortlist leeg'); return; }
+  if (!all.length) { showToast(t('slEmpty')); return; }
   const withCapa = !state.hideCapa;   // vraagprijs valt ook onder de verborgen-stats-toggle
   const cols = ['Name', 'Position', 'Age', 'Club', 'Nationality',
     ...(withCapa ? ['CA', 'PA'] : []), 'Value(GBP)', ...(withCapa ? ['AskingPrice(GBP)'] : []), 'Wage(GBP)', 'Contract', 'Interest'];
@@ -1908,9 +1983,19 @@ function projectAttrs(p) {
   }
   return proj;
 }
+// Profielweergave: 'side' = paneel rechts (default), 'popup' = gecentreerde modal.
+function profMode() { return localStorage.getItem('fmss_profmode') || 'side'; }
+function closeDetail() {
+  $('detail').classList.add('hidden');
+  $('detail-backdrop').classList.add('hidden');
+  state.selected = null; renderVisible();
+}
 function showDetail(p) {
   state.selected = p;
   renderVisible();
+  const pop = profMode() === 'popup';
+  $('detail').classList.toggle('popup', pop);
+  $('detail-backdrop').classList.toggle('hidden', !pop);
   $('detail').classList.remove('hidden');
   const isPlayer = !!p.attrs;
   const on = state.shortlist.has(p.id);
@@ -1923,8 +2008,8 @@ function showDetail(p) {
   </div>` : '';
   const inCmp = state.compare.includes(p.id);
   let html = `<h2>${escHtml(p.name)} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${starSvg(18)}</span>
-    <button class="copybtn" title="Kopieer naam">${icon('clipboard', 13)}</button>
-    <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">${icon('compare', 13)}</button></h2>
+    <button class="copybtn" title="${t('copyBtnTip')}">${icon('clipboard', 13)}</button>
+    <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">${icon('compare', 13)}</button>${isPlayer && p.attrs ? `<button class="cardbtn" title="${t('cardBtnTip')}">${icon('card', 13)}</button>` : ''}</h2>
   <div class="sub">${getAge(p)} · ${natsLabel(p)}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
   ${gauge}
   <div class="kv">
@@ -1934,21 +2019,24 @@ function showDetail(p) {
     <div><b>${t('wageLabel')}</b> ${fmtMoney(p.wage)}</div>
     ${p.worldRep ? `<div><b>${t('repLabel')}</b> ${p.worldRep}</div>` : ''}
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
+    ${p.ownerClub && p.ownerClub !== p.club ? `<div><b>${t('ownerLabel')}</b> ${escHtml(p.ownerClub)}</div>` : ''}
     ${p.height ? `<div><b>${t('height')}</b> ${p.height} cm</div>` : ''}
-    ${isPlayer && !state.hideCapa && metaScore(p) != null ? `<div title="${t('metaHint')}"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
+    ${isPlayer && !state.hideMeta && metaScore(p) != null ? `<div data-help="metaHint"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
   </div>`;
 
   const flags = [];
   if (isFree(p)) flags.push(`<span class="pill">${t('tag_free')}</span>`);
   if (p.listed) flags.push(`<span class="pill warn">${t('tag_listed')}</span>`);
+  if (p.loanListed) flags.push(`<span class="pill warn">${t('tag_loan')}</span>`);
   if (p.setForRelease) flags.push(`<span class="pill warn">${t('tag_rel')}</span>`);
   if (p.notForSale) flags.push(`<span class="pill">${t('tag_nfs')}</span>`);
-  if (isAttainable(p)) flags.push(`<span class="pill good" title="${t('attainHint')}">${t('attainable')}</span>`);
+  if (isAttainable(p)) flags.push(`<span class="pill good" data-help="attainHint">${t('attainable')}</span>`);
   if (flags.length) html += '<div>' + flags.join('') + '</div>';
 
   if (isPlayer) {
     const i = interestEstimate(p);
     if (i) html += `<div class="interest-box"><b>${t('interestTitle')}:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100)</span>${i.note ? `<div class="int-note">${t(i.note === 'minor' ? 'minorNote' : 'minorIntlNote')}</div>` : ''}</div>`;
+    html += '<div id="dev-box"></div>';   // ontwikkel-grafiek (trends) laadt async
   }
 
   // Beste tactische rollen (met de gekozen rol bovenaan als die past)
@@ -1967,11 +2055,13 @@ function showDetail(p) {
   }
 
   if (isPlayer && p.attrs) {
-    const canPot = p.pa > p.ca;
-    html += `<label class="potswitch${canPot ? '' : ' off'}"><input type="checkbox" id="pot-toggle" ${state.showPot ? 'checked' : ''} ${canPot ? '' : 'disabled'}> ${t('showPot')}${state.showPot ? ` <span class="dim">(${t('potNote')})</span>` : ''}</label>`;
+    // Potentie leunt op PA (verborgen stat): toggle alleen tonen als verborgen stats aan staan.
+    const canPot = !state.hideCapa && p.pa > p.ca;
+    if (!state.hideCapa)
+      html += `<label class="potswitch${canPot ? '' : ' off'}"><input type="checkbox" id="pot-toggle" ${state.showPot ? 'checked' : ''} ${canPot ? '' : 'disabled'}> ${t('showPot')}${state.showPot ? ` <span class="dim">(${t('potNote')})</span>` : ''}</label>`;
     const isGk = (p.posArr || []).includes('GK');
     const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
-    const proj = state.showPot ? projectAttrs(p) : null;
+    const proj = (!state.hideCapa && state.showPot) ? projectAttrs(p) : null;
     const col = {};
     for (const [gk, keys] of groups) {
       const rows = sortByLabel(keys).filter(k => p.attrs[k] != null);
@@ -2016,10 +2106,367 @@ function showDetail(p) {
   document.querySelector('.copybtn').onclick = () => copyName(p.name);
   const cmp = document.querySelector('.cmpbtn');
   if (cmp) cmp.onclick = () => { toggleCompare(p.id); cmp.classList.toggle('on', state.compare.includes(p.id)); };
+  const cb = document.querySelector('.cardbtn');
+  if (cb) cb.onclick = () => downloadPlayerCard(p);
   const pt = $('pot-toggle');
   if (pt) pt.onchange = () => { state.showPot = pt.checked; showDetail(p); };
+  if (isPlayer) renderDevChart(p);
   if (p.id !== state._donLast) { state._donLast = p.id; maybeDonateNudge(); }   // telt per nieuw profiel
 }
+
+// ---------- ontwikkel-grafiek (trends in het profiel) ----------
+// Haalt de opgeslagen reeks van deze speler op en tekent maximaal twee mini-panelen:
+// CA/PA (verborgen als verborgen stats uit staan) en marktwaarde. Aparte panelen omdat
+// het twee verschillende schalen zijn (nooit een dubbele y-as). Stippen markeren echte
+// meetpunten (delta-opslag); tussenliggende dumps zonder wijziging lopen vlak door.
+async function renderDevChart(p) {
+  try {
+    const r = await fetch(`/api/history/series?uid=${p.id}&manager=${encodeURIComponent(state.meta.manager || 'default')}`);
+    if (!r.ok) return;
+    const { dates, entries } = await r.json();
+    const box = $('dev-box');
+    if (!box || state.selected !== p) return;   // gebruiker klikte al door
+    // Reeks reconstrueren: vanaf het eerste meetpunt elke datum invullen (carry-forward).
+    const pts = [];
+    let cur = null;
+    for (const d of dates) {
+      const e = entries[d];
+      if (e) cur = e;
+      if (cur) pts.push({ d, ca: cur[0], pa: cur[1], v: cur[2], real: !!e });
+    }
+    if (pts.length < 2) return;
+    const panels = [];
+    if (!state.hideCapa) panels.push(devPanel(pts, 'capa'));
+    if (pts.some(q => q.v > 0)) panels.push(devPanel(pts, 'value'));
+    if (!panels.length) return;
+    box.innerHTML = `<div class="attr-col dev-col"><h3>${t('devTitle')}</h3><div class="dev-wrap">${panels.join('')}</div></div>`;
+  } catch { /* geen historie beschikbaar */ }
+}
+
+function devPanel(pts, kind) {
+  // Linkergoot voor de y-labels (geld is breder dan een CA-getal), zodat labels en
+  // datapunten elkaar nooit raken; rechts ruimte voor de CA/PA-lijnlabels.
+  const W = 200, H = 84, padL = kind === 'capa' ? 26 : 36, padR = kind === 'capa' ? 24 : 8, padT = 11, padB = 14;
+  const n = pts.length;
+  const x = i => padL + (W - padL - padR) * (n === 1 ? 0.5 : i / (n - 1));
+  const series = kind === 'capa'
+    ? [{ get: q => q.ca, cls: 'dvl-ca', dash: '', label: 'CA' },
+       { get: q => q.pa, cls: 'dvl-pa', dash: '4 3', label: 'PA' }]
+    : [{ get: q => q.v, cls: 'dvl-v', dash: '', label: '' }];
+  const all = pts.flatMap(q => series.map(s => s.get(q))).filter(v => v != null && v > 0);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  // Minimale as-spanwijdte: piepkleine verschillen (waarde-geruis van 0,1%, CA +1) mogen
+  // niet als steile lijnen ogen doordat de as op min/max krimpt. CA/PA-as minstens 12
+  // punten, waarde-as minstens 12% van het midden; echte sprongen vullen het paneel nog.
+  const midV = (lo + hi) / 2;
+  const minSpan = kind === 'capa' ? 12 : Math.max(1, midV * 0.12);
+  if (hi - lo < minSpan) { lo = midV - minSpan / 2; hi = midV + minSpan / 2; }
+  const pad = (hi - lo) * 0.08;
+  lo -= pad; hi += pad;
+  const y = v => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
+  const fmtV = v => kind === 'capa' ? Math.round(v) : fmtMoney(v);
+  const fmtD = d => `${d.slice(5, 7)}-'${d.slice(2, 4)}`;
+
+  let g = '';
+  // basislijn + min/max-labels in de linkergoot (terughoudend, tekst nooit in seriekleur)
+  g += `<line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" class="dv-axis"/>`;
+  g += `<text x="${padL - 3}" y="${padT + 3}" class="dv-lbl" text-anchor="end">${fmtV(hi)}</text>`;
+  g += `<text x="${padL - 3}" y="${H - padB}" class="dv-lbl" text-anchor="end">${fmtV(lo)}</text>`;
+  g += `<text x="${padL}" y="${H - 3}" class="dv-lbl">${fmtD(pts[0].d)}</text>`;
+  g += `<text x="${W - padR}" y="${H - 3}" class="dv-lbl" text-anchor="end">${fmtD(pts[n - 1].d)}</text>`;
+  const endLbls = [];
+  for (const s of series) {
+    // null-veilig pad: ontbrekende waardes breken de lijn i.p.v. naar de bodem te duiken
+    let path = '', pen = false, lastY = null;
+    pts.forEach((q, i) => {
+      const v = s.get(q);
+      if (v == null || v <= 0) { pen = false; return; }
+      path += `${pen ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+      pen = true; lastY = y(v);
+      if (q.real) g += `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2" class="dvd ${s.cls}"/>`;
+    });
+    g += `<path d="${path}" class="dvl ${s.cls}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''}/>`;
+    if (s.label && lastY != null) endLbls.push({ txt: s.label, y: lastY + 3 });
+  }
+  // Eindlabels (CA/PA) uit elkaar duwen als de lijnen vrijwel samenvallen; identiteit
+  // hangt niet alleen aan kleur (PA is ook gestippeld), maar overlappend is onleesbaar.
+  if (endLbls.length === 2 && Math.abs(endLbls[0].y - endLbls[1].y) < 11) {
+    const mid = (endLbls[0].y + endLbls[1].y) / 2;
+    const [a, b] = endLbls[0].y <= endLbls[1].y ? endLbls : [endLbls[1], endLbls[0]];
+    a.y = mid - 5.5; b.y = mid + 5.5;
+  }
+  for (const l of endLbls) g += `<text x="${W - padR + 3}" y="${l.y.toFixed(1)}" class="dv-lbl">${l.txt}</text>`;
+  // hover-banen (volle hoogte, breder dan de stip) met tooltip per dumpdatum
+  const seg = (W - padL - padR) / Math.max(1, n - 1);
+  pts.forEach((q, i) => {
+    const tip = kind === 'capa' ? `${fmtDate(q.d)} · CA ${q.ca} · PA ${q.pa}` : `${fmtDate(q.d)} · ${q.v > 0 ? fmtMoney(q.v) : '–'}`;
+    g += `<rect x="${(x(i) - seg / 2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${H}" class="dv-hit"><title>${tip}</title></rect>`;
+  });
+  const cap = kind === 'capa' ? 'CA / PA' : t('cmpValue');
+  return `<div class="dev-panel"><div class="dev-cap">${cap}</div><svg viewBox="0 0 ${W} ${H}">${g}</svg></div>`;
+}
+
+// ---------- deelbare spelerskaart (PNG) — v3, FM-native ----------
+// Ontwerptaal van FM zelf, zodat FM-spelers de kaart in één oogopslag lezen: het volledige
+// attributengrid met FM-kleuren (groen = klasse, een muur van groen = viral regen),
+// scout-sterren voor huidig en potentieel vermogen, beste rollen en financiën.
+// Tier-accent volgt CA; wonderkids (≤21, PA-CA ≥ 25) krijgen goud + badge. Labels app-taal.
+// Kaartlabels apart van de hoofd-i18n gehouden: veel kaart-only strings, bij elkaar leesbaarder.
+const CARDL = {
+  nl: { meta: 'META', cur: 'HUIDIG', pot: 'POTENTIEEL', roles: 'BESTE ROLLEN', value: 'WAARDE',
+    ask: 'VRAAGPRIJS', wage: 'LOON', contract: 'CONTRACT', rep: 'Reputatie', inj: 'Blessures',
+    wk: '★ WONDERKID', repW: 'Wereldwijd', repC: 'Continentaal', repN: 'Nationaal', repL: 'Lokaal',
+    injL: 'Laag', injM: 'Gemiddeld', injH: 'Hoog',
+    sListed: 'OP TRANSFERLIJST', sLoan: 'TE HUUR', sRel: 'VRIJGEGEVEN', sNfs: 'NIET TE KOOP', sFree: 'CLUBLOOS' },
+  en: { meta: 'META', cur: 'CURRENT', pot: 'POTENTIAL', roles: 'TOP ROLES', value: 'VALUE',
+    ask: 'ASKING PRICE', wage: 'WAGE', contract: 'CONTRACT', rep: 'Reputation', inj: 'Injury',
+    wk: '★ WONDERKID', repW: 'Worldwide', repC: 'Continental', repN: 'National', repL: 'Local',
+    injL: 'Low', injM: 'Medium', injH: 'High',
+    sListed: 'TRANSFER LISTED', sLoan: 'FOR LOAN', sRel: 'RELEASED', sNfs: 'NOT FOR SALE', sFree: 'FREE AGENT' },
+};
+// Kaartkolommen zoals FM ze zelf indeelt: standaardsituaties horen bij Technisch (de app
+// splitst ze in het profiel, de kaart voegt ze weer samen → 14 rijen, net als Mentaal).
+function cardGroups(p, isGk) {
+  const a = p.attrs || {};
+  // > 0: FM-attributen lopen 1-20; 0 betekent "niet in de dump" en hoort niet op de kaart.
+  const pick = keys => sortByLabel(keys).filter(k => a[k] > 0).map(k => [attrName(k), a[k]]);
+  return isGk
+    ? [[t('g_goalkeeping'), pick(ATTR_GROUPS_GK[0][1])],
+       [t('g_mental'), pick(ATTR_GROUPS_GK[1][1])],
+       [t('g_physical'), pick(ATTR_GROUPS_GK[2][1])]]
+    : [[t('g_technical'), pick([...ATTR_GROUPS_OUTFIELD[0][1], ...ATTR_GROUPS_OUTFIELD[3][1]])],
+       [t('g_mental'), pick(ATTR_GROUPS_OUTFIELD[1][1])],
+       [t('g_physical'), pick(ATTR_GROUPS_OUTFIELD[2][1])]];
+}
+
+// Bouwt het kaartmodel uit een echte speler (alle afgeleide waardes en labels).
+function buildCardModel(p) {
+  const L = CARDL[state.lang] || CARDL.nl;
+  const isGk = (p.posArr || []).includes('GK');
+  const meta = metaScore(p);
+  const ca = p.ca || 0, pa = p.pa || 0;
+  const age0 = getAge(p);
+  const wk = age0 > 0 && age0 <= 21 && pa - ca >= 25;   // leeftijd 0/onbekend is géén wonderkid
+  const tier = wk ? 'gold' : ca >= 150 ? 'elite' : ca >= 115 ? 'strong' : 'neutral';
+
+  const st = isFree(p) ? { t: L.sFree, c: '#8294a8' }
+    : p.notForSale ? { t: L.sNfs, c: '#8294a8' }
+    : p.setForRelease ? { t: L.sRel, c: '#e06060' }
+    : p.listed ? { t: L.sListed, c: '#e8a13c' }
+    : p.loanListed ? { t: L.sLoan, c: '#4aa3ff' }
+    : null;
+
+  const wr = p.worldRep || 0;
+  const rep = wr >= 6500 ? L.repW : wr >= 4500 ? L.repC : wr >= 2500 ? L.repN : L.repL;
+  const ip = p.attrs ? p.attrs.InjuryProneness : 0;
+  const injury = ip > 0 ? (ip >= 14 ? { t: L.injH, c: '#e06060' } : ip >= 8 ? { t: L.injM, c: '#e8a13c' } : { t: L.injL, c: '#46c46e' }) : null;
+
+  const ev = estValue(p);
+  const fee = feeEstimate(p);
+  // Verborgen stats uit → sterren blijven (scout-sterren zijn in FM gewoon zichtbaar),
+  // maar rauwe CA/PA-getallen en de vraagprijs (afgeleid van CA) gaan van de kaart.
+  const hideNum = state.hideCapa;
+  const ask = !hideNum && fee.v > 0 ? `${fmtMoney(fee.v * 0.85)}–${fmtMoney(fee.v * 1.15)}` : '–';
+  const roles = bestRoles(p, 2).map(r => [roleName(r.id), r.score]);
+  const snapDate = state.meta.gameDate ? fmtDate(state.meta.gameDate) : '';
+
+  return {
+    L, tier, wk, gk: isGk, name: (p.name || '?').toUpperCase(),
+    club: p.club || L.sFree, division: p.div || '', nation: natsLabel(p) || '',
+    positions: (p.posArr || []).slice(0, 3).join(' · ') || '–',
+    age: getAge(p), foot: footLabel(p), height: p.height ? p.height + ' cm' : '–',
+    ca, pa, hideNum, hexNum: state.hideMeta ? null : meta != null ? meta.toFixed(1) : '–',
+    groups: cardGroups(p, isGk), roles,
+    value: ev.v > 0 ? (ev.est ? '~' : '') + fmtMoney(ev.v) : '–',
+    ask, wage: p.wage > 0 ? fmtMoney(p.wage) : '–', contract: fmtDate(p.expires) || '–',
+    status: st, rep, injury, snap: 'FM26' + (snapDate ? ' · ' + snapDate : ''),
+  };
+}
+
+const CARD_TIER = { elite: '#46c46e', strong: '#4aa3ff', neutral: '#aeb9c6', gold: '#f5c518' };
+const cardFmc = v => v >= 16 ? '#46c46e' : v >= 11 ? '#e8a13c' : '#aeb9c6';
+function cardAlpha(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+
+function drawPlayerCard(p) {
+  const d = buildCardModel(p);
+  const cv = document.createElement('canvas');
+  cv.width = 1200; cv.height = 1600;
+  const x = cv.getContext('2d');
+  const W = 600, H = 800, g = 1;
+  const P = { bg2: '#1c242f', bd: '#2a3441', tx: '#dbe4ee', mu: '#8294a8', gr: '#46c46e', am: '#e8a13c', gd: '#f5c518' };
+  const T = CARD_TIER[d.tier], wk = d.wk;
+  const A = cardAlpha, fmc = cardFmc;
+  const F = (w, s) => `${w} ${s}px "Segoe UI", system-ui, sans-serif`;
+  const ls = v => { try { x.letterSpacing = v; } catch (e) { } };
+  const rr = (a, b, w, h, r) => { x.beginPath(); x.roundRect(a, b, w, h, r); };
+  const hexPath = (cx, cy, r) => { x.beginPath(); for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + i * Math.PI / 3, px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r; i ? x.lineTo(px, py) : x.moveTo(px, py); } x.closePath(); };
+  const cham = (i, c, col, lw) => { x.beginPath(); x.moveTo(i + c, i); x.lineTo(W - i - c, i); x.lineTo(W - i, i + c); x.lineTo(W - i, H - i - c); x.lineTo(W - i - c, H - i); x.lineTo(i + c, H - i); x.lineTo(i, H - i - c); x.lineTo(i, i + c); x.closePath(); x.strokeStyle = col; x.lineWidth = lw; x.stroke(); };
+  const fit = (s, maxW, size, min, w) => { x.font = F(w, size); while (size > min && x.measureText(s).width > maxW) { size -= 1; x.font = F(w, size); } return size; };
+  const trunc = (s, maxW) => { if (x.measureText(s).width <= maxW) return s; while (s.length > 2 && x.measureText(s + '…').width > maxW) s = s.slice(0, -1); return s + '…'; };
+  const chipAt = (cx0, y0, text, col) => { x.font = F(800, 10.5); ls('1px'); const w = x.measureText(text).width + 24; rr(cx0, y0, w, 24, 12); x.fillStyle = A(col, .12); x.fill(); x.strokeStyle = A(col, .55); x.lineWidth = 1.25; rr(cx0, y0, w, 24, 12); x.stroke(); x.fillStyle = col; x.textAlign = 'left'; x.fillText(text, cx0 + 12, y0 + 16.5); ls('0px'); return w; };
+  // 5-puntster met fractionele vulling (halve sterren, zoals FM-scoutrapporten).
+  const starPath = (cx, cy, r) => { x.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr2 = i % 2 ? r * .47 : r; const px = cx + Math.cos(a) * rr2, py = cy + Math.sin(a) * rr2; i ? x.lineTo(px, py) : x.moveTo(px, py); } x.closePath(); };
+  const starRow = (x0, cy, r, step, val, fillCol, fillA) => {
+    for (let i = 0; i < 5; i++) {
+      const cx0 = x0 + i * step;
+      const f = Math.max(0, Math.min(1, val - i));
+      const frac = f >= .75 ? 1 : f >= .25 ? .5 : 0;
+      starPath(cx0, cy, r); x.fillStyle = A('#0b0f14', .5); x.fill();
+      x.strokeStyle = A(fillCol, .45); x.lineWidth = 1.25; x.stroke();
+      if (frac > 0) {
+        x.save(); starPath(cx0, cy, r); x.clip();
+        x.fillStyle = A(fillCol, fillA);
+        x.fillRect(cx0 - r, cy - r, 2 * r * frac, 2 * r);
+        x.restore();
+        starPath(cx0, cy, r); x.strokeStyle = A(fillCol, .9); x.stroke();
+      }
+    }
+  };
+
+  x.setTransform(2, 0, 0, 2, 0, 0);
+  x.clearRect(0, 0, W, H);
+  x.textBaseline = 'alphabetic';
+  x.save(); rr(0, 0, W, H, 20); x.clip();
+  let bg = x.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#1c242f'); bg.addColorStop(.45, '#151b24'); bg.addColorStop(1, '#0e1218'); x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  let rg = x.createRadialGradient(300, 180, 0, 300, 180, 420); rg.addColorStop(0, A(T, d.tier === 'neutral' ? .08 : .13)); rg.addColorStop(1, A(T, 0)); x.fillStyle = rg; x.fillRect(0, 0, W, H);
+  if (wk) { x.save(); x.translate(300, 400); x.rotate(-.42); x.fillStyle = A(P.gd, .04); x.fillRect(-150, -620, 110, 1240); x.fillStyle = A(P.gd, .03); x.fillRect(10, -620, 34, 1240); x.restore(); }
+  let tb = x.createLinearGradient(0, 0, W, 0); tb.addColorStop(0, A(T, 0)); tb.addColorStop(.12, A(T, .95)); tb.addColorStop(.88, A(T, .95)); tb.addColorStop(1, A(T, 0)); x.shadowColor = A(T, .6 * g); x.shadowBlur = 16 * g; x.fillStyle = tb; x.fillRect(0, 0, W, 5); x.shadowBlur = 0;
+  cham(12, 18, A(T, .3), 1.25); if (wk) cham(17, 24, A(P.gd, .15), 1);
+
+  // ----- header: identiteit links, bio rechts -----
+  x.textAlign = 'left';
+  const ns = fit(d.name, 386, 34, 21, 800); x.font = F(800, ns); x.fillStyle = P.tx; ls('-0.5px'); x.fillText(d.name, 28, 66); ls('0px');
+  x.font = F(700, 14); x.fillStyle = A(P.tx, .92); x.fillText(trunc(d.club, 386), 28, 92);
+  x.font = F(600, 11); x.fillStyle = P.mu; x.fillText(trunc(d.division, 386), 28, 110);
+  x.textAlign = 'right';
+  x.font = F(800, 19); x.fillStyle = P.tx; x.fillText(d.positions, 572, 52);
+  x.font = F(600, 12); x.fillStyle = P.mu; x.fillText(`${d.age} · ${d.foot} · ${d.height}`, 572, 72);
+  x.font = F(600, 11); x.fillStyle = A(P.mu, .85); x.fillText(trunc(d.nation, 190), 572, 90);
+  if (wk) { x.font = F(800, 10.5); const ww = x.measureText(d.L.wk).width + 24; chipAt(572 - ww, 100, d.L.wk, P.gd); }
+
+  // ----- sterrenpaneel: scout-sterren (huidig/potentieel) + meta-hexchip -----
+  rr(24, 132, 552, 86, 12); x.fillStyle = A(P.bg2, .5); x.fill(); x.strokeStyle = A(P.bd, .7); x.lineWidth = 1; rr(24, 132, 552, 86, 12); x.stroke();
+  const srLab = (tt, y) => { x.font = F(700, 9); ls('1.5px'); x.fillStyle = P.mu; x.textAlign = 'left'; x.fillText(tt, 42, y); ls('0px'); };
+  srLab(d.L.cur, 164); srLab(d.L.pot, 199);
+  starRow(146, 160, 12, 29, d.ca / 40, P.gd, .95);
+  starRow(146, 195, 12, 29, d.pa / 40, P.gd, .45);
+  if (!d.hideNum) {
+    x.textAlign = 'left';
+    x.font = F(800, 17); x.fillStyle = T; x.fillText(String(d.ca), 292, 166); let cw = x.measureText(String(d.ca)).width;
+    x.font = F(700, 10); x.fillStyle = P.mu; x.fillText('CA', 292 + cw + 5, 166);
+    x.font = F(800, 17); x.fillStyle = wk ? P.gd : P.tx; x.fillText(String(d.pa), 292, 201); cw = x.measureText(String(d.pa)).width;
+    x.font = F(700, 10); x.fillStyle = P.mu; x.fillText('PA', 292 + cw + 5, 201);
+  }
+  // meta-hexchip (FMSS-handtekening); vervalt als de meta-toggle uit staat
+  if (d.hexNum !== null) {
+    hexPath(512, 175, 33); x.fillStyle = P.bg2; x.shadowColor = A(T, .5 * g); x.shadowBlur = 14 * g; x.fill(); x.shadowBlur = 0; x.strokeStyle = A(T, .9); x.lineWidth = 1.5; x.stroke();
+    hexPath(512, 175, 27); x.strokeStyle = A(T, .22); x.lineWidth = 1; x.stroke();
+    x.textAlign = 'center'; x.fillStyle = T; x.font = F(800, 20); x.fillText(d.hexNum, 512, 181);
+    x.font = F(700, 7.5); x.fillStyle = P.mu; ls('1.5px'); x.fillText(d.L.meta, 512, 195); ls('0px');
+  }
+
+  // ----- attributengrid: 3 kolommen in FM-kleuren, zebra-rijen, chips voor 16+ -----
+  const cols = [24, 216, 408], colW = 168, rowH = 20, rowY0 = 280;
+  const gridHead = (tt, x0, y0) => {
+    x.font = F(800, 10); ls('1.5px'); x.fillStyle = P.mu; x.textAlign = 'left'; x.fillText(tt.toUpperCase(), x0, y0); ls('0px');
+    rr(x0, y0 + 8, colW, 2, 1); x.fillStyle = A(T, .5); x.fill();
+  };
+  d.groups.forEach((grp, gi) => {
+    const x0 = cols[gi];
+    gridHead(grp[0], x0, 250);
+    grp[1].forEach(([nm, v], idx) => {
+      const ry = rowY0 + idx * rowH;
+      if (idx % 2 === 0) { rr(x0 - 6, ry - 14, colW + 12, 19, 4); x.fillStyle = A('#0b0f14', .35); x.fill(); }
+      // lange NL-labels ("Beheersing strafschopgebied") krimpen eerst, afkappen is laatste redmiddel
+      x.textAlign = 'left'; const lsz = fit(nm, colW - 36, 10.5, 8.5, 600); x.font = F(600, lsz); x.fillStyle = A(P.tx, .72); x.fillText(trunc(nm, colW - 36), x0, ry);
+      const vx = x0 + colW;
+      if (v >= 16) {
+        rr(vx - 28, ry - 13.5, 31, 18, 5); x.fillStyle = A(P.gr, v >= 18 ? .3 : .17); x.fill();
+        if (v >= 18) { x.strokeStyle = A(P.gr, .5); x.lineWidth = 1; rr(vx - 28, ry - 13.5, 31, 18, 5); x.stroke(); }
+        x.textAlign = 'right'; x.font = F(800, 12.5); x.fillStyle = v >= 18 ? '#7ee2a0' : P.gr; x.fillText(String(v), vx - 5, ry);
+      } else {
+        x.textAlign = 'right'; x.font = F(v >= 11 ? 700 : 600, 12); x.fillStyle = v >= 11 ? P.am : A(P.mu, .95); x.fillText(String(v), vx - 5, ry);
+      }
+    });
+  });
+
+  // ----- beste rollen: onder Fysiek in kolom 3 -----
+  const rx = cols[2], physRows = d.groups[2][1].length;
+  const rolesY = rowY0 + physRows * rowH + 18;
+  gridHead(d.L.roles, rx, rolesY);
+  d.roles.forEach((r, i) => { const yy = rolesY + 32 + i * 38;
+    x.textAlign = 'left'; const rsz = fit(r[0], colW - 38, 11.5, 9, 700); x.font = F(700, rsz); x.fillStyle = P.tx; x.fillText(trunc(r[0], colW - 38), rx, yy);
+    x.textAlign = 'right'; x.font = F(800, 13); x.fillStyle = fmc(r[1]); x.fillText(r[1].toFixed(1), rx + colW, yy);
+    rr(rx, yy + 7, colW, 4, 2); x.fillStyle = A(P.bd, .8); x.fill();
+    rr(rx, yy + 7, colW * Math.min(20, r[1]) / 20, 4, 2); x.fillStyle = fmc(r[1]); x.fill(); });
+
+  // ----- financiën + status/reputatie/blessures -----
+  rr(24, 564, 552, 104, 12); x.fillStyle = A(P.bg2, .35); x.fill(); x.strokeStyle = A(P.bd, .7); x.lineWidth = 1; rr(24, 564, 552, 104, 12); x.stroke();
+  const fx = [44, 180, 316, 452], flab = [d.L.value, d.L.ask, d.L.wage, d.L.contract], fval = [d.value, d.ask, d.wage, d.contract];
+  x.textAlign = 'left'; flab.forEach((l, i) => { x.font = F(700, 9.5); ls('1.5px'); x.fillStyle = P.mu; x.fillText(l, fx[i], 590); ls('0px');
+    const vs = fit(fval[i], 126, i === 0 ? 18 : 15, 11, 800); x.font = F(800, vs); x.fillStyle = i === 0 ? T : P.tx; x.fillText(fval[i], fx[i], 616); });
+  x.strokeStyle = A(P.bd, .5); x.beginPath(); x.moveTo(44, 632); x.lineTo(556, 632); x.stroke();
+  x.font = F(600, 11.5); x.fillStyle = P.mu; x.textAlign = 'left'; x.fillText(d.L.rep + ' · ' + d.rep, 44, 654);
+  if (d.status) { x.font = F(800, 10.5); const sw = x.measureText(d.status.t).width + 24; chipAt(300 - sw / 2, 636, d.status.t, d.status.c); }
+  if (d.injury) { x.font = F(700, 11.5); const iw = x.measureText(d.injury.t).width; x.fillStyle = d.injury.c; x.textAlign = 'right'; x.fillText(d.injury.t, 556, 654);
+    x.font = F(600, 11.5); x.fillStyle = P.mu; x.fillText(d.L.inj + ' ·', 556 - iw - 6, 654); }
+
+  // ----- footer -----
+  x.strokeStyle = A(P.bd, .7); x.beginPath(); x.moveTo(40, 700); x.lineTo(560, 700); x.stroke();
+  x.textAlign = 'left'; x.font = F(600, 12); x.fillStyle = P.mu; x.fillText(d.snap, 40, 738);
+  x.font = F(800, 19); const w1 = x.measureText('FM').width, w2 = x.measureText('Super').width, w3 = x.measureText('Scout').width;
+  let sx = 562 - (w1 + w2 + w3);
+  hexPath(sx - 16, 733, 7); x.fillStyle = A(T, .9); x.fill();
+  x.fillStyle = P.tx; x.fillText('FM', sx, 739); x.fillStyle = P.gr; x.fillText('Super', sx + w1, 739); x.fillStyle = P.tx; x.fillText('Scout', sx + w1 + w2, 739);
+  x.restore();
+
+  // borders
+  x.strokeStyle = A(T, .95); x.lineWidth = 2.5; x.shadowColor = A(T, .55 * g); x.shadowBlur = 18 * g; rr(1.5, 1.5, 597, 797, 19); x.stroke(); x.shadowBlur = 0;
+  x.strokeStyle = A(P.bd, .9); x.lineWidth = 1; rr(6.5, 6.5, 587, 787, 15); x.stroke();
+  return cv;
+}
+
+function downloadPlayerCard(p) {
+  try {
+    drawPlayerCard(p).toBlob(b => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = `fmss-${(p.name || 'speler').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '')}.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }, 'image/png');
+    showToast(t('cardSaved'), 'check');
+  } catch { showToast('!'); }
+}
+
+// ---------- app-stijl helptooltip ----------
+// Elk element met data-help="<i18n-key>" krijgt bij hover een tooltip in de app-stijl
+// (i.p.v. de kale Windows-title-popup). De tekst wordt op het moment van tonen uit de
+// actieve taal gehaald, dus taalwissels werken vanzelf.
+function initHelpTip() {
+  const tip = document.createElement('div');
+  tip.id = 'help-tip'; tip.className = 'hidden';
+  document.body.appendChild(tip);
+  let cur = null;
+  const hide = () => { cur = null; tip.classList.add('hidden'); };
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-help]');
+    if (el === cur) return;
+    if (!el) { hide(); return; }
+    cur = el;
+    tip.textContent = t(el.dataset.help);
+    tip.classList.remove('hidden');
+    const r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';               // eerst meten op (0,0)
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let xPos = Math.max(8, Math.min(window.innerWidth - tw - 8, r.left + r.width / 2 - tw / 2));
+    let yPos = r.bottom + 8;
+    if (yPos + th > window.innerHeight - 8) yPos = r.top - th - 8;
+    tip.style.left = xPos + 'px'; tip.style.top = yPos + 'px';
+  });
+  document.addEventListener('scroll', hide, true);
+}
+initHelpTip();
 
 // ---------- update-melding ----------
 // Checkt hooguit 1x per ~20 uur de laatste GitHub-release (API staat CORS toe) en toont
@@ -2043,8 +2490,39 @@ async function checkUpdate() {
     el.innerHTML = `<a href="${REPO_URL}/releases/latest" target="_blank" rel="noopener">${tf('updateAvail', { v: chk.tag })}</a>
       <button title="${t('donateLater')}">${icon('x', 10)}</button>`;
     el.classList.remove('hidden');
+    // Klik = downloaden + installer starten (server verifieert de SHA-256). Faalt het,
+    // dan valt de pill terug op de gewone link naar de releasepagina.
+    el.querySelector('a').onclick = e => { e.preventDefault(); startSelfUpdate(el); };
     el.querySelector('button').onclick = () => { localStorage.setItem('fmss_upd_dismiss', chk.tag); el.classList.add('hidden'); };
   } catch { }
+}
+
+// Zelf-update: server downloadt en verifieert de nieuwe Setup.exe en start hem; wij
+// tonen alleen de voortgang in de pill. Als de server stopt ('launching' gezien of
+// verbinding weg), is de installer bezig en tonen we de slottekst.
+async function startSelfUpdate(el) {
+  const setTxt = (txt, cls = '') => { el.innerHTML = `<span class="${cls}">${escHtml(txt)}</span>`; };
+  try {
+    setTxt(tf('updDl', { pct: 0 }));
+    await fetch('/api/update-install', { method: 'POST' });
+    for (; ;) {
+      await new Promise(r => setTimeout(r, 500));
+      let st;
+      try { st = await (await fetch('/api/update-status')).json(); }
+      catch { break; }   // server al gestopt voor de installer
+      if (st.phase === 'downloading') setTxt(tf('updDl', { pct: st.pct || 0 }));
+      else if (st.phase === 'verifying') setTxt(t('updVerify'));
+      else if (st.phase === 'launching') break;
+      else if (st.phase === 'error') {
+        el.innerHTML = `<a href="${REPO_URL}/releases/latest" target="_blank" rel="noopener">${escHtml(t('updErr'))}</a>`;
+        console.error('update:', st.error);
+        return;
+      }
+    }
+    setTxt(t('updLaunch'));
+  } catch {
+    el.innerHTML = `<a href="${REPO_URL}/releases/latest" target="_blank" rel="noopener">${escHtml(t('updErr'))}</a>`;
+  }
 }
 
 // ---------- probleem melden ----------
@@ -2206,8 +2684,8 @@ function openCompare() {
   if (!state.hideCapa) {
     body += row('CA', players.map(p => p.ca));
     body += row('PA', players.map(p => p.pa));
-    body += row(t('c_meta'), players.map(p => metaScore(p)), { fmt: v => v.toFixed(1) });
   }
+  if (!state.hideMeta) body += row(t('c_meta'), players.map(p => metaScore(p)), { fmt: v => v.toFixed(1) });
   body += row(t('cmpValue'), players.map(p => estValue(p).v), { fmt: fmtMoney, hi: null });
   if (!state.hideCapa)
     body += row(t('c_fee'), players.map(p => { const f = feeEstimate(p); return f.v > 0 ? f.v : null; }), { fmt: fmtMoney, hi: false });
@@ -2327,7 +2805,7 @@ function analyseSquad() {
     const cas = members.map(p => p.ca || 0);
     const ages = members.map(p => getAge(p)).filter(x => x != null);
     const bestCa = cas.length ? Math.max(...cas) : 0;
-    const youngTalents = members.filter(p => getAge(p) <= 21 && (p.pa || 0) > 0).sort((a, b) => (b.pa || 0) - (a.pa || 0));
+    const youngTalents = members.filter(p => { const a = getAge(p); return a > 0 && a <= 21 && (p.pa || 0) > 0; }).sort((a, b) => (b.pa || 0) - (a.pa || 0));
     const succ = youngTalents.find(p => (p.pa || 0) >= bestCa);   // jong talent dat het niveau haalt
     // Statusbepaling
     let status = 'ok';
@@ -2420,14 +2898,15 @@ function scoutFor(s) {
   applyFilters();
   showToast([...codes].join(', '), 'search');
 }
-$('detail-close').onclick = () => { $('detail').classList.add('hidden'); state.selected = null; renderVisible(); };
-document.addEventListener('keydown', e => { if (e.key === 'Escape') $('detail-close').onclick(); });
+$('detail-close').onclick = closeDetail;
+$('detail-backdrop').onclick = closeDetail;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
 // ---------- UI-bediening ----------
 ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
   let tm; $(id).addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(applyFilters, 150); });
 });
-['f-eu', 'f-myclub', 'f-listed', 'f-contract', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
+['f-eu', 'f-myclub', 'f-tstatus', 'f-contract', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
 $('btn-adv').onclick = advDialog;
 $('f-staffrole').addEventListener('change', applyFilters);
 // Divisie-zoekbalk: filter terwijl je typt + eigen suggestie-dropdown (app-stijl, i.p.v.
@@ -2465,10 +2944,11 @@ $('f-role').addEventListener('change', () => {
 $('btn-clear').onclick = () => {
   document.querySelectorAll('#filters input[type=text], #filters input[type=number]').forEach(i => i.value = '');
   document.querySelectorAll('#filters input[type=checkbox]').forEach(i => i.checked = false);
-  $('f-staffrole').value = ''; $('f-interest').value = '0'; $('f-contract').value = '';
+  $('f-staffrole').value = ''; $('f-interest').value = '0'; $('f-contract').value = ''; $('f-tstatus').value = '';
   state.advF = []; saveAdv();
   activePos.clear();
   document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on'));
+  state.myTeam = 'all'; renderMyTeamChips();   // subteamchip (Eerste/Jeugd) hoort ook bij "wissen"
   state.presetSel = null; renderPresets();   // dropdown-label terug naar de placeholder
   applyFilters();
 };
@@ -2478,6 +2958,27 @@ $('btn-coffee').onclick = openKofi;
 $('btn-report').onclick = reportBug;
 $('es-report').onclick = reportBug;
 checkUpdate();
+
+// Ko-fi-glow: af en toe (minstens 8 uur ertussen, en dan nog maar een deel van de
+// starts) krijgt het koffie-icoon even een zachte gloed, 20-90 s na het opstarten.
+// Verdwijnt weer na een paar klikken ergens in de app of vanzelf na 90 s; klikken op
+// het icoon zelf opent gewoon Ko-fi. Bewust subtiel, geen popup.
+function maybeCoffeeGlow() {
+  const last = +localStorage.getItem('fmss_glow_at') || 0;
+  if (Date.now() - last < 8 * 3600e3) return;
+  if (Math.random() > 0.4) return;
+  localStorage.setItem('fmss_glow_at', String(Date.now()));
+  setTimeout(() => {
+    const btn = $('btn-coffee');
+    btn.classList.add('glow');
+    let clicks = 0;
+    const stop = () => { btn.classList.remove('glow'); document.removeEventListener('click', onClick); };
+    const onClick = () => { if (++clicks >= 4) stop(); };
+    document.addEventListener('click', onClick);
+    setTimeout(stop, 90e3);
+  }, 20e3 + Math.random() * 70e3);
+}
+maybeCoffeeGlow();
 
 // inklapbare filtersecties (voorkeur onthouden)
 // Eerste gebruik (geen opgeslagen stand): secundaire secties dicht zodat de zijbalk op
@@ -2540,14 +3041,27 @@ $('sel-lang').addEventListener('change', () => {
 // CA/PA verbergen (anti-"spieken"). Past de hele tool consistent aan.
 function applyHideCapa() {
   document.body.classList.toggle('hide-capa', state.hideCapa);
-  if (state.hideCapa) {   // bijbehorende filters leegmaken zodat ze niet stiekem filteren (ook meta/vraagprijs)
-    ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-fee'].forEach(id => { const e = $(id); if (e) e.value = ''; });
-    if (hiddenStatCol(state.sortKey)) { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
-  }
+  document.body.classList.toggle('hide-meta', state.hideMeta);
+  // Verborgen filters leegmaken zodat ze niet stiekem blijven filteren. CA/PA/vraagprijs
+  // vallen onder de hidden-stats-toggle; meta onder zijn eigen toggle.
+  if (state.hideCapa) ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-fee'].forEach(id => { const e = $(id); if (e) e.value = ''; });
+  if (state.hideMeta) ['f-meta-min', 'f-meta-max'].forEach(id => { const e = $(id); if (e) e.value = ''; });
+  if (hiddenStatCol(state.sortKey)) { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
   updateAdvBtn();   // regels op verborgen data tellen niet mee zolang de toggle uit staat
   if (state.mode === 'analysis') renderAnalysis(); else applyFilters();
   if (state.selected) showDetail(state.selected);
 }
+$('set-profile').value = profMode();
+$('set-profile').addEventListener('change', () => {
+  localStorage.setItem('fmss_profmode', $('set-profile').value);
+  if (state.selected) showDetail(state.selected);   // open profiel meteen omzetten
+});
+$('set-hidemeta').checked = !state.hideMeta;   // "tonen" = niet verbergen (standaard aan)
+$('set-hidemeta').addEventListener('change', () => {
+  state.hideMeta = !$('set-hidemeta').checked;
+  localStorage.setItem('fmss_hidemeta', state.hideMeta ? '1' : '0');
+  applyHideCapa();   // deelt de her-render (kolommen, filters, profiel, analyse)
+});
 $('set-hidecapa').checked = !state.hideCapa;   // "tonen" = niet verbergen (standaard aan)
 $('set-hidecapa').addEventListener('change', () => {
   state.hideCapa = !$('set-hidecapa').checked;
@@ -2591,7 +3105,14 @@ $('btn-fetch').onclick = async () => {
         b.onclick = () => { b.className = 'hidden'; };
       } catch { }
     }, 15000);
-  } catch { showToast('!'); }
+  } catch (e) {
+    // Meestal: de lokale server is weg (achtergrondvenster → server afgesloten). Toon dat
+    // duidelijk i.p.v. een raadselachtig "!"; herstart via het venster opnieuw openen.
+    console.error('Nieuwe data:', e);
+    b.className = 'scanning error';
+    b.innerHTML = bannerMsg('warning', t('serverGone'));
+    b.onclick = () => { b.className = 'hidden'; };
+  }
 };
 
 function applyLang() {
@@ -2599,7 +3120,7 @@ function applyLang() {
   document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
   document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
   document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
-  document.querySelectorAll('[data-help]').forEach(el => el.title = t(el.dataset.help));   // ?-tooltips
+  // ?-helpteksten tonen via de eigen app-tooltip (zie initHelpTip), niet meer via title.
   $('f-name').placeholder = t('searchph');
   $('btn-coffee').title = t('donateBtn');
   $('set-version').textContent = 'FMSuperScout v' + APP_VERSION;
@@ -2720,6 +3241,10 @@ async function initHeartbeat() {
     if (!st.appMode) return;
     const beat = () => fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
     setInterval(beat, 4000); beat();
+    // Achtergrondvensters knijpen timers af, dus klop ook meteen zodra het venster weer
+    // zichtbaar of gefocust wordt — dan is de server gegarandeerd vers bij de eerste klik.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
+    window.addEventListener('focus', beat);
     window.addEventListener('pagehide', () => { try { navigator.sendBeacon('/api/bye'); } catch {} });
   } catch { /* server weg */ }
 }
@@ -2728,5 +3253,6 @@ initHeartbeat();
 buildPitch();
 applyLang();
 document.body.classList.toggle('hide-capa', state.hideCapa);
+document.body.classList.toggle('hide-meta', state.hideMeta);
 $('sl-count').textContent = state.shortlist.size;
 loadDump().then(() => poll());

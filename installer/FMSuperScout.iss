@@ -7,7 +7,7 @@
 ; Bouwen: installer\build-exe.ps1 (staged payload in dist\stage).
 
 #define MyAppName "FMSuperScout"
-#define MyAppVersion "1.1.1"
+#define MyAppVersion "1.2.0"
 #define Stage "..\dist\stage"
 
 [Setup]
@@ -26,6 +26,11 @@ SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\icon.ico
 Compression=lzma2/max
 SolidCompression=yes
+; Draaiende FMSuperScout (node.exe houdt app-bestanden vast) automatisch sluiten bij
+; een update; 'force' omdat een consoleproces geen nette sluit-melding kan ontvangen.
+; Maakt de één-klik-update betrouwbaar, ook als de gebruiker de app open laat staan.
+CloseApplications=force
+RestartApplications=no
 WizardStyle=modern
 DisableProgramGroupPage=yes
 DisableWelcomePage=no

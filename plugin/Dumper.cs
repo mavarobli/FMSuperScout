@@ -83,7 +83,14 @@ internal static class Dumper
         Plugin.Log.LogInfo("FMSuperScout: geheugen scannen…");
         Directory.CreateDirectory(OutDir);
         WriteStatus("scanning", 0, 0);
+        // Alle dump-specifieke statische staat resetten: mislukt de detectie in déze save,
+        // dan mogen badge, Mijn club-filter en historie niet stilletjes op de vorige
+        // carrière blijven draaien.
         GameDate = null;   // niet de datum van een vorige dump/save laten doorwerken in AgeFrom
+        MyClub = null; ManagerName = null; MyClubRep = 0;
+        GameYear = 0; ClubCount = 0; LinkedViaSquad = 0; VtGp = 0;
+        DiagMyTeam = 0; DateVotes = new(); AllOffHist = new();
+        DiagStaffRaw = 0; DiagStaffAlsoPlayer = 0;
         // Fase-timing: waar gaat de tijd heen? Elke Phase() logt de duur sinds de vorige.
         PhaseLog = new List<string>();
         long tPrev = 0;
@@ -122,7 +129,11 @@ internal static class Dumper
         ulong modLo = mem.ModLo, modHi = mem.ModHi;   // snelle inline-afwijzing in de hotloop
         object progLock = new();
         var regions = mem.ScanRegions.Where(r => r.size >= 0x40).ToList();
-        int maxDop = System.Math.Max(1, Environment.ProcessorCount - 1);
+        // Cap op 8 workers: elke worker draagt een 32MB-leesbuffer, dus cores-1 werd op
+        // 16/32-core-machines 480MB-1GB extra RAM bovenop FM zelf — precies de machines
+        // waar mega-saves toch al tegen OOM aanhikken. Boven ~8 workers is ReadProcessMemory
+        // bovendien de flessenhals, niet de CPU.
+        int maxDop = System.Math.Clamp(Environment.ProcessorCount - 1, 1, 8);
 
         // N workers, elk een round-robin-deel van de regio's (regio's variëren sterk in
         // grootte → interleaven balanceert de last). Task.Run i.p.v. Parallel.ForEach:
@@ -478,6 +489,11 @@ internal static class Dumper
             e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
             byte flags = m.U8(con + Fields.CON_STATUS_FLAGS);
             e.Listed = (flags & (1 << 0)) != 0 || (flags & (1 << 3)) != 0; // Listed / by request
+            // Bit 1 = huurlijst-kandidaat (naast 0=Listed, 3=by request, 4=NFS, 5=Release).
+            // Nog niet in-game geverifieerd; diagnostics.txt toont een bit-histogram en een
+            // sample zodat de pin met één echte dump te bevestigen is.
+            e.LoanListed = (flags & (1 << 1)) != 0;
+            e.StatusFlags = flags;
             e.NotForSale = (flags & (1 << 4)) != 0;
             e.SetForRelease = (flags & (1 << 5)) != 0;
         }
@@ -730,8 +746,13 @@ internal static class Dumper
     // ---------- output ----------
     private static void WriteJson(IEnumerable<Person> players, IEnumerable<Person> staff)
     {
+        // Atomair: eerst naar dump.json.tmp schrijven en pas na een geslaagde Close
+        // over dump.json heen schuiven. De web-app kan dump.json op elk moment lezen;
+        // zonder dit kon een half geschreven bestand stilletjes als halve spelerslijst
+        // geladen worden (of de lezing botsen met het schrijven).
         string path = Path.Combine(OutDir, "dump.json");
-        var j = new JsonWriter(path);
+        string tmp = path + ".tmp";
+        var j = new JsonWriter(tmp);
         j.BeginObj();
         j.Key("meta"); j.BeginObj();
         j.Prop("generated", DateTime.Now.ToString("s"));
@@ -774,6 +795,7 @@ internal static class Dumper
         j.EndArr();
         j.EndObj();
         j.Close();
+        File.Move(tmp, path, true);
     }
 
     private static void WriteJsonProgress(int written, int total)
@@ -807,9 +829,14 @@ internal static class Dumper
             j.Prop("foot", p.Foot);
             if (p.Height > 0) j.Prop("height", p.Height);
             Money(j, "value", p.Value);
-            Money(j, "askingPrice", p.Value); // v1: transferwaarde; echte vraagprijs in v2
+            // Vraagprijs = waardeveld. Een los opgeslagen "echte vraagprijs" bestaat niet:
+            // FM berekent de geëiste som per onderhandeling (koper-afhankelijk). De enige
+            // gematerialiseerde vraagprijs (club zet expliciet een prijs bij Listed) landt
+            // exact in dit waardeveld (ijking 14-07, 4/4 ±1%). Rest: app-model + clausules.
+            Money(j, "askingPrice", p.Value);
             j.Null4("wageDemand");
             j.Prop("listed", p.Listed);
+            j.Prop("loanListed", p.LoanListed);
             j.Prop("notForSale", p.NotForSale);
             j.Prop("setForRelease", p.SetForRelease);
             j.Prop("clubRep", p.ClubRep);
@@ -852,6 +879,19 @@ internal static class Dumper
             w.WriteLine($"Staf ruw: {DiagStaffRaw}  ·  ook speler (verwijderd als dubbel): {DiagStaffAlsoPlayer}  ·  netto staf: {staff.Count}");
             w.WriteLine("Fasen: " + string.Join(" · ", PhaseLog));
             w.WriteLine();
+            // Repin-hints bij een afwijkende gameversie: welke pinnen staan er, waar zitten
+            // de pieken nu — samen met docs/repin-guide.md is dat het halve herstelwerk.
+            if (!VersionOk)
+            {
+                w.WriteLine("=== REPIN-HINTS (gameversie wijkt af van gepinde " + Fields.SUPPORTED_VERSION + ".x) ===");
+                w.WriteLine($"Gepind: speler=0x{Fields.PLAYER_OFFSET:X} speler+staf=0x{Fields.PLAYER_STAFF_OFFSET:X} " +
+                            $"staf=0x{Fields.STAFF_OFFSET:X} manager=0x{Fields.HUMAN_MANAGER_OFFSET:X}");
+                w.WriteLine("Kandidaten nu (grootste class-pieken hieronder). Vuistregels: elke class toont");
+                w.WriteLine("als twee pieken 0x28 uit elkaar (neem de laagste van het paar); de staf-piek is");
+                w.WriteLine("groter dan de spelerpiek; manager is een mini-piek (~2). Volledige werkwijze:");
+                w.WriteLine("docs/repin-guide.md in de repo. Na het pinnen: SUPPORTED_* in Fields.cs bijwerken.");
+                w.WriteLine();
+            }
             // Health-check: de grote pieken horen speler=0x288 en staf=0x100 te zijn. Wijkt dit
             // af na een FM-patch, dan zijn de class-offsets verschoven en moeten ze opnieuw gepind.
             w.WriteLine("=== Class-offsets (meta+4) met plausibele UID, top 15 ===");
@@ -864,7 +904,9 @@ internal static class Dumper
             w.WriteLine();
             w.WriteLine($"Mijn club: {ManagerName} · {MyClub} · reputatie={MyClubRep}");
             w.WriteLine($"Clubs gedetecteerd: {ClubCount} · spelers via selectie gekoppeld: {LinkedViaSquad}");
-            w.WriteLine($"In-game datum: {(GameDate is DateTime g2 ? g2.ToString("yyyy-MM-dd") + " (memory)" : "derived")} · game-versie: {GameVersion ?? "?"}");
+            // NB: de "memory"-datum komt uit het team-wedstrijdschema (eerstvolgende speeldag),
+            // dus hij kan enkele dagen vóórlopen op de echte in-game kalenderdag.
+            w.WriteLine($"In-game datum: {(GameDate is DateTime g2 ? g2.ToString("yyyy-MM-dd") + " (team-schema, ≈ speeldag)" : "derived")} · game-versie: {GameVersion ?? "?"}");
             w.WriteLine();
 
             w.WriteLine("Sample spelers (eerste 12):");
@@ -874,6 +916,21 @@ internal static class Dumper
             w.WriteLine("Sample staf (eerste 8):");
             foreach (var p in staff.Values.Take(8))
                 w.WriteLine($"  {p.Name} lft={p.Age} CA={p.Ca} PA={p.Pa} rol={p.Job} club={p.Club}");
+            w.WriteLine();
+
+            // Contract-statusflags: bit-histogram + huurlijst-sample, om de loan-listed-pin
+            // (bit 1) te verifiëren tegen wat FM zelf toont bij deze spelers.
+            w.WriteLine("=== Contract-statusflags (bit-histogram over spelers) ===");
+            var bitHist = new int[8];
+            foreach (var p in players.Values)
+                for (int b = 0; b < 8; b++)
+                    if ((p.StatusFlags & (1 << b)) != 0) bitHist[b]++;
+            w.WriteLine("  bit0=Listed bit1=LoanListed? bit3=ByRequest bit4=NotForSale bit5=Release");
+            for (int b = 0; b < 8; b++)
+                if (bitHist[b] > 0) w.WriteLine($"  bit{b}: {bitHist[b]:N0}");
+            w.WriteLine("Sample te huur (bit 1, eerste 8) — check deze in FM (Transferstatus: te huur?):");
+            foreach (var p in players.Values.Where(x => x.LoanListed).Take(8))
+                w.WriteLine($"  {p.Name} lft={p.Age} club={p.Club}");
             w.WriteLine();
 
             // Huur-overzicht: moederclub (volledig contract) ≠ huidige squad-club.
@@ -909,6 +966,8 @@ internal sealed class Person
     public long Wage;
     public string Expires;
     public bool Listed;
+    public bool LoanListed;
+    public byte StatusFlags;
     public bool NotForSale;
     public bool SetForRelease;
     public int CurRep;

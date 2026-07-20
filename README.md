@@ -11,7 +11,8 @@
 FMSuperScout reads the full database of your open save (players **and** staff), including what FM
 normally hides: **CA/PA**, hidden personality attributes and FM's **real transfer value**. You get
 a snappy, spreadsheet-style app with search, filters, role ratings, comparison and squad analysis
-over 45,000+ people.
+over 45,000+ people. Monster saves work too: a 100+ league database with 635k people loads in
+about 17 seconds.
 
 Two parts: a small **BepInEx plugin** that dumps the database to JSON from inside the game, and a
 **local web app** where you search, filter and compare. No internet, no accounts, data never
@@ -22,7 +23,8 @@ leaves your PC.
 ## Features
 
 - **Search and filter**: name/club, age, CA, PA, value, asking price, wage, nationality, EU/EEA,
-  contract status, division (with smart search). Pick positions on a clickable pitch.
+  contract status, transfer status (for sale, for loan), division (with smart search). Pick
+  positions on a clickable pitch.
 - **Attribute filter**: min/max thresholds on any attribute ("Pace 15+"), hidden characteristics
   and personality included. Rules combine, show as removable chips and save into presets.
 - **Tactical role ratings**: 19 FM roles scored from the key attributes; sortable column plus a
@@ -31,16 +33,27 @@ leaves your PC.
 - **Squad analysis**: flags thin depth, aging and missing succession per position group, and
   scouts candidates for the gap in one click.
 - **Player profile**: attributes in FM colours and grouping, personality and hidden
-  characteristics, a CA/PA gauge and a potential projection per attribute.
+  characteristics, a CA/PA gauge and a potential projection per attribute. Opens beside the
+  list or as a centered popup, your choice in Settings.
+- **Shareable player card**: one click saves a PNG of any player in FM's own visual
+  language: scout stars for current and potential ability, the full attribute grid in FM
+  colours, best roles and finances. Wonderkids get a gold card. Built for showing off that
+  one insane regen.
+- **Loan-aware**: players on loan show in blue with their parent club in the tooltip and on
+  the profile; under the My club filter your own loaned-out players show in red.
+- **Development trends**: every dump adds a compact local snapshot, and player profiles grow
+  a chart of CA/PA and value over time (dots mark real changes). Stored delta-only, a few
+  MB per season, entirely on your own disk.
 - **Market value from memory**: FM's actual transfer value for most players, a calibrated
   estimate for the rest (see *Accuracy*).
 - **Asking price and transfer interest**: estimates based on contract, transfer status, age,
   reputation gap and wages, including the FIFA under-18 transfer rule.
 - **Shortlist** (★) with its own tab and CSV export.
 - **Settings**: NL/EN, GBP/EUR, and a toggle to hide all hidden stats at once for those who
-  consider them cheating.
-- **Update aware**: the app checks the latest release about once a day and shows a dismissible
-  link when a newer version is out. No auto-install, no tracking.
+  consider them cheating (the meta score has its own toggle, so you can keep either one).
+- **One-click update**: the app checks the latest release about once a day and shows a
+  dismissible notification. One click downloads the new installer, verifies its SHA-256
+  against the release and starts it. Nothing installs without your click, no tracking.
 
 ## Install (end users)
 
@@ -101,8 +114,8 @@ The app reads whatever the FMSuperScout plugin last dumped from your **active sa
 
 1. Start FM26 and load your save.
 2. Press **F9** in-game (or click **⬇ New data** in the app).
-3. When the green bar appears, click it to load. If a read fails, the app shows a red bar with the
-   reason instead of waiting forever.
+3. The data loads by itself as soon as the dump is ready. If a read fails, the app shows what
+   went wrong instead of waiting forever.
 
 Data lives in `%LOCALAPPDATA%\FMSuperScout\` (`dump*.json`, `status.json`, `diagnostics.txt`).
 

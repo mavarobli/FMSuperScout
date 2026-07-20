@@ -2,6 +2,91 @@
 
 Status overview of what is done, what is open, and ideas. Not yet built where it says "backlog".
 
+## 20. QA round 17-07 (v1.2 prep) - DONE + recommendations
+
+Full pass over the tool: i18n audit (NL/EN dictionaries are symmetric, 4 hardcoded Dutch
+strings fixed), complete UI walkthrough in English (all tabs, popups, compare, presets,
+export, column picker: zero console errors), sort rewritten to decorate-sort-undecorate
+with a reused Intl.Collator (meta/name sort ~10x faster on big data), and the local server
+now rejects non-localhost Host headers (DNS-rebinding protection, standard practice for
+localhost APIs; matters now that /api/update-install exists).
+
+**Open verification**: the loan-listed pin (contract flags bit 1, plugin v0.1.36) needs one
+F9 + a check of the "Sample te huur" list in diagnostics.txt against FM.
+
+### Recommended next features (not built, in rough priority order)
+
+1. **Real asking price - DROPPED after investigation (17-07)**: a stored per-player
+   asking price does not exist. FM computes the demanded fee per negotiation and it is
+   buyer-dependent (reputation gap, window, competing bids), so there is nothing static
+   to read. The only materialized asking price (club explicitly sets a price when
+   listing) lands exactly in the value field we already read (calibration 14-07, 4/4
+   ±1%), and the app already shows those exact and unmarked. Genie Scout/FMRTE read no
+   such field either. Remaining improvement path: sharpening the fee model with real
+   paid-vs-value data points (release clauses were explored and dropped, see item 8).
+2. **Trends across dumps - BUILT (17-07)**: every loaded dump posts a compact snapshot
+   (uid → CA/PA/value) to the local server, stored delta-only per manager in
+   DATA_DIR\history (49k save: ~2 MB baseline + KBs per snapshot; 321k mega save:
+   ~13 MB baseline, merge ~0.7 s; value noise <2.5% ignored; rewind to an older
+   in-game date discards the stale future; capped at 120 dates with baseline-preserving
+   pruning). Profile shows a "Development" section: CA/PA and value mini-charts, dots on
+   real change points, tooltips per dump date, hidden-stats-aware. Verified end-to-end
+   incl. delta counts, rewind, same-date replace, EN/NL, popup scaling and collision-free
+   label geometry.
+3. **Quick presets**: one-click chips for wonderkids, expiring contracts, free agents,
+   loan targets (the new transfer-status dropdown makes these trivial). Low effort.
+4. **Staff attribute filter**: the attribute filter popup is players-only; staff shares
+   the same infrastructure. Low-medium effort.
+5. **Shareable player card - BUILT (17-07), v2 (19-07), v3 FM-native (20-07)**: v1 was
+   a canvas card iterated against design-critique; v2 ported a Claude Design FUT-style
+   layout (hexagon radar, composite stats). mavarobli's verdict on v2: too radical, says too
+   little — FM players must instantly see how good a player is. v3 replaces the
+   abstraction with FM's own visual language: scout star rows (current/potential,
+   half-star precision), the full three-column attribute grid with FM colouring (green
+   chips 16+, amber 11+; set pieces merged back into Technical like FM itself, GK column
+   for keepers), top-2 roles with bars, finance panel, status/reputation/injury row,
+   meta hex chip, tier accent + gold wonderkid badge. Hidden-stats aware: stars stay
+   (scout info), raw CA/PA numbers, asking price and meta chip drop out per the
+   toggles. Verified via rendered PNGs: wonderkid NL, elite (wall of green), GK NL+EN,
+   neutral listed (status chip), hidden-mode.
+6. **Offset repin helper - BUILT (17-07)**: docs/repin-guide.md (step-by-step recovery
+   after an FM patch, incl. the 0x28-pair rule of thumb and which constants live where)
+   plus a REPIN-HINTS section that the plugin prints in diagnostics.txt automatically
+   whenever the game version deviates from the pinned one.
+7. **Installer polish - BUILT (17-07)**: `CloseApplications=force` +
+   `RestartApplications=no` added to the .iss (compile-checked), so a running
+   FMSuperScout viewer no longer blocks the one-click update. The fm.exe-running
+   check with retry dialog already existed (PrepareToInstall, WMI).
+8. **Release clause reading - DROPPED (20-07)**: two hunt iterations (exact-amount scan,
+   then per-player pointer scan with a ±15% GBP band and vtable cross-analysis) were
+   built and removed again per mavarobli. Neither run produced a result on a live save, and
+   diagnosing was muddied by tooling issues (the trigger/hunt files written by the dev
+   sandbox turned out not to be the ones FM saw). If this is ever picked up again:
+   start from a fresh in-FM experiment (set unique clauses on 2-3 players yourself)
+   and have the plugin log unconditionally from the first line of the sweep. The hunt
+   code lives in git history (plugin 0.1.37, removed in 0.1.38).
+
+Codex-review 20-07: verified items were fixed for the 1.2.0 release (atomic dump write +
+incomplete-dump detection, Origin gate, worker cap, per-dump state reset, localStorage
+guards, HTML escaping, myTeam reset, age-0 guard, updater timeouts, atomic history
+write, version alignment). Deliberately deferred:
+
+9. **History fingerprint per career**: history files key on manager name only, so two
+   saves with the same manager name share timelines. A career fingerprint (manager +
+   start year or a generated id) fixes it but breaks existing history files, so it
+   needs a migration; low urgency (same-name collisions are rare).
+10. **CSP header as defense-in-depth**: the app uses inline styles and inline handlers
+    in places, so a strict CSP needs refactoring first. Escaping at the source (done)
+    covers the realistic attack surface.
+11. **CI workflow (GitHub Actions)**: build plugin + run node tests on push. Useful
+    once there are external contributors; solo-release value is limited.
+12. **csproj portability**: BepInExCore points at mavarobli's Steam path (with an interop
+    fallback already in place). Only affects other machines building the plugin; add a
+    fallback or env override when a second contributor appears.
+13. **In-game date precision**: the "memory" date comes from the team schedule (next
+    fixture), so it can run a few days ahead of the real calendar day. Fine for
+    history dating (monotonic, stable); diagnostics now labels it "team-schema".
+
 ## 1. Full standalone installer (.exe) - BUILT (15-07); to be tested by mavarobli
 
 **Inno Setup 6 installer** (`installer/FMSuperScout.iss`, build with `installer/build-exe.ps1`

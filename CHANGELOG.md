@@ -3,6 +3,109 @@
 Notable changes per release. The installer only picks up app and plugin changes when a
 new release is built, so the Unreleased section below is what the next release ships.
 
+## [1.2.0] - 2026-07-20
+
+Plugin: v0.1.38.
+
+### Fixed
+- "New data" no longer sometimes fails with a bare "!" after playing FM for a while.
+  Cause: browsers throttle timers in background windows, the heartbeat went quiet and
+  the local server shut itself down mid-session. The shutdown threshold is now 90
+  seconds, every API request counts as a sign of life, the window sends an immediate
+  heartbeat when refocused, and if the server really is gone the app says so in a
+  clear banner instead of "!".
+- Goalkeepers show "–" for meta instead of a made-up average, on the card and in the
+  meta column of the table (which showed a dot).
+- The help texts (the "?" hints) now show as app-styled tooltips instead of the bare
+  Windows title popups, and they follow the app language live.
+- The development section no longer stretches a lone CA/PA chart across the full
+  profile width (huge text) when a player has no stored market value to chart.
+- No more stray dots after the shortlist stars when the window is not full screen:
+  the star column clips instead of showing a text ellipsis.
+- Four untranslated Dutch strings no longer show in the English UI: the copy-name
+  tooltip on every table row, the copy button on the profile, the "unknown club"
+  tooltip and the empty-shortlist toast.
+- Sorting computes the sort key once per row instead of once per comparison and
+  reuses a single Intl.Collator for text. Sorting by meta score or name on large
+  databases is roughly an order of magnitude faster.
+- The local server only accepts requests with a real localhost Host header (403
+  otherwise). This closes the DNS-rebinding hole where a malicious website could
+  reach the local API, which matters now that the API can start an update install.
+- Release-hardening round (external code review by Codex, verified and fixed):
+  - The plugin now writes dump.json atomically (via a .tmp file and rename) and the
+    app refuses to load an incomplete dump, with a clear "FM was probably still
+    writing it" message. Previously a dump read mid-write, or a truncated stream,
+    could silently show (and store in history) half a player list.
+  - Cross-site protection on top of the Host check: any request carrying a non-local
+    Origin gets a 403, and /api/bye only accepts POST, so a malicious website can no
+    longer trigger an update install, a dump or a server shutdown from the browser.
+  - The memory scan caps its parallel workers at 8. Each worker carries a 32 MB read
+    buffer, so "cores minus one" meant 0.5-1 GB extra RAM on 16/32-core machines: the
+    likely culprit behind out-of-memory reports on big saves. Above ~8 workers the
+    bottleneck is memory reading anyway, so scans stay just as fast.
+  - The plugin resets all per-dump state (manager, club, reputation, season year,
+    diagnostics) at the start of every dump, so a failed detection can no longer
+    silently reuse the previous career's club badge, My club filter or history.
+  - Corrupt browser storage (one bad JSON value) no longer crashes the app into a
+    blank screen before the error screen exists: broken keys reset to defaults.
+  - Manager, club and staff-role names from FM memory are HTML-escaped before
+    rendering, and the history file is written atomically like the dump.
+  - "Clear filters" now also resets the first-team/reserves/youth chip under My club.
+  - Players with an unknown age (0) no longer count as wonderkids on the player card
+    or as young talents in squad analysis.
+  - The one-click updater gets a 30-second network timeout (a silent connection now
+    falls back to the release-page link instead of hanging on "downloading") and only
+    shuts the server down after Windows confirms the installer process really started.
+
+### Added
+- Shareable player card: a button on the player profile saves a 1200x1600 PNG in
+  FMSuperScout style, built from FM's own visual language so FM players read it at a
+  glance: scout star ratings for current and potential ability, the full three-column
+  attribute grid with FM-style colouring (green chips for 16+, a wall of green for that
+  one insane regen), best two roles, a finance panel (value, asking price, wage,
+  contract), reputation, injury risk and transfer status, plus the meta score as a hex
+  chip. Card accent follows CA (elite green / strong blue / neutral); wonderkids (21 or
+  younger, PA at least 25 above CA) get a gold card with a badge. Labels follow the app
+  language (NL/EN). With hidden stats off the card keeps the stars (visible scout info
+  in FM) but drops the raw CA/PA numbers and asking price; the meta chip follows the
+  meta toggle.
+- The meta score now has its own "Show meta score" toggle in Settings, separate from the
+  hidden-stats toggle, so you can hide CA/PA and the hidden characteristics while keeping
+  meta, or vice versa. The estimated-potential toggle is now correctly hidden when hidden
+  stats are off (it is derived from PA).
+- Development trends: every loaded dump adds a compact snapshot per player (CA, PA,
+  value) to a local history, stored delta-only so it stays small (a 49k-player save:
+  ~2 MB baseline, then a few hundred KB per snapshot with real changes; value noise
+  under 2.5% is ignored). The player profile shows a Development section with two
+  mini charts (CA/PA and value) once a player has history; dots mark real changes,
+  tooltips show the exact numbers per dump date. Reloading an older save (rewind)
+  discards the now-invalid future points; history is kept per manager under
+  %LOCALAPPDATA%\FMSuperScout\history. With hidden stats off you only see the value
+  chart. Charts need plugin dumps from two different in-game dates to appear.
+- The installer now force-closes a running FMSuperScout app before updating
+  (CloseApplications), so the one-click update also works when you leave the app
+  open. The FM26-running check with retry dialog already existed.
+- Maintenance tooling for FM patches: diagnostics.txt prints repin hints whenever the
+  game version deviates from the pinned one, and docs/repin-guide.md documents the
+  full recovery workflow.
+- Transfer status filter: the transfer-listed checkbox is now a dropdown with All /
+  For sale / For loan / For sale or loan. Loan-listed data comes from plugin v0.1.36
+  (contract flags bit 1, pin still to be confirmed in-game; diagnostics.txt shows a
+  bit histogram and a sample of loan-listed players to verify against FM). Old presets
+  that used the checkbox map to "For sale" automatically. Player profiles show a
+  "for loan" tag.
+- Players on loan show in blue in the table (parent club in the name tooltip and on
+  the profile). Under the My club filter, own players parked elsewhere stay red.
+- Player profile can open as a centered popup instead of the right-side panel:
+  new setting under Settings > Player profile. Escape, the close button or a click
+  next to the popup closes it.
+- The coffee icon gets a soft glow now and then (at most once per 8 hours, on a
+  random subset of app starts, 20-90 s after opening). It fades after a few clicks
+  anywhere in the app or after 90 seconds.
+- One-click update: clicking the update notification now downloads the new installer
+  from GitHub, verifies its SHA-256 against the release and starts it, with progress
+  shown in the pill. Falls back to a link to the release page if anything fails.
+
 ## [1.1.1] - 2026-07-17
 
 Plugin: v0.1.35.

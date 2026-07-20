@@ -35,8 +35,23 @@ Open `%LOCALAPPDATA%\FMSuperScout\` (paste that in the Explorer address bar):
 - **No files at all**: the plugin never ran. Back to step 1.
 - **`status.json` says `"state":"error"`**: the scan failed; the file includes the
   reason. Report it (see below) with this file attached.
-- **`dump.json` exists but the app shows nothing**: click the reload button in the
-  app, or check `diagnostics.txt` for `Spelers: 0`.
+- **`dump.json` exists but the app shows nothing**: since v1.1.1 the app tells you
+  what went wrong on the empty screen (with a Report button). On older versions:
+  click the reload button, or check `diagnostics.txt` for `Spelers: 0`.
+
+## 4b. Huge saves (100+ playable leagues)
+
+A fully loaded database (300k+ players) produces a dump of 600+ MB. Since v1.1.1
+the app loads those fine (about 15-20 seconds). If the window still crashes while
+loading, your PC is out of free memory: close FM26 first (the dump is already on
+disk, the game is not needed for viewing) and click Try again.
+
+## 4c. "New data" hangs or FM26 does not respond
+
+Since v1.1.1 the plugin picks up app requests on its own background thread, and
+the app shows a hint after 15 seconds if the game does not respond. If that hint
+appears: check that a save is loaded, or press F9 in the game; a full FM26 restart
+fixes the rare case where the game session ignores hotkeys entirely.
 
 ## 5. Game version
 
