@@ -72,7 +72,7 @@ Expected SHA-256:
 ```
 
 VirusTotal scan of this exact file:
-https://www.virustotal.com/gui/file/03e80fa71d91cc4314b99bbe5d3845c7b761a1714c8b3ae7375e3e5229aa3c6b
+https://www.virustotal.com/gui/file-analysis/MjU2MjM4ODFjNDZhMTMxYmRiMGNlOWNiZmRlNTJjYjI6MTc4NDUzNzYzNg==
 
 Full changelog: https://github.com/mavarobli/FMSuperScout/blob/main/CHANGELOG.md
 Issues and ideas: https://github.com/mavarobli/FMSuperScout/issues
