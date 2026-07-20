@@ -3,6 +3,15 @@
 Notable changes per release. The installer only picks up app and plugin changes when a
 new release is built, so the Unreleased section below is what the next release ships.
 
+## [Unreleased]
+
+### Fixed
+- Ghost players no longer show up in the list. FM pre-generates newgens in memory
+  (for example ahead of the youth intake) before they exist in the game world; they
+  appeared as clubless "free agents" with great stats that you could never find or
+  sign in FM (several hundred per save, more around intake time). Recognizable by
+  the unset-reputation sentinel; real free agents always carry a reputation value.
+
 ## [1.2.0] - 2026-07-20
 
 Plugin: v0.1.38.

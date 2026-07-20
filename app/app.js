@@ -1053,7 +1053,12 @@ async function loadDump(force = false) {
     if (!data._complete || !data.meta || !data.meta.pluginVersion)
       throw new Error(t('dumpIncomplete'));
     b.className = 'hidden';
-    state.players = data.players || [];
+    // Spookrecords eruit: FM genereert newgens alvast in het geheugen (o.a. voor de
+    // jeugdintake) vóórdat ze in de spelwereld bestaan. Kenmerk: clubloos én reputatie
+    // op de 0xFFFF-sentinel ("niet ingesteld"). Ze ogen als transfervrije parels maar
+    // zijn in de game onvindbaar en niet te tekenen; echte clublozen hebben wél een
+    // reputatiewaarde.
+    state.players = (data.players || []).filter(p => p.club || p.worldRep !== 0xFFFF);
     state.staff = data.staff || [];
     state.meta = data.meta || {};
     state._wageCeil = undefined;   // loonplafond opnieuw berekenen voor deze dump
