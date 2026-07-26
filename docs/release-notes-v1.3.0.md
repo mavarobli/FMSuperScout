@@ -69,3 +69,7 @@ More info → Run anyway. Verify first if you like:
 below.
 
 SHA-256: `83d81562ef7fa91dfd9402f768cc6de17779eca88756e26c6eac81cf6db1200a`
+[VirusTotal: 1/67](https://www.virustotal.com/gui/file/83d81562ef7fa91dfd9402f768cc6de17779eca88756e26c6eac81cf6db1200a);
+de ene hit is Microsofts ML-heuristiek (Wacatac.C!ml), bekend vals alarm op ongesigneerde
+installers. Lokale Defender met actuele definities keurt exact dit bestand goed;
+false-positive-melding ligt bij Microsoft.
