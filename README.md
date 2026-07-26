@@ -27,10 +27,10 @@ your PC.
 
 > Single-player use only. The plugin **only reads** memory, it never writes to the game.
 
-<!-- Screenshots: drop the PNGs in docs/img/ with these names and they appear here. -->
 <p align="center">
-  <img src="docs/img/players.png" alt="Player list with the growth column and filters" width="90%">
+  <img src="docs/img/players.jpg" alt="Player list sorted by the growth column, with the development and physical filters in the sidebar" width="90%">
 </p>
+<p align="center"><sub>Sorted by growth: who gained the most CA since your chosen reference date.</sub></p>
 
 ## What it does that other tools do not
 
@@ -55,8 +55,9 @@ current and potential ability, the full attribute grid in FM colours, best roles
 Wonderkids get a gold card. Built for showing off that one insane regen.
 
 <p align="center">
-  <img src="docs/img/profile.png" alt="Player profile with development charts" width="90%">
+  <img src="docs/img/profile.jpg" alt="Player profile with CA/PA and value development charts" width="90%">
 </p>
+<p align="center"><sub>A player profile, with how his ability and value moved across the save.</sub></p>
 
 ## Everything else
 
