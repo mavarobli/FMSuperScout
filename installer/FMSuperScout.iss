@@ -7,7 +7,7 @@
 ; Bouwen: installer\build-exe.ps1 (staged payload in dist\stage).
 
 #define MyAppName "FMSuperScout"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.3.0"
 #define Stage "..\dist\stage"
 
 [Setup]
@@ -60,7 +60,7 @@ nl.DetectedXbox=Automatisch gevonden via de Xbox-app (XboxGames).
 nl.DetectedNone=Niet automatisch gevonden — wijs de map zelf aan (de map met fm.exe).
 nl.InvalidGameDir=Dit lijkt geen Football Manager 26-map (fm.exe niet gevonden). Kies de juiste map.
 nl.FmRunning=Football Manager 26 draait nog. Sluit de game volledig af en klik op "Opnieuw".
-nl.FirstRunNote=Klaar! Let op:%n%n• De EERSTE keer dat je FM26 start duurt het 1-3 minuten extra (zwart consolevenster = normaal): de mod-laag stelt zichzelf in.%n• Meldt je virusscanner iets over BepInEx/winhttp.dll? Dat is de bekende mod-laag die ook door andere FM26-mods gebruikt wordt; keur hem goed.%n%nDaarna: start FM26, laad je save en druk op F9 — FMSuperScout doet de rest.
+nl.FirstRunNote=Klaar. Lees dit even, het scheelt je een schrikmoment:%n%nDE EERSTE START VAN FM26 DUURT 1 TOT 3 MINUTEN LANGER%nJe ziet dan een zwart consolevenster. Dat hoort zo: de mod-laag stelt zichzelf eenmalig in. Laat het venster open staan, ook als FM lijkt te hangen. Sluit je het af, dan werkt de tool niet.%n%nDaarna: start FM26, laad je save en druk op F9. Volgende keren start FM gewoon weer normaal.%n%nMeldt je virusscanner iets over BepInEx of winhttp.dll? Dat is de bekende mod-laag die ook andere FM26-mods gebruiken. Keur hem goed.
 nl.RunViewer=FMSuperScout nu starten
 en.GamePageCaption=Football Manager 26 folder
 en.GamePageDesc=Where is Football Manager 26 installed?
@@ -71,7 +71,7 @@ en.DetectedXbox=Detected automatically via the Xbox app (XboxGames).
 en.DetectedNone=Not detected automatically — please locate the folder yourself (the one containing fm.exe).
 en.InvalidGameDir=This does not look like a Football Manager 26 folder (fm.exe not found). Please pick the correct folder.
 en.FmRunning=Football Manager 26 is still running. Close the game completely, then click "Retry".
-en.FirstRunNote=Done! Please note:%n%n• The FIRST launch of FM26 takes 1-3 minutes longer (a black console window is normal): the mod layer is setting itself up.%n• If your antivirus flags BepInEx/winhttp.dll: that is the well-known mod loader also used by other FM26 mods; allow it.%n%nThen: start FM26, load your save and press F9 — FMSuperScout does the rest.
+en.FirstRunNote=Done. Read this bit, it saves you a scare:%n%nTHE FIRST LAUNCH OF FM26 TAKES 1 TO 3 MINUTES LONGER%nYou will see a black console window. That is normal: the mod layer sets itself up once. Leave the window open, even if FM looks stuck. Close it and the tool will not work.%n%nThen: start FM26, load your save and press F9. Later launches are back to normal speed.%n%nIf your antivirus flags BepInEx or winhttp.dll: that is the well-known mod loader other FM26 mods use too. Allow it.
 en.RunViewer=Launch FMSuperScout now
 
 [Files]

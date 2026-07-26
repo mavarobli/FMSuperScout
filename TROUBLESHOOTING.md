@@ -1,7 +1,31 @@
 # Troubleshooting
 
-The most common issue is "no players loaded". Work through this list top to bottom;
-each step tells you what it means if it fails.
+Two different problems live here. If **FM26 itself will not start** after installing,
+read the section directly below. For **"no players loaded"**, start at step 1 and work
+down; each step tells you what it means if it fails.
+
+## 0. FM26 will not start, or seems to hang, after installing
+
+Almost always this is the first launch still running, not a broken game.
+
+After installing, the mod layer builds its files once. That takes **1 to 3 minutes**
+and shows a black console window while it works. FM does not paint its own window in
+that time, so it looks frozen. It is not. Leave it alone and it will start.
+
+If you already closed it, just start FM26 again and wait it out. Later launches are
+back to normal speed. FMSuperScout also shows this explanation on its empty screen
+when it sees the mod layer has not finished setting up yet.
+
+Still nothing after 5 minutes of waiting:
+
+- Check your antivirus quarantine for `winhttp.dll` in your FM26 folder (see step 1).
+- Already using BepInEx for another mod? A version conflict is possible. Rename the
+  `BepInEx` folder, verify FM starts, then reinstall FMSuperScout.
+- To rule the tool out entirely: delete `winhttp.dll` from your FM26 folder. FM then
+  starts without any mods. If it still fails, the cause is not FMSuperScout.
+
+Either way, please report it (see the bottom of this page) with `BepInEx\LogOutput.log`
+attached. That log says exactly how far the mod layer got.
 
 ## 1. Does a black console window appear when FM26 starts?
 

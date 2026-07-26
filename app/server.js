@@ -216,6 +216,36 @@ function latestDump() {
   }
 }
 
+// Installatiestaat van de mod-laag. De installer legt de gamemap vast in het register;
+// zonder die sleutel (draaien vanuit de broncode, of handmatig geinstalleerd) weten we
+// niets en zeggen we dat ook, zodat de app geen onzin toont.
+//
+// Waarom interop: BepInEx genereert die map tijdens de eerste FM-start na installatie,
+// een minuut of drie achter een zwart consolevenster. Precies in dat venster denken
+// mensen dat het spel vastloopt, en dat is de melding die we eerder kregen.
+let setupCache = null;
+function checkSetup(cb) {
+  if (setupCache && Date.now() - setupCache.at < 5000) return cb(setupCache.val);
+  const done = gameDir => {
+    const at = p => { try { return fs.readdirSync(p).length; } catch { return -1; } };
+    const val = gameDir
+      ? {
+        known: true, gameDir,
+        pluginInstalled: fs.existsSync(path.join(gameDir, 'BepInEx', 'plugins', 'FMSuperScout.dll')),
+        bepinex: fs.existsSync(path.join(gameDir, 'BepInEx')),
+        interopReady: at(path.join(gameDir, 'BepInEx', 'interop')) > 0,
+      }
+      : { known: false };
+    setupCache = { at: Date.now(), val };
+    cb(val);
+  };
+  execFile('reg', ['query', 'HKLM\\Software\\FMSuperScout', '/v', 'GamePath'],
+    { windowsHide: true }, (err, out) => {
+      const m = !err && /GamePath\s+REG_SZ\s+(.+)/i.exec(out || '');
+      done(m ? m[1].trim() : null);
+    });
+}
+
 const server = http.createServer((req, res) => {
   // DNS-rebinding-bescherming: alleen echte localhost-hosts accepteren. Een kwaadaardige
   // website kan zijn domein naar 127.0.0.1 laten wijzen en wordt dan same-origin met deze
@@ -276,13 +306,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/fmstatus') {
+  if (url.pathname === '/api/fmstatus') {   // zie checkSetup hieronder voor de installatiestaat
     // Draait Football Manager? (De plugin leeft in fm.exe, dus zonder draaiende game
     // wordt een data-verzoek nooit opgepikt.)
     execFile('tasklist', ['/FI', 'IMAGENAME eq fm.exe', '/NH'], { windowsHide: true }, (err, out) => {
       const running = !err && /fm\.exe/i.test(out || '');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ running }));
+    });
+    return;
+  }
+
+  if (url.pathname === '/api/setup') {
+    // Staat de mod-laag klaar? BepInEx maakt zijn interop-map pas aan tijdens de eerste
+    // start van FM na installatie, en dat duurt 1-3 minuten achter een zwart consolevenster.
+    // Zolang die map er niet is, heeft "druk op F9" geen zin en is een andere uitleg nodig.
+    checkSetup(s => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(s));
     });
     return;
   }
@@ -312,6 +353,35 @@ const server = http.createServer((req, res) => {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: String(e.message || e) }));
     });
+    return;
+  }
+
+  if (url.pathname === '/api/history/deltas') {
+    // Bulk-variant van /series: per speler zijn stand op de peildatum plus de index van
+    // zijn eerste waarneming. Daaruit haalt de app de groeikolom, het groeifilter en de
+    // "nieuw sinds"-vraag zonder per speler een verzoek te doen (~1,3 MB op 59k spelers).
+    const h = loadHist(url.searchParams.get('manager'));
+    const since = String(url.searchParams.get('since') || '');
+    const idx = new Map(h.dates.map((d, i) => [d, i]));
+    const p = {};
+    // Zonder peildatum alleen de datumlijst: de app heeft die nodig om "sinds de vorige
+    // dump" te kunnen uitrekenen, en dat scheelt een payload van ruim een megabyte.
+    if (!since) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ dates: h.dates, ref: null, p }));
+      return;
+    }
+    for (const uid in h.players) {
+      const e = h.players[uid];
+      // Datums per speler zijn dun bezaaid; sorteren is goedkoper dan alle dates aflopen.
+      const keys = Object.keys(e).sort();
+      if (!keys.length) continue;
+      let ref = null;
+      for (const k of keys) { if (k > since) break; ref = e[k]; }
+      p[uid] = ref ? [ref[0], ref[1], idx.get(keys[0]) ?? 0] : [null, null, idx.get(keys[0]) ?? 0];
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ dates: h.dates, ref: since, p }));
     return;
   }
 

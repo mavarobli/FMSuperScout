@@ -5,7 +5,76 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-26
+
+Plugin: v0.1.39.
+
+### Added
+- Growth: a Development section in the sidebar with a reference period (since last dump,
+  6 months, a year, this season, all history), a Growth column showing CA gained since
+  that date in green or red, and filters for a growth range and for players who did not
+  exist yet at that date. Built entirely on the snapshots the app already stored, so no
+  extra data is collected. Players whose earliest record is too thin (CA under 40) stay
+  blank rather than reporting a nonsense jump, and new players sort to the bottom instead
+  of counting as zero growth.
+- Intake Radar: after a youth intake, a bar above the list says how many newgens appeared
+  worldwide since your last dump and who the best prospect is. One click filters to them,
+  sorted by potential. It recognises an intake by shape (a burst of new players who are
+  nearly all 17 or under), which on a real save finds all seven intakes across two
+  seasons, including the southern-hemisphere round, without firing on transfer windows.
+  No other tool can do this: it takes a memory of yesterday to know who is new.
+- Season report: when your in-game season crosses July 1st, a small dismissible card
+  shows what the tool did for you that season (profiles viewed, database loads, cards
+  shared, shortlist size) with the coffee question underneath. Once per football season,
+  never more often. It replaces the old milestone nudges at 25/500/2000 viewed profiles.
+  Two footer links silence it forever: "Already donated?" also turns the coffee icon
+  gold as a thank-you.
+- Wonderkid filter: one tick for players aged 21 or under with a PA of 150+ and at least
+  25 points of growth left. On a 51k player save that is 556 names.
+- Height and preferred-foot filters, in a new Physical section in the sidebar. The foot
+  options are built from your own save, so they follow the language FM runs in.
+
+### Changed
+- Development charts on the player profile now show the change over the period, in green
+  for progress and red for decline, next to the CA/PA and Value headings.
+- The chart's axis labels are the player's real high and low instead of the padded edge of
+  the axis. A keeper with PA 168 had "172" written above his line, which is a number that
+  never occurred in his save.
+- Chart tooltips are app-styled instead of the bare Windows popup, and they show the date
+  and CA. PA is only added when it actually moved during the period, which for most players
+  it does not. The same treatment was applied to the rest of the data: player names, the
+  meta and interest cells, squad-depth dots and the comparison bars no longer produce a
+  Windows popup. Icon buttons keep their plain labels, which is what screen readers expect.
+- Clearer handling of the slow first FM launch. The app now checks whether the mod
+  layer finished setting itself up, and if not it says so on the empty screen instead
+  of telling you to press F9. The installer's closing page leads with the warning, and
+  troubleshooting opens with a section for "FM will not start" rather than burying it
+  under "no players loaded". Someone reported FM refusing to load after installing,
+  which is what an unfinished first launch looks like from the outside.
+- The Interest column and filter now carry a "?" that explains what the score means.
+  Two people asked whether it was clubs being interested in the player or the player
+  being willing to come. It is the second one, and the tooltip also says plainly that
+  it is an estimate: FM only works this out during a negotiation, where your actual
+  offer counts too.
+- The coffee icon's occasional glow now happens right after the tool gave you something:
+  your database finishing loading (from the third load onwards), a saved player card or
+  an exported shortlist. At most once a day, never while the season report is open, and
+  a click anywhere no longer kills it. It used to run off a random timer 20 to 90 seconds
+  after startup and switched itself off after four clicks anywhere in the app, which in a
+  tool you click through constantly meant it was almost never visible at all.
+- The wonderkid bar is stricter. It used to be age plus growth room only, which nearly
+  every sixteen-year-old clears: 28% of a real database qualified. Adding the PA
+  requirement brings that to 1%. The gold player card follows the same rule, so gold
+  now means something.
+
 ### Fixed
+- Loaned players now show up under "My club" and in the list. A player who appears in
+  two club squads was assigned to whichever club had him in the most senior team, which
+  for a loan is a coin flip: pick the parent club and the loan becomes invisible, because
+  current club and parent club end up identical. The parent club is already known from
+  the contract, so the other squad is now taken as where he actually plays. Verified on
+  a 51,845 player save: 429 loans instead of 167, and a club that showed 3 of its 12
+  loaned-out players now shows all 12.
 - Ghost players no longer show up in the list. FM pre-generates newgens in memory
   (for example ahead of the youth intake) before they exist in the game world; they
   appeared as clubless "free agents" with great stats that you could never find or

@@ -44,6 +44,10 @@ leaves your PC.
 - **Development trends**: every dump adds a compact local snapshot, and player profiles grow
   a chart of CA/PA and value over time (dots mark real changes). Stored delta-only, a few
   MB per season, entirely on your own disk.
+- **Growth and Intake Radar**: sort the world by how much CA a player gained since any
+  reference date, filter on it, and get a heads-up on youth intake day listing every newgen
+  that appeared worldwide since your last dump, best potential first. This is what the
+  saved snapshots make possible and it is the one thing a tool without memory cannot do.
 - **Market value from memory**: FM's actual transfer value for most players, a calibrated
   estimate for the rest (see *Accuracy*).
 - **Asking price and transfer interest**: estimates based on contract, transfer status, age,
@@ -103,8 +107,6 @@ The plugin is C# (BepInEx 6, IL2CPP). It builds with a standard .NET SDK:
 dotnet build plugin/FMSuperScout.csproj -c Release
 ```
 
-On this machine the SDK lives user-local (not on PATH):
-`%LOCALAPPDATA%\Microsoft\dotnet\dotnet.exe build plugin/FMSuperScout.csproj -c Release`.
 Install the built DLL by copying `plugin/bin/Release/FMSuperScout.dll` to
 `<FM26>\BepInEx\plugins\` while the game is closed.
 
@@ -158,33 +160,25 @@ by the model tests in [`test/`](test/).
 | `test/` | Zero-dependency model tests (`npm test`) |
 | `docs/` | Value-model, .fmf-format and status/backlog notes |
 
-## How it compares
+## Where this fits
 
-There's a healthy little ecosystem of FM26 tools that read hidden data from memory: Genie Scout,
-FMST 26 and FMRTE all do it well, and Genie Scout has been the default recommendation since 2009
-for good reason. It also has role ratings and player comparison of its own, so here's an honest
-picture of where FMSuperScout actually earns its place (as of July 2026):
+FM26 has a healthy set of tools that read hidden data from memory, several of them very good
+and several of them free. This one is worth a look if you want:
 
-**Speed is the main one.** Press F9 and the full loaded database (45k+ players) is pulled from
-your save in about 10 seconds, with a progress bar. After that everything is instant: search
-while you type, sort 48k rows, stack filters, no loading pauses between clicks. It runs as a
-modern web app, so it feels closer to a fast website than to classic desktop tooling.
-
-Beyond that:
-
+- **The whole database in one go, then instant everything.** F9 pulls your full loaded save
+  (45k+ players) in about 10 seconds. After that, search while you type, sort 48k rows and
+  stack filters with no pauses. A 635k-person monster save loads in about 17 seconds.
 - **Squad needs analysis**: depth, aging and succession per position group, one click to scout
-  candidates for the gap. Built for the "what does my squad actually need" question.
-- **Comparison the way FM shows it**: up to 3 players with FM-style bars, hidden stats and
-  personality included.
-- **Complete filter setups as presets**: pitch positions, role, all criteria, saved under one name.
-- **A one-click toggle to hide CA/PA and all hidden stats**, for people who consider reading
-  them cheating.
-- **Open source and free, no ads**: the only one in this list where you can read exactly what
-  it does with your system.
+  candidates for the gap.
+- **A meta score built on [FM-Arena's attribute testing](https://fm-arena.com/table/26-player-attributes-testing)**,
+  so you can sort the world by what actually wins matches in the engine.
+- **Shareable player cards** as PNG, in FM's own visual language.
+- **Development trends** across your save's seasons, stored locally.
+- **A one-click toggle to hide CA/PA and all hidden stats**, if you consider reading them cheating.
+- **Open source**, so you can read exactly what it does with your system.
 
-And to be fair, the others win elsewhere. Genie Scout and FMST 26 go deeper on raw statistics
-(FMST does 100+ columns with xG and per-90s), FMRTE is the tool if you want to *edit* your save,
-and all three have a longer track record. If that's what you need, use them, they're good.
+If you want to *edit* your save, want deep match statistics with xG and per-90s, or want an
+overlay inside the game itself, other tools do those things and this one does not.
 
 ## Support
 

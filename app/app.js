@@ -22,6 +22,8 @@ const state = {
   colCfg: jread('fmss_cols', {}),  // per modus: {order:[], hidden:[]}
   colW: jread('fmss_colw', {}),    // per modus: {kolomkey: breedte px}
   advF: jread('fmss_adv', []),     // attribuutfilter-regels [{k,min,max}]
+  hist: null,        // {dates, refIdx, map: Map<uid,[caRef,paRef,firstIdx]>} uit /api/history/deltas
+  histPeriod: localStorage.getItem('fmss_histperiod') || 'y1',
 };
 // Beschadigde browseropslag (één ongeldige JSON-waarde) mag de app nooit vóór het
 // foutscherm laten crashen: kapotte sleutel → standaardwaarde, opslag opgeruimd.
@@ -29,9 +31,12 @@ function jread(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
   catch { try { localStorage.removeItem(key); } catch { } return fallback; }
 }
+// Resten van het oude mijlpaal-nudgesysteem (25/500/2000 profielen), vervangen door het
+// seizoensrapport. Eenmalig opruimen zodat oude installs geen dode sleutels meeslepen.
+try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.removeItem(k)); } catch { }
 const GBP_TO_EUR = 1.16;
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -43,13 +48,29 @@ const I18N = {
     profileMode: 'Spelersprofiel', profSide: 'Rechts', profPopup: 'Popup',
     devTitle: 'Ontwikkeling',
     cardBtnTip: 'Spelerskaart opslaan (PNG)', cardSaved: 'Kaart opgeslagen in Downloads',
-    donateBtn: 'Steun FMSuperScout', donateTitle: 'Lekker aan het scouten?',
-    donateBody: 'FMSuperScout is gratis en blijft gratis. Als het je een uur turen in traag menu bespaart, is een koffie welkom. Zo niet, draait ie ook gewoon door.',
-    donateTitle2: '500 profielen gescout', donateBody2: 'Als FMSuperScout een scout was, had ie nu een contractverlenging verdiend. Een koffie mag ook. Blijft verder gewoon gratis.',
-    donateTitle3: '2000 profielen. Respect.', donateBody3: 'Dit is de laatste keer dat we het vragen, beloofd. Bevalt de tool? Een koffie houdt de ontwikkeling warm.',
-    donateCta: '☕ Koffie', donateLater: 'Later',
+    donateBtn: 'Steun FMSuperScout',
+    seasonTitle: 'Dat was seizoen {s}',
+    seasonStatProfiles: '{n} profielen bekeken', seasonStatLoads: '{n}× de database geladen',
+    seasonStatCards: '{n} spelerskaarten gedeeld', seasonStatShort: '{n} op de shortlist',
+    seasonAsk: 'FMSuperScout deed het hele seizoen gratis mee. Een koffie is z\'n complete jaarsalaris.',
+    alreadyDonated: 'Al gedoneerd?', neverAsk: 'Vraag het niet meer',
+    supporterThanks: 'Dank je wel! Je hoort er niets meer over.',
+    donateCta: '☕ Trakteer', donateLater: 'Later',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
+    esSetupTitle: 'Start Football Manager 26 eerst een keer',
+    esSetupBody: 'De eerste start na de installatie duurt 1 tot 3 minuten langer en toont een zwart consolevenster. Dat hoort zo: de mod-laag bouwt eenmalig zijn bestanden. Laat het venster open staan, ook als FM lijkt te hangen.',
+    esSetupHint: 'Daarna laad je je save en druk je op F9. De volgende keren start FM gewoon weer normaal.',
+    devDeltaHint: 'Verandering over de getoonde periode: de laatste meting min de eerste. Groen is vooruitgang, rood achteruitgang.',
+    c_growth: 'Groei', grNew: 'nieuw', development: 'Ontwikkeling', histPeriod: 'Periode',
+    hp_last: 'Sinds vorige dump', hp_m6: 'Afgelopen 6 maanden', hp_y1: 'Afgelopen jaar',
+    hp_season: 'Dit seizoen', hp_all: 'Sinds we meten', growthRange: 'Groei', onlyNew: 'Alleen nieuwe spelers',
+    growthHint: 'Hoeveel CA erbij is gekomen sinds de gekozen peildatum, uit je eigen opgeslagen momentopnames. Groen is groei, rood verlies.\n\n"nieuw" betekent dat hij er op de peildatum nog niet was. Spelers met een te dun beginrecord (CA onder 40) blijven leeg: die zouden een onzinnige sprong laten zien.\n\nElke keer dat je F9 drukt komt er een meetpunt bij, dus hoe langer je de tool gebruikt hoe verder je terug kunt kijken.',
+    onlyNewHint: 'Spelers die er op de peildatum nog niet waren. Meestal jeugdspelers uit een intake, soms iemand die vanuit een niet-geladen competitie jouw database in komt.',
+    intakeTitle: 'Jeugdintake: {n} nieuwe spelers wereldwijd', intakeBest: 'Beste vooruitzicht: {p}',
+    intakeShow: 'Toon de intake',
+    physical: 'Fysiek', heightCm: 'Lengte (cm)', wonderkidOnly: 'Alleen wonderkids',
+    wonderkidHint: 'Hoogstens 21 jaar, PA 150 of hoger en nog minstens 25 punten groei over (PA min CA). Dezelfde grens als het gouden randje op de spelerskaart.',
     origin: 'Herkomst', originComp: 'Herkomst & competitie', nat: 'Nationaliteit', euonly: 'Alleen EU/EEA', availability: 'Beschikbaarheid',
     interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Beschikbaar', listed: 'Op transferlijst',
     tstatus: 'Transferstatus', tsSale: 'Te koop', tsLoan: 'Te huur', tsAny: 'Te koop of te huur',
@@ -69,6 +90,7 @@ const I18N = {
     c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.', c_div: 'Divisie',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
     int_big: 'Groot', int_ok: 'Redelijk', int_small: 'Klein', int_no: 'Nee', interestTitle: 'Interesse-inschatting',
+    interestHint: 'Zou deze speler een overstap naar jouw club zien zitten? Dus zijn kant van het verhaal, niet de interesse van clubs in hem.\n\nGeschat uit het reputatieverschil (jouw club tegen de zijne en tegen zijn eigen status), of je zijn salaris kunt dragen, zijn ambitie en loyaliteit, leeftijd, en of hij beschikbaar is. FIFA-artikel 19 telt mee voor niet-EU-spelers onder de 18.\n\nHet is een schatting, geen FM-getal: FM rekent dit pas uit tijdens een onderhandeling en kijkt dan ook naar jouw concrete bod. Een speler die hier "Klein" scoort kan bij een goed aanbod alsnog ja zeggen.',
     minorNote: 'Te jong voor een transfer.', minorIntlNote: 'Als niet-EU-minderjarige pas vanaf 18 haalbaar (FIFA-regel voor internationale transfers).',
     ambition: 'Ambitie', loyalty: 'Loyaliteit', professionalism: 'Professionaliteit', adaptability: 'Aanpassing',
     pressure: 'Druk', sportsmanship: 'Sportiviteit', temperament: 'Temperament', controversy: 'Controverse', determination: 'Vastberadenheid',
@@ -141,13 +163,29 @@ const I18N = {
     profileMode: 'Player profile', profSide: 'Right side', profPopup: 'Popup',
     devTitle: 'Development',
     cardBtnTip: 'Save player card (PNG)', cardSaved: 'Card saved to Downloads',
-    donateBtn: 'Support FMSuperScout', donateTitle: 'Found your next signing?',
-    donateBody: 'FMSuperScout is free and stays free. If it beat squinting at slow menus, a coffee helps. If not, it keeps working anyway.',
-    donateTitle2: 'That is 500 profiles scouted', donateBody2: 'If FMSuperScout were a scout, it would have earned a contract extension by now. A coffee works too. Free either way.',
-    donateTitle3: '2000 profiles. Respect.', donateBody3: 'Last time we ask, promise. If the tool earns its place in your saves, a coffee keeps development going.',
+    donateBtn: 'Support FMSuperScout',
+    seasonTitle: 'That was season {s}',
+    seasonStatProfiles: '{n} profiles viewed', seasonStatLoads: '{n} database loads',
+    seasonStatCards: '{n} player cards shared', seasonStatShort: '{n} shortlisted',
+    seasonAsk: 'FMSuperScout played the whole season for free. A coffee is its entire annual wage.',
+    alreadyDonated: 'Already donated?', neverAsk: 'Don\'t ask again',
+    supporterThanks: 'Thank you! You won\'t hear about this again.',
     donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
+    esSetupTitle: 'Start Football Manager 26 once first',
+    esSetupBody: 'The first launch after installing takes 1 to 3 minutes longer and shows a black console window. That is normal: the mod layer builds its files once. Leave the window open, even if FM looks stuck.',
+    esSetupHint: 'After that, load your save and press F9. Later launches are back to normal speed.',
+    devDeltaHint: 'Change over the period shown: the last reading minus the first. Green is progress, red is decline.',
+    c_growth: 'Growth', grNew: 'new', development: 'Development', histPeriod: 'Period',
+    hp_last: 'Since last dump', hp_m6: 'Last 6 months', hp_y1: 'Last year',
+    hp_season: 'This season', hp_all: 'Since tracking began', growthRange: 'Growth', onlyNew: 'Only new players',
+    growthHint: 'How much CA he has gained since the chosen reference date, from your own stored snapshots. Green is growth, red is loss.\n\n"new" means he did not exist yet at that date. Players with too thin a starting record (CA under 40) stay empty: they would show a nonsense jump.\n\nEvery time you press F9 another data point is added, so the longer you use the tool the further back you can look.',
+    onlyNewHint: 'Players who did not exist at the reference date. Usually youth intake players, sometimes someone arriving in your database from a league you had not loaded.',
+    intakeTitle: 'Youth intake: {n} new players worldwide', intakeBest: 'Best prospect: {p}',
+    intakeShow: 'Show the intake',
+    physical: 'Physical', heightCm: 'Height (cm)', wonderkidOnly: 'Wonderkids only',
+    wonderkidHint: 'Age 21 or under, PA of 150 or more, and at least 25 points of growth left (PA minus CA). Same bar as the gold trim on the player card.',
     origin: 'Origin', originComp: 'Origin & competition', nat: 'Nationality', euonly: 'EU/EEA only', availability: 'Availability',
     interestmin: 'Interest ≥', all: 'All', attainable: 'Available', listed: 'Transfer listed',
     tstatus: 'Transfer status', tsSale: 'For sale', tsLoan: 'For loan', tsAny: 'For sale or loan',
@@ -167,6 +205,7 @@ const I18N = {
     c_clubrep: 'Club rep', c_worldrep: 'World rep', c_div: 'Division',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
     int_big: 'High', int_ok: 'Fair', int_small: 'Low', int_no: 'No', interestTitle: 'Interest estimate',
+    interestHint: 'Would this player fancy a move to your club? His side of it, not other clubs\' interest in him.\n\nEstimated from the reputation gap (your club against his, and against his own standing), whether you can carry his wages, his ambition and loyalty, age, and whether he is available. FIFA article 19 applies to non-EU players under 18.\n\nThis is an estimate, not an FM number: FM works it out during a negotiation and weighs your actual offer too. A player sitting at "Low" here can still say yes to a strong bid.',
     minorNote: 'Too young for a transfer.', minorIntlNote: 'As a non-EU minor, only feasible from age 18 (FIFA rule on international transfers).',
     ambition: 'Ambition', loyalty: 'Loyalty', professionalism: 'Professionalism', adaptability: 'Adaptability',
     pressure: 'Pressure', sportsmanship: 'Sportsmanship', temperament: 'Temperament', controversy: 'Controversy', determination: 'Determination',
@@ -250,6 +289,10 @@ const ICON_PATHS = {
   arrowRight: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   card: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  // Voetbal: gevulde vijfhoek in het midden, vijf dunne naden naar de rand en korte
+  // hints van de randvlakken. Bewust een eigen, dunne lijndikte (1.1): met dikke naden
+  // leest dit als een stuurwiel in plaats van een bal (varianten vergeleken 26-07).
+  ball: '<g stroke-width="1.1"><circle cx="12" cy="12" r="10.2"/><path d="M12 8.8 12 1.8 M15.1 11.05 21.7 8.9 M13.9 14.7 18 20.4 M10.1 14.7 6 20.4 M8.9 11.05 2.3 8.9 M4.6 17.2 7.4 16.4 M19.4 17.2 16.6 16.4 M6 4.5 8.2 6.3 M18 4.5 15.8 6.3"/></g><polygon points="12,8.8 15.1,11.05 13.9,14.7 10.1,14.7 8.9,11.05" fill="currentColor" stroke="none"/>',
 };
 const icon = (name, size = 14) =>
   `<svg class="ic" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
@@ -312,6 +355,165 @@ const EU_NATIONS = new Set([
 const isEu = p => (p.nat || []).some(n => EU_NATIONS.has((n || '').toLowerCase()));
 
 // Voet: de plugin schrijft NL ('Rechts'/'Links'/'Beide') in de dump → vertalen bij tonen.
+// ---------- ontwikkeling: groei t.o.v. een peildatum ----------
+// Alles hieronder leest uit één bron: state.hist, opgehaald bij het laden van een dump.
+// Daarop draaien de groeikolom, het groeifilter, "alleen nieuwe spelers" en de intakebalk.
+//
+// Peildatum uit de gekozen periode. De grens van "dit seizoen" is 1 juli, net als bij het
+// seizoensrapport. Valt de peildatum vóór de eerste momentopname, dan wordt het stilzwijgend
+// de vroegste datum die we hebben: liever "sinds we meten" dan een lege kolom.
+const HIST_PERIODS = ['last', 'm6', 'y1', 'season', 'all'];
+function histRefDate() {
+  const gd = state.meta.gameDate;
+  const dates = state.hist ? state.hist.dates : null;
+  if (!gd || !dates || dates.length < 2) return null;
+  const d = new Date(gd);
+  const iso = x => x.toISOString().slice(0, 10);
+  switch (state.histPeriod) {
+    case 'last': return dates[dates.length - 2];
+    case 'm6': { const x = new Date(d); x.setMonth(x.getMonth() - 6); return iso(x); }
+    case 'season': { const y = seasonYearOf(); return y ? `${y}-07-01` : dates[0]; }
+    case 'all': return dates[0];
+    default: { const x = new Date(d); x.setFullYear(x.getFullYear() - 1); return iso(x); }
+  }
+}
+// Basislijn onder CA 40 is geen echte speler maar een half ingevuld record (FM vult
+// newgens en niet-gescoute spelers gaandeweg aan). Zonder deze ondergrens bestaat de
+// stijgerslijst uit "CA 1 -> 98" zonder naam; mét ondergrens uit echte doorbraken.
+const HIST_MIN_BASE = 40;
+// De map is op numerieke uid gesleuteld (zie refreshHistDeltas): deze twee functies draaien
+// per rij bij elk filter én bij het sorteren, dus een String()-conversie per aanroep zou
+// tienduizenden overbodige allocaties per toetsaanslag kosten.
+function caGrowth(p) {
+  const h = state.hist && state.hist.map.get(p.id);
+  if (!h || h[0] == null || h[0] < HIST_MIN_BASE) return null;
+  return (p.ca || 0) - h[0];
+}
+// Nieuw sinds de peildatum: eerste waarneming ligt ná de peildatum.
+function isNewSince(p) {
+  const h = state.hist && state.hist.map.get(p.id);
+  return !!h && h[2] > state.hist.refIdx;
+}
+// Zonder meetpunten in de map is er niets te tonen, ook al kennen we wel datums (bv. een
+// save zonder in-game datum, waardoor er geen peildatum te bepalen valt).
+const histReady = () => !!(state.hist && state.hist.dates.length >= 2 && state.hist.map.size);
+
+async function setHistPeriod(per) {
+  state.histPeriod = per;
+  try { localStorage.setItem('fmss_histperiod', per); } catch { }
+  $('f-hist-period').value = per;
+  await refreshHistDeltas();
+}
+// De hele sectie verdwijnt zonder historie of met verborgen CA: een periodekeuze zonder
+// data eronder is alleen maar verwarrend.
+function renderDevSection() {
+  const on = histReady() && !state.hideCapa && state.mode !== 'staff';
+  const sec = $('fg-development');
+  if (sec) sec.style.display = on ? '' : 'none';
+  if (!on) return;
+  $('f-hist-period').value = state.histPeriod;
+}
+
+async function loadHistDeltas() {
+  state.hist = null;
+  try {
+    const mgr = encodeURIComponent(state.meta.manager || 'default');
+    // Eerst alleen de datumlijst (kleine respons), want "sinds de vorige dump" heeft die
+    // nodig om een peildatum te kunnen kiezen. Daarna pas de volle set ophalen.
+    const probe = await fetch(`/api/history/deltas?manager=${mgr}`);
+    if (!probe.ok) return;
+    const meta = await probe.json();
+    if (!meta.dates || meta.dates.length < 2) return;
+    state.hist = { dates: meta.dates, refIdx: 0, map: new Map() };
+    await refreshHistDeltas();
+  } catch { /* historie is nice-to-have, nooit het laden blokkeren */ }
+}
+async function refreshHistDeltas() {
+  if (!state.hist) return;
+  const ref = histRefDate();
+  if (!ref) return;
+  try {
+    const mgr = encodeURIComponent(state.meta.manager || 'default');
+    const r = await fetch(`/api/history/deltas?manager=${mgr}&since=${ref}`);
+    if (!r.ok) return;
+    const j = await r.json();
+    // refIdx = laatste momentopname op of vóór de peildatum; alles daarna telt als "nieuw".
+    let ri = -1;
+    j.dates.forEach((d, i) => { if (d <= ref) ri = i; });
+    // Numerieke sleutels: uid's komen als string uit JSON, maar p.id is een getal.
+    const map = new Map();
+    for (const k in j.p) map.set(+k, j.p[k]);
+    state.hist = { dates: j.dates, refIdx: ri, map };
+    intakeCache = null;
+  } catch { /* laat de vorige stand staan */ }
+}
+
+// ---------- intakebalk ----------
+// Een jeugdintake is te herkennen aan de vorm van de instroom: veel spelers ineens, en
+// bijna allemaal 17 of jonger. Gekalibreerd op 24 echte dumpovergangen: die drempels
+// vinden alle zeven intakes (incl. de zuidelijke ronde in oktober) en wijzen elke
+// transferwindow-piek af (bv. 510 nieuwe spelers waarvan 11% jong).
+const INTAKE_MIN = 200, INTAKE_YOUNG_SHARE = 0.7, INTAKE_MAX_SHARE = 0.4;
+// De uitkomst hangt alleen aan de dump en de historie, niet aan filters of taal. Zonder
+// deze memo loopt renderIntakeBar bij elke tab- of taalwissel opnieuw door 51k spelers.
+let intakeCache = null;
+function intakeSince() {
+  if (!histReady() || state.hideCapa) return null;
+  if (intakeCache) return intakeCache.v;
+  const lastIdx = state.hist.dates.length - 1;
+  const done = v => { intakeCache = { v }; return v; };
+  const fresh = state.players.filter(p => {
+    const h = state.hist.map.get(p.id);
+    return h && h[2] === lastIdx;
+  });
+  if (fresh.length < INTAKE_MIN) return done(null);
+  // Nieuwe carrière of ineens veel meer competities geladen: dan is "nieuw" betekenisloos.
+  if (fresh.length > state.players.length * INTAKE_MAX_SHARE) return done(null);
+  const withAge = fresh.filter(p => getAge(p) > 0);
+  const young = withAge.filter(p => getAge(p) <= 17).length;
+  if (!withAge.length || young / withAge.length < INTAKE_YOUNG_SHARE) return done(null);
+  let best = null;
+  for (const p of fresh) if (p.pa > 0 && (!best || p.pa > best.pa)) best = p;   // geen sort van 1500 rijen
+  return done({ n: fresh.length, best });
+}
+function renderIntakeBar() {
+  const bar = $('intake-bar');
+  if (!bar) return;
+  const key = state.hist ? state.hist.dates[state.hist.dates.length - 1] : '';
+  const info = state.mode === 'players' && localStorage.getItem('fmss_intake_seen') !== key ? intakeSince() : null;
+  if (!info) { bar.classList.add('hidden'); return; }
+  const best = info.best
+    ? `<span class="ib-best">${tf('intakeBest', { p: `${escHtml(info.best.name)}, ${getAge(info.best)}, ${escHtml(info.best.club || '?')}` })} · PA ${info.best.pa}</span>` : '';
+  bar.innerHTML = `${icon('ball', 14)}<span class="ib-txt">${escHtml(tf('intakeTitle', { n: info.n.toLocaleString(state.lang === 'en' ? 'en-GB' : 'nl-NL') }))}</span>${best}
+    <button class="ib-go">${t('intakeShow')}</button>
+    <button class="ib-x" title="${t('donateLater')}">${icon('x', 12)}</button>`;
+  bar.classList.remove('hidden');
+  const dismiss = () => { try { localStorage.setItem('fmss_intake_seen', key); } catch { } bar.classList.add('hidden'); };
+  bar.querySelector('.ib-x').onclick = dismiss;
+  bar.querySelector('.ib-go').onclick = async () => {
+    dismiss();
+    $('btn-clear').onclick();
+    await setHistPeriod('last');
+    $('f-new').checked = true;
+    $('f-age-max').value = 18;
+    state.sortKey = 'pa'; state.sortDir = -1;
+    renderTable(); applyFilters();
+  };
+}
+
+// Wonderkid: jong, veel groei over én een top uitzicht. Eén definitie voor het filter en
+// het gouden randje op de spelerskaart, zodat die twee niet uit elkaar kunnen lopen.
+// Leeftijd 0/onbekend telt niet mee.
+//
+// De PA-drempel is er bewust bij (26-07): zonder die eis haalt bijna elke zestienjarige de
+// 25 punten groei, en dan is 28% van de database "wonderkid" (14.201 van 51.345 spelers in
+// een echte save). Met PA >= 150 blijven er 556 over: een lijst waar je echt op kunt scouten,
+// en goud op de kaart betekent weer iets.
+const WONDERKID_PA = 150;
+function isWonderkid(p) {
+  const a = getAge(p);
+  return a > 0 && a <= 21 && (p.pa || 0) >= WONDERKID_PA && (p.pa || 0) - (p.ca || 0) >= 25;
+}
 const FOOT_KEY = { rechts: 'footR', links: 'footL', beide: 'footB', right: 'footR', left: 'footL', both: 'footB' };
 const footLabel = p => { const k = FOOT_KEY[(p.foot || '').toLowerCase()]; return k ? t(k) : (p.foot || '–'); };
 
@@ -350,7 +552,10 @@ const natsLabel = p => (p.nat || []).map(natLabel).join(', ');
 
 // Kolommen die onder de "verborgen stats"-toggle vallen: CA/PA zelf, plus meta-score en
 // vraagprijs (beide afgeleid van/verweven met verborgen data, Marks keuze).
-const hiddenStatCol = k => (state.hideCapa && (k === 'ca' || k === 'pa' || k === 'fee')) || (state.hideMeta && k === 'meta');
+// Groei is uit CA afgeleid, dus die valt onder dezelfde verberg-toggle. Zonder historie
+// bestaat de kolom niet: hem tonen met overal "–" zou alleen maar vragen oproepen.
+const hiddenStatCol = k => (state.hideCapa && (k === 'ca' || k === 'pa' || k === 'fee' || k === 'growth'))
+  || (state.hideMeta && k === 'meta') || (k === 'growth' && !histReady());
 
 // ---------- geld ----------
 function fmtMoney(v) {
@@ -412,12 +617,15 @@ const PLAYER_COLS = [
   { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? `<span class="eu-yes">${icon('check', 12)}</span>` : '<span class="dim">–</span>', w: 42 },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa), w: 56 },
+  // Groei: null bij spelers zonder basislijn (nieuw of te dun record). Bewust géén 0, want
+  // de sortering zet null onderaan; met 0 zouden newgens bovenin een stijgerslijst staan.
+  { key: 'growth', label: 'c_growth', num: true, help: 'growthHint', get: caGrowth, render: p => growthHtml(p), w: 74 },
   { key: 'meta', label: 'c_meta', num: true, help: 'metaHint', get: p => metaScore(p), render: p => metaHtml(p), w: 64 },
   { key: 'value', label: 'c_value', num: true, get: p => estValue(p).v, render: p => estHtml(p), w: 95 },
   { key: 'fee', label: 'c_fee', num: true, get: p => { const f = feeEstimate(p); return f.v == null ? -1 : f.v; }, render: p => feeHtml(p), w: 105 },
   { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney, w: 100 },
   { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls, w: 110 },
-  { key: 'interest', label: 'c_interest', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p), w: 90 },
+  { key: 'interest', label: 'c_interest', help: 'interestHint', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p), w: 110 },
   { key: 'status', label: 'c_status', get: p => 0, render: p => statusHtml(p), w: 110 },
   // Standaard verboren extra kolommen (via rechtsklik aan te zetten, sorteerbaar):
   { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true, w: 85 },
@@ -458,9 +666,9 @@ const isFree = p => !p.club && !(p.clubRep > 0);
 // niet kon uitlezen (bekende beperking), of "clubloos" bij een echte transfervrije speler.
 function clubLabel(p) {
   if (p.club) return escHtml(p.club);
-  if (p.clubRep > 0) return `<span class="dim" title="${tf('clubNotRead', { r: p.clubRep })}">${t('clubUnknown')}</span>`;
+  if (p.clubRep > 0) return `<span class="dim" data-tip="${escHtml(tf('clubNotRead', { r: p.clubRep }))}">${t('clubUnknown')}</span>`;
   // Transfervrij: streepje met tooltip (de status-pill "clubloos" vertelt het al).
-  return `<span class="dim" title="${t('clubless')}">–</span>`;
+  return `<span class="dim" data-help="clubless">–</span>`;
 }
 function estValue(p) {
   if (p.value != null && p.value > 0) return { v: p.value, est: false, lo: Math.round(p.value * 0.85), hi: Math.round(p.value * 1.15) };
@@ -485,7 +693,7 @@ function estHtml(p) {
   const e = estValue(p);
   if (e.v == null) return '<span class="dim">–</span>';
   // Transfervrij: gewoon een streepje (de status-kolom/pill vertelt het verhaal al).
-  if (e.v === 0) return `<span class="dim" title="${t('free_l')}">–</span>`;
+  if (e.v === 0) return `<span class="dim" data-help="free_l">–</span>`;
   return (e.est ? '<span class="dim">~</span>' : '') + fmtMoney(e.v);
 }
 
@@ -574,7 +782,7 @@ function feeEstimate(p) {
 function feeHtml(p) {
   const f = feeEstimate(p);
   if (f.v == null) return '<span class="dim">–</span>';
-  if (f.v === 0) return `<span class="dim" title="${t('free_l')}">–</span>`;
+  if (f.v === 0) return `<span class="dim" data-help="free_l">–</span>`;
   // Gelijst met echte waarde = exacte, door de club gezette vraagprijs → geen "~".
   const exact = p.listed && !f.valueEst;
   return (exact ? '' : '<span class="dim">~</span>') + fmtMoney(f.v);
@@ -650,7 +858,7 @@ function interestEstimate(p) {
 function intHtml(p) {
   const i = interestEstimate(p);
   if (!i) return '<span class="dim">?</span>';
-  return `<span class="int ${i.cls}" title="${i.score}/100">${i.label}</span>`;
+  return `<span class="int ${i.cls}" data-tip="${i.score}/100">${i.label}</span>`;
 }
 
 function statusHtml(p) {
@@ -878,7 +1086,15 @@ function metaScore(p) {
 }
 function metaHtml(p) {
   const s = metaScore(p);
-  return s == null ? '<span class="dim">–</span>' : `<span class="${roleClass(s)}" title="${t('metaLabel')}">${s.toFixed(1)}</span>`;
+  return s == null ? '<span class="dim">–</span>' : `<span class="${roleClass(s)}" data-help="metaLabel">${s.toFixed(1)}</span>`;
+}
+// Groei in de tabel: dezelfde kleurtaal als de ontwikkelgrafiek. Nieuwe spelers krijgen
+// "nieuw" in plaats van een streepje, want dát is de informatie die je zoekt.
+function growthHtml(p) {
+  const g = caGrowth(p);
+  if (g == null) return isNewSince(p) ? `<span class="gr-new">${t('grNew')}</span>` : '<span class="dim">–</span>';
+  if (g === 0) return '<span class="dim">0</span>';
+  return `<span class="gr-${g > 0 ? 'up' : 'down'}">${g > 0 ? '+' : '−'}${Math.abs(g)}</span>`;
 }
 
 // ---------- posities & veld ----------
@@ -1080,9 +1296,23 @@ async function loadDump(force = false) {
     loadError = null; renderEmptyState();
     $('empty-state').classList.add('hidden');
     buildStaffRoles();
+    buildFootOptions();
     buildDivisions();   // divisiefilter vullen zodra er dump-data met divisies is
     applyFilters();
-    setTimeout(postHistorySnapshot, 100);   // trends bijwerken, buiten het laadpad om
+    // Historie komt ná de eerste render binnen: de lijst hoeft er niet op te wachten.
+    // Trends bijwerken en daarna pas de groeidata ophalen: de momentopname van déze dump
+    // moet erin staan, anders ontbreekt de nieuwste datum en klopt "nieuw sinds" niet.
+    // Allemaal ná de eerste render, de lijst hoeft er niet op te wachten.
+    setTimeout(() => postHistorySnapshot().then(loadHistDeltas).then(() => {
+      renderDevSection();
+      if (histReady()) { renderTable(); applyFilters(); renderIntakeBar(); }
+    }), 100);
+    // Seizoensrapport eerst (rolt het in-game seizoen over 1 juli?), daarna pas de
+    // gloed: die blijft vanzelf stil zolang het rapportkaartje open staat.
+    const loads = (+localStorage.getItem('fmss_loads') || 0) + 1;
+    localStorage.setItem('fmss_loads', String(loads));
+    maybeSeasonReport();
+    if (loads >= 3) coffeeGlow();
     return true;
   } catch (e) {
     console.error(e);
@@ -1126,15 +1356,32 @@ async function postHistorySnapshot() {
 // dump op schijf staat die niet ingelezen kon worden — een foutblok met de oorzaak, de
 // dump-grootte en knoppen om opnieuw te proberen of het te melden. Zo is een mislukte
 // load nooit meer een stil, onverklaard leeg scherm.
+// Eerste FM-start na installatie: BepInEx bouwt dan zijn interop-map, wat 1-3 minuten
+// duurt achter een zwart consolevenster. Zolang die map ontbreekt heeft "druk op F9" geen
+// zin, en denken mensen dat FM vastloopt (meest gemelde probleem, juli 2026). Daarom in
+// dat geval een eigen uitleg in plaats van de gewone stappen.
+let setupState = null;
+function checkSetupState() {
+  fetch('/api/setup').then(r => r.json()).then(s => { setupState = s; renderEmptyState(); }).catch(() => {});
+}
 function renderEmptyState() {
-  const normal = $('es-normal'), errBox = $('es-error');
+  const normal = $('es-normal'), errBox = $('es-error'), setupBox = $('es-setup');
   if (!errBox) return;
+  const needsFirstRun = !loadError && setupState && setupState.known
+    && setupState.pluginInstalled && !setupState.interopReady;
+  if (setupBox) {
+    setupBox.classList.toggle('hidden', !needsFirstRun);
+    if (needsFirstRun) setupBox.innerHTML =
+      `<h2>${escHtml(t('esSetupTitle'))}</h2><p>${escHtml(t('esSetupBody'))}</p>` +
+      `<p class="es-setup-hint">${escHtml(t('esSetupHint'))}</p>`;
+  }
   if (!loadError) {
     errBox.classList.add('hidden');
-    if (normal) normal.classList.remove('hidden');
+    if (normal) normal.classList.toggle('hidden', needsFirstRun);
     return;
   }
   if (normal) normal.classList.add('hidden');
+  if (setupBox) setupBox.classList.add('hidden');
   const sizeLine = loadError.size
     ? `<p class="es-err-size">${tf('esErrSize', { mb: (loadError.size / 1048576).toFixed(0) })}</p>` : '';
   // Crash (tab-OOM): de melding ís de uitleg + tip; er is geen technisch foutdetail.
@@ -1194,6 +1441,19 @@ function buildStaffRoles() {
   const jobs = [...new Set(state.staff.map(s => s.job).filter(Boolean))].sort();
   $('f-staffrole').innerHTML = `<option value="">${t('all')}</option>` + jobs.map(j => `<option>${escHtml(j)}</option>`).join('');
   $('f-staffrole').value = cur;
+}
+// Voetkeuze uit de dump zelf: de plugin leest de tekst zoals FM hem toont, dus die is
+// afhankelijk van de speltaal ("Rechts" / "Right"). Opties opbouwen uit de aanwezige
+// waarden houdt het filter goed in elke taal; het label komt uit footLabel waar we hem
+// kennen, anders gewoon de waarde uit het geheugen.
+const FOOT_ORDER = { footR: 0, footL: 1, footB: 2 };
+function buildFootOptions() {
+  const cur = $('f-foot').value;
+  const vals = [...new Set(state.players.map(p => p.foot).filter(Boolean))]
+    .sort((a, b) => (FOOT_ORDER[FOOT_KEY[a.toLowerCase()]] ?? 9) - (FOOT_ORDER[FOOT_KEY[b.toLowerCase()]] ?? 9));
+  $('f-foot').innerHTML = `<option value="">${t('all')}</option>` +
+    vals.map(v => `<option value="${escHtml(v)}">${escHtml(footLabel({ foot: v }))}</option>`).join('');
+  $('f-foot').value = vals.includes(cur) ? cur : '';
 }
 // Divisie-select: vult zich uit de aanwezige div-waarden; blijft verborgen zolang de
 // plugin nog geen divisie meestuurt (div is momenteel leeg in de dump).
@@ -1335,6 +1595,16 @@ function applyFilters() {
   const fee = parseMoney($('f-fee').value);
   const wage = parseMoney($('f-wage').value);
   const nat = $('f-nat').value.trim().toLowerCase();
+  // Ontwikkeling: alleen actief met historie én zichtbare CA (groei is CA-afgeleid).
+  const devOn = histReady() && !state.hideCapa && state.mode !== 'staff';
+  const gMinRaw = $('f-growth-min').value, gMaxRaw = $('f-growth-max').value;
+  const gMin = devOn && gMinRaw !== '' ? +gMinRaw : null;
+  const gMax = devOn && gMaxRaw !== '' ? +gMaxRaw : null;
+  const onlyNew = devOn && $('f-new').checked;
+  const hMin = +$('f-height-min').value || 0, hMax = +$('f-height-max').value || 999;
+  const footF = $('f-foot').value;
+  // Wonderkids: staf heeft geen PA-groei, en zonder zichtbare PA is het filter verstopt.
+  const onlyWk = state.mode !== 'staff' && !state.hideCapa && $('f-wonderkid').checked;
   const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
   const minInterest = +$('f-interest').value || 0;
   const tstatus = $('f-tstatus').value, contractF = $('f-contract').value;
@@ -1358,6 +1628,17 @@ function applyFilters() {
     if (fee != null && (feeEstimate(p).v ?? Infinity) > fee) return false;
     if (wage != null && (p.wage ?? Infinity) > wage) return false;
     if (nat && !(p.nat || []).some(n => n.toLowerCase().includes(nat) || natLabel(n).toLowerCase().includes(nat))) return false;
+    if (onlyWk && !isWonderkid(p)) return false;
+    if (onlyNew && !isNewSince(p)) return false;
+    // Onbekende groei (nieuw, of te dunne basislijn) valt buiten een ingestelde grens,
+    // net als bij lengte: anders zou "groei ≥ 10" vol nieuwe spelers staan.
+    if (gMin != null || gMax != null) {
+      const g = caGrowth(p);
+      if (g == null || (gMin != null && g < gMin) || (gMax != null && g > gMax)) return false;
+    }
+    // Lengte/voet: onbekend valt buiten een ingesteld filter, net als bij de attribuutregels.
+    if (hMin > 0 || hMax < 999) { const h = p.height || 0; if (h < hMin || h > hMax) return false; }
+    if (footF && p.foot !== footF) return false;
     if (onlyEu && !isEu(p)) return false;
     // "Mijn club": toon eigen spelers + verhuurde (moederclub = mijn club, spelen elders)
     // + gehuurde (spelen bij mij, moederclub elders). Zie loanStatus() voor de kleuring.
@@ -1406,7 +1687,11 @@ function updateSecDots() {
   const on = {
     position: activePos.size > 0,
     role: !!$('f-role').value,
-    quality: ['f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max'].some(id => val(id)) || activeAdvRules().length > 0,
+    quality: ['f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max'].some(id => val(id))
+      || activeAdvRules().length > 0 || (!state.hideCapa && $('f-wonderkid').checked),
+    development: histReady() && !state.hideCapa
+      && (['f-growth-min', 'f-growth-max'].some(id => val(id)) || $('f-new').checked),
+    physical: ['f-height-min', 'f-height-max'].some(id => val(id)) || !!$('f-foot').value,
     financial: ['f-price', 'f-fee', 'f-wage'].some(id => val(id)),
     origin: !!(val('f-nat') || $('f-eu').checked || val('f-div')),
     availability: +$('f-interest').value > 0 || !!$('f-tstatus').value || !!$('f-contract').value || $('f-myclub').checked || $('f-shortlist').checked,
@@ -1439,6 +1724,13 @@ function buildChips() {
   range('f-ca-min', 'f-ca-max', 'CA');
   range('f-pa-min', 'f-pa-max', 'PA');
   range('f-meta-min', 'f-meta-max', t('c_meta'));
+  if (!state.hideCapa && $('f-wonderkid').checked) add(t('wonderkidOnly'), uncheck('f-wonderkid'));
+  if (histReady() && !state.hideCapa) {
+    if ($('f-new').checked) add(t('onlyNew'), uncheck('f-new'));
+    range('f-growth-min', 'f-growth-max', t('growthRange'));
+  }
+  range('f-height-min', 'f-height-max', t('heightCm'));
+  if ($('f-foot').value) add(`${t('foot')}: ${$('f-foot').selectedOptions[0].textContent}`, () => { $('f-foot').value = ''; });
   if (v('f-price')) add(`${t('maxvalue')} ${v('f-price')}`, clearInput('f-price'));
   if (v('f-fee')) add(`${t('maxfee')} ${v('f-fee')}`, clearInput('f-fee'));
   if (v('f-wage')) add(`${t('maxwage')} ${v('f-wage')}`, clearInput('f-wage'));
@@ -1466,9 +1758,11 @@ function renderChips(chips) {
 // ---------- opgeslagen filterpresets ----------
 // Een preset is een momentopname van alle filtervelden (tekst, vinkjes, selects, posities
 // op het veld en de gekozen tactische rol). Bewaard in localStorage; zelfde naam = overschrijven.
-const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat', 'f-div'];
-const PRESET_CHECK_IDS = ['f-eu', 'f-myclub', 'f-shortlist'];
-const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role', 'f-contract', 'f-tstatus'];
+const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-growth-min', 'f-growth-max', 'f-height-min', 'f-height-max', 'f-price', 'f-fee', 'f-wage', 'f-nat', 'f-div'];
+const PRESET_CHECK_IDS = ['f-eu', 'f-myclub', 'f-shortlist', 'f-wonderkid', 'f-new'];
+// De peilperiode hoort bewust bij de preset: "doorbraken dit seizoen" betekent niets als
+// het venster erbij wegvalt. Zie applyPreset voor het opnieuw ophalen van de groeidata.
+const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role', 'f-contract', 'f-tstatus', 'f-foot', 'f-hist-period'];
 function loadPresets() { try { return JSON.parse(localStorage.getItem('fmss_presets') || '[]'); } catch { return []; } }
 function storePresets(list) { localStorage.setItem('fmss_presets', JSON.stringify(list)); }
 function snapshotFilters() {
@@ -1508,6 +1802,12 @@ function applyPreset(s) {
   localStorage.setItem('fmss_role', state.role);
   if (state.role) { state.sortKey = 'role'; state.sortDir = -1; }
   else if (state.sortKey === 'role') { state.sortKey = 'ca'; state.sortDir = -1; }
+  // Andere peilperiode = andere groeidata, dus eerst ophalen en dán filteren.
+  const per = (s.select || {})['f-hist-period'];
+  if (per && HIST_PERIODS.includes(per) && per !== state.histPeriod && histReady()) {
+    setHistPeriod(per).then(applyFilters);
+    return;
+  }
   applyFilters();
 }
 // Klein in-app dialoogje in de stijl van de app (geen system-popups zoals prompt/confirm).
@@ -1837,7 +2137,7 @@ function renderVisible() {
         const ls = loanStatus(p);
         const lt = ls === 'loan-out' ? ` · ${tf('loanOut', { c: p.club || '?' })}`
           : ls === 'loan-in' ? ` · ${tf('loanIn', { c: p.ownerClub || '?' })}` : '';
-        return `<td class="pname ${ls} ${stick}" title="${t('copyNameTip')}${lt}">${v ? escHtml(v) : '?'}</td>`;
+        return `<td class="pname ${ls} ${stick}" data-tip="${escHtml(t('copyNameTip') + lt)}">${v ? escHtml(v) : '?'}</td>`;
       }
       if (c.dimNull && !v) return `<td class="dim">–</td>`;
       if (c.fmt) v = c.fmt(v);
@@ -1911,6 +2211,7 @@ function exportShortlist() {
   a.download = 'fmsuperscout-shortlist.csv';
   a.click(); URL.revokeObjectURL(a.href);
   showToast(all.length + ' → CSV', 'check');
+  coffeeGlow();
 }
 
 // ---------- detailpaneel ----------
@@ -2040,7 +2341,7 @@ function showDetail(p) {
 
   if (isPlayer) {
     const i = interestEstimate(p);
-    if (i) html += `<div class="interest-box"><b>${t('interestTitle')}:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100)</span>${i.note ? `<div class="int-note">${t(i.note === 'minor' ? 'minorNote' : 'minorIntlNote')}</div>` : ''}</div>`;
+    if (i) html += `<div class="interest-box" data-help="interestHint"><b>${t('interestTitle')}:</b> <span class="int ${i.cls}">${i.label}</span> <span class="dim">(${i.score}/100)</span> <span class="col-help">?</span>${i.note ? `<div class="int-note">${t(i.note === 'minor' ? 'minorNote' : 'minorIntlNote')}</div>` : ''}</div>`;
     html += '<div id="dev-box"></div>';   // ontwikkel-grafiek (trends) laadt async
   }
 
@@ -2116,7 +2417,7 @@ function showDetail(p) {
   const pt = $('pot-toggle');
   if (pt) pt.onchange = () => { state.showPot = pt.checked; showDetail(p); };
   if (isPlayer) renderDevChart(p);
-  if (p.id !== state._donLast) { state._donLast = p.id; maybeDonateNudge(); }   // telt per nieuw profiel
+  if (p.id !== state._donLast) { state._donLast = p.id; bumpStat('fmss_uses'); }   // teller voor het seizoensrapport
 }
 
 // ---------- ontwikkel-grafiek (trends in het profiel) ----------
@@ -2159,7 +2460,10 @@ function devPanel(pts, kind) {
        { get: q => q.pa, cls: 'dvl-pa', dash: '4 3', label: 'PA' }]
     : [{ get: q => q.v, cls: 'dvl-v', dash: '', label: '' }];
   const all = pts.flatMap(q => series.map(s => s.get(q))).filter(v => v != null && v > 0);
-  let lo = Math.min(...all), hi = Math.max(...all);
+  // Echte uitersten apart houden: de as krijgt lucht, maar de labels moeten getallen tonen
+  // die écht in de reeks voorkomen. Anders staat er "172" boven een speler met PA 168.
+  const loReal = Math.min(...all), hiReal = Math.max(...all);
+  let lo = loReal, hi = hiReal;
   // Minimale as-spanwijdte: piepkleine verschillen (waarde-geruis van 0,1%, CA +1) mogen
   // niet als steile lijnen ogen doordat de as op min/max krimpt. CA/PA-as minstens 12
   // punten, waarde-as minstens 12% van het midden; echte sprongen vullen het paneel nog.
@@ -2175,8 +2479,10 @@ function devPanel(pts, kind) {
   let g = '';
   // basislijn + min/max-labels in de linkergoot (terughoudend, tekst nooit in seriekleur)
   g += `<line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" class="dv-axis"/>`;
-  g += `<text x="${padL - 3}" y="${padT + 3}" class="dv-lbl" text-anchor="end">${fmtV(hi)}</text>`;
-  g += `<text x="${padL - 3}" y="${H - padB}" class="dv-lbl" text-anchor="end">${fmtV(lo)}</text>`;
+  // Labels op de hoogte van de échte uiterste waarden, niet op de opgerekte as-randen.
+  g += `<text x="${padL - 3}" y="${(y(hiReal) + 3).toFixed(1)}" class="dv-lbl" text-anchor="end">${fmtV(hiReal)}</text>`;
+  if (Math.abs(y(loReal) - y(hiReal)) > 10)
+    g += `<text x="${padL - 3}" y="${(y(loReal) + 3).toFixed(1)}" class="dv-lbl" text-anchor="end">${fmtV(loReal)}</text>`;
   g += `<text x="${padL}" y="${H - 3}" class="dv-lbl">${fmtD(pts[0].d)}</text>`;
   g += `<text x="${W - padR}" y="${H - 3}" class="dv-lbl" text-anchor="end">${fmtD(pts[n - 1].d)}</text>`;
   const endLbls = [];
@@ -2201,21 +2507,38 @@ function devPanel(pts, kind) {
     a.y = mid - 5.5; b.y = mid + 5.5;
   }
   for (const l of endLbls) g += `<text x="${W - padR + 3}" y="${l.y.toFixed(1)}" class="dv-lbl">${l.txt}</text>`;
-  // hover-banen (volle hoogte, breder dan de stip) met tooltip per dumpdatum
+  // Hover-banen (volle hoogte, breder dan de stip) met een tooltip in app-stijl per
+  // dumpdatum. PA staat er alleen bij als die in deze reeks echt beweegt; bij een vaste PA
+  // is het ruis naast het lijnlabel dat het al zegt.
+  const paVaries = kind === 'capa' && new Set(pts.map(q => q.pa)).size > 1;
   const seg = (W - padL - padR) / Math.max(1, n - 1);
   pts.forEach((q, i) => {
-    const tip = kind === 'capa' ? `${fmtDate(q.d)} · CA ${q.ca} · PA ${q.pa}` : `${fmtDate(q.d)} · ${q.v > 0 ? fmtMoney(q.v) : '–'}`;
-    g += `<rect x="${(x(i) - seg / 2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${H}" class="dv-hit"><title>${tip}</title></rect>`;
+    const tip = kind === 'capa'
+      ? `${fmtDate(q.d)} · CA ${q.ca}${paVaries ? ` · PA ${q.pa}` : ''}`
+      : `${fmtDate(q.d)} · ${q.v > 0 ? fmtMoney(q.v) : '–'}`;
+    g += `<rect x="${(x(i) - seg / 2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${H}" class="dv-hit" data-tip="${escHtml(tip)}"/>`;
   });
+  // Verandering over het getoonde venster, in de kop van het paneel: groen omhoog, rood omlaag.
+  const main = series[0];
+  const vals = pts.map(main.get).filter(v => v != null && v > 0);
+  let delta = '';
+  if (vals.length > 1) {
+    const dv = vals[vals.length - 1] - vals[0];
+    if (dv !== 0) {
+      const sign = dv > 0 ? '+' : '−';
+      const txt = kind === 'capa' ? sign + Math.abs(Math.round(dv)) : sign + fmtMoney(Math.abs(dv));
+      delta = `<span class="dev-delta ${dv > 0 ? 'up' : 'down'}" data-help="devDeltaHint">${txt}</span>`;
+    }
+  }
   const cap = kind === 'capa' ? 'CA / PA' : t('cmpValue');
-  return `<div class="dev-panel"><div class="dev-cap">${cap}</div><svg viewBox="0 0 ${W} ${H}">${g}</svg></div>`;
+  return `<div class="dev-panel"><div class="dev-cap">${cap}${delta}</div><svg viewBox="0 0 ${W} ${H}">${g}</svg></div>`;
 }
 
 // ---------- deelbare spelerskaart (PNG) — v3, FM-native ----------
 // Ontwerptaal van FM zelf, zodat FM-spelers de kaart in één oogopslag lezen: het volledige
 // attributengrid met FM-kleuren (groen = klasse, een muur van groen = viral regen),
 // scout-sterren voor huidig en potentieel vermogen, beste rollen en financiën.
-// Tier-accent volgt CA; wonderkids (≤21, PA-CA ≥ 25) krijgen goud + badge. Labels app-taal.
+// Tier-accent volgt CA; wonderkids (zie isWonderkid) krijgen goud + badge. Labels app-taal.
 // Kaartlabels apart van de hoofd-i18n gehouden: veel kaart-only strings, bij elkaar leesbaarder.
 const CARDL = {
   nl: { meta: 'META', cur: 'HUIDIG', pot: 'POTENTIEEL', roles: 'BESTE ROLLEN', value: 'WAARDE',
@@ -2250,8 +2573,7 @@ function buildCardModel(p) {
   const isGk = (p.posArr || []).includes('GK');
   const meta = metaScore(p);
   const ca = p.ca || 0, pa = p.pa || 0;
-  const age0 = getAge(p);
-  const wk = age0 > 0 && age0 <= 21 && pa - ca >= 25;   // leeftijd 0/onbekend is géén wonderkid
+  const wk = isWonderkid(p);
   const tier = wk ? 'gold' : ca >= 150 ? 'elite' : ca >= 115 ? 'strong' : 'neutral';
 
   const st = isFree(p) ? { t: L.sFree, c: '#8294a8' }
@@ -2441,13 +2763,16 @@ function downloadPlayerCard(p) {
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     }, 'image/png');
     showToast(t('cardSaved'), 'check');
+    bumpStat('fmss_cards');   // teller voor het seizoensrapport
+    coffeeGlow();             // net iets opgeleverd: zacht waardemoment
   } catch { showToast('!'); }
 }
 
 // ---------- app-stijl helptooltip ----------
 // Elk element met data-help="<i18n-key>" krijgt bij hover een tooltip in de app-stijl
 // (i.p.v. de kale Windows-title-popup). De tekst wordt op het moment van tonen uit de
-// actieve taal gehaald, dus taalwissels werken vanzelf.
+// actieve taal gehaald, dus taalwissels werken vanzelf. Met data-tip="<letterlijke tekst>"
+// kan hetzelfde voor al samengestelde tekst, zoals de meetpunten in de ontwikkelgrafiek.
 function initHelpTip() {
   const tip = document.createElement('div');
   tip.id = 'help-tip'; tip.className = 'hidden';
@@ -2455,11 +2780,11 @@ function initHelpTip() {
   let cur = null;
   const hide = () => { cur = null; tip.classList.add('hidden'); };
   document.addEventListener('mouseover', e => {
-    const el = e.target.closest('[data-help]');
+    const el = e.target.closest('[data-help],[data-tip]');
     if (el === cur) return;
     if (!el) { hide(); return; }
     cur = el;
-    tip.textContent = t(el.dataset.help);
+    tip.textContent = el.dataset.tip ?? t(el.dataset.help);
     tip.classList.remove('hidden');
     const r = el.getBoundingClientRect();
     tip.style.left = '0px'; tip.style.top = '0px';               // eerst meten op (0,0)
@@ -2554,36 +2879,78 @@ function reportBug() {
   window.open(`${REPO_URL}/issues/new?title=${encodeURIComponent('[bug] ')}&body=${encodeURIComponent(body)}`, '_blank', 'noopener');
 }
 
-// ---------- steun (Ko-fi), sympathiek en niet-opdringerig ----------
+// ---------- steun (Ko-fi): één seizoensrapport per voetbalseizoen ----------
+// Eén moment, en het juiste: rolt het in-game seizoen over 1 juli heen, dan verschijnt
+// één wegklikbaar kaartje met wat de tool dat seizoen voor je deed, en daaronder de
+// vraag. Niet vaker, niet minder vaak. "Al gedoneerd?" of "Vraag het niet meer" maakt
+// het permanent stil; donateurs krijgen een goudkleurig koffie-icoon als bedankje.
 const KOFI = 'https://ko-fi.com/fmsuperscout';
 function openKofi() { window.open(KOFI, '_blank', 'noopener'); }
-// Wegklikbare nudges op mijlpalen van echt gebruik (25/500/2000 bekeken profielen),
-// max 3 ooit en daarna definitief stil. Minimaal 14 dagen tussen twee nudges, zodat
-// een marathonsessie er nooit twee achter elkaar triggert. 'fmss_donate' telt hoeveel
-// er getoond zijn (oude installs met '1' vallen automatisch in fase 2).
-const DONATE_MILESTONES = [25, 500, 2000];
-function maybeDonateNudge() {
-  const stage = +localStorage.getItem('fmss_donate') || 0;
-  if (stage >= DONATE_MILESTONES.length) return;
-  const n = (+localStorage.getItem('fmss_uses') || 0) + 1;
-  localStorage.setItem('fmss_uses', String(n));
-  if (n < DONATE_MILESTONES[stage]) return;
-  const last = +localStorage.getItem('fmss_donate_at') || 0;
-  if (stage > 0 && Date.now() - last < 14 * 864e5) return;
-  localStorage.setItem('fmss_donate', String(stage + 1));
-  localStorage.setItem('fmss_donate_at', String(Date.now()));
-  const sfx = stage === 0 ? '' : String(stage + 1);   // '', '2', '3' → donateTitle/donateTitle2/...
+const kofiOff = () => localStorage.getItem('fmss_kofi_off') === '1';
+// Gebruikstellers voor het rapport; de baseline wordt bij elk rapport verschoven zodat
+// de cijfers per seizoen zijn, niet cumulatief.
+function bumpStat(k) { try { localStorage.setItem(k, String((+localStorage.getItem(k) || 0) + 1)); } catch { } }
+
+// Seizoensjaar: 1 juli is de grens, zoals in het echte voetbal. 10-07-2029 → seizoen
+// 2029/30 is net begonnen. Zonder exacte datum valt het terug op het afgeleide
+// seizoensjaar uit de dump (zelfde grens, want dat ís een seizoensjaar).
+function seasonYearOf() {
+  const ds = state.meta.gameDate;
+  if (ds) { const d = new Date(ds); if (!isNaN(d)) return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1; }
+  return state.meta.gameYear || 0;
+}
+function maybeSeasonReport() {
+  if (kofiOff()) return;
+  const y = seasonYearOf(); if (!y) return;
+  const prev = +localStorage.getItem('fmss_season') || 0;
+  if (!prev || y < prev) {   // allereerste dump, of een oudere save geladen: ijken, niet vragen
+    localStorage.setItem('fmss_season', String(y));
+    return;
+  }
+  if (y === prev) return;
+  localStorage.setItem('fmss_season', String(y));
+  // Vangnet voor save-wissels: wie tussen twee careers in verschillende jaren springt,
+  // krijgt niet bij elke wissel een rapport. Het seizoensijkpunt schuift wel gewoon mee.
+  const lastAt = +localStorage.getItem('fmss_season_at') || 0;
+  if (Date.now() - lastAt < 7 * 864e5) return;
+  localStorage.setItem('fmss_season_at', String(Date.now()));
+
+  let base; try { base = JSON.parse(localStorage.getItem('fmss_season_base') || '{}'); } catch { base = {}; }
+  const cur = { uses: +localStorage.getItem('fmss_uses') || 0, loads: +localStorage.getItem('fmss_loads') || 0, cards: +localStorage.getItem('fmss_cards') || 0 };
+  try { localStorage.setItem('fmss_season_base', JSON.stringify(cur)); } catch { }
+  const n = k => Math.max(0, cur[k] - (+base[k] || 0));
+  const stats = [];
+  if (n('uses') > 0) stats.push(tf('seasonStatProfiles', { n: n('uses').toLocaleString(state.lang === 'en' ? 'en-GB' : 'nl-NL') }));
+  if (n('loads') > 0) stats.push(tf('seasonStatLoads', { n: n('loads') }));
+  if (n('cards') > 0) stats.push(tf('seasonStatCards', { n: n('cards') }));
+  if (state.shortlist.size > 0) stats.push(tf('seasonStatShort', { n: state.shortlist.size }));
+
+  const season = `${y - 1}/${String(y).slice(2)}`;
+  // Bewuste asymmetrie: het eerste rapport heeft geen permanente uitknop (wegklikken kan
+  // altijd via kruisje of Later); "Vraag het niet meer" verschijnt vanaf het tweede
+  // rapport, klein en zonder onderstreping. "Al gedoneerd?" is er wel meteen.
+  const shown = +localStorage.getItem('fmss_season_n') || 0;
+  localStorage.setItem('fmss_season_n', String(shown + 1));
   const el = $('donate-nudge');
   el.innerHTML = `<button class="dn-x" title="${t('donateLater')}">${icon('x', 12)}</button>
-    <div class="dn-title">☕ ${t('donateTitle' + sfx)}</div>
-    <div class="dn-text">${t('donateBody' + sfx)}</div>
+    <div class="dn-title">${icon('ball', 15)} ${escHtml(tf('seasonTitle', { s: season }))}</div>
+    ${stats.length ? `<div class="dn-stats">${stats.join(' · ')}</div>` : ''}
+    <div class="dn-text">${t('seasonAsk')}</div>
     <div class="dn-actions"><a class="dn-cta" href="${KOFI}" target="_blank" rel="noopener">${t('donateCta')}</a>
-      <button class="dn-later">${t('donateLater')}</button></div>`;
+      <button class="dn-later">${t('donateLater')}</button></div>
+    <div class="dn-links"><button class="dn-donated">${t('alreadyDonated')}</button>${shown >= 1 ? `<button class="dn-never">${t('neverAsk')}</button>` : ''}</div>`;
   el.classList.remove('hidden');
   const close = () => el.classList.add('hidden');
   el.querySelector('.dn-cta').onclick = close;
   el.querySelector('.dn-later').onclick = close;
   el.querySelector('.dn-x').onclick = close;
+  el.querySelector('.dn-donated').onclick = () => {
+    localStorage.setItem('fmss_kofi_off', '1'); localStorage.setItem('fmss_supporter', '1');
+    $('btn-coffee').classList.add('supporter');
+    showToast(t('supporterThanks'), 'check'); close();
+  };
+  const nv = el.querySelector('.dn-never');
+  if (nv) nv.onclick = () => { localStorage.setItem('fmss_kofi_off', '1'); close(); };
 }
 
 // ---------- spelervergelijking ----------
@@ -2682,7 +3049,7 @@ function openCompare() {
         `${bits ? `<br>${bits}` : ''}` +
         `${p.attrs ? `<br><span class="cmp-winsb">${tf('cmpWinsBadge', { n: wins[i] })}</span>` : ''}</div></div>`;
     }).join('') +
-    (two ? `<div class="cmp-cell cmp-delta" title="${t('cmpDeltaHint')}">Δ</div>` : '') + '</div>';
+    (two ? `<div class="cmp-cell cmp-delta" data-help="cmpDeltaHint">Δ</div>` : '') + '</div>';
 
   // ----- kerngetallen -----
   let body = '';
@@ -2710,12 +3077,12 @@ function openCompare() {
   // speler 2), lengte ∝ het verschil. Bij 3 spelers: naam | w1 w2 w3 met winnaar-markering.
   const cmpBar = (a, b, hi, dec) => {
     if (a == null || b == null || hi == null)
-      return '<span class="cbar" title="–"><i class="cb-tick"></i></span>';
+      return '<span class="cbar"><i class="cb-tick"></i></span>';
     const d = a - b;
     const p1beter = (d > 0) === (hi !== false);
     const pct = Math.min(100, Math.round(Math.abs(d) / 8 * 100));   // 8 punten verschil = vol
     const dTxt = d === 0 ? '=' : (d > 0 ? '+' : '−') + (dec ? Math.abs(d).toFixed(dec) : Math.abs(d));
-    return `<span class="cbar" title="Δ ${dTxt}"><i class="cb-tick"></i>` +
+    return `<span class="cbar" data-tip="Δ ${escHtml(dTxt)}"><i class="cb-tick"></i>` +
       (d === 0 ? '' : `<i class="${p1beter ? 'cb-l' : 'cb-r'}" style="width:${Math.max(6, pct / 2)}%"></i>`) + '</span>';
   };
   const attrPanelRow = (label, vals, opts = {}) => {
@@ -2872,7 +3239,7 @@ function renderAnalysis() {
     const yt = x.youngTalents[0];
     return `<div class="an-card ${st}">
       <div class="an-card-top"><span class="an-pos">${x.g.label[state.lang] || x.g.label.nl}</span>${badge}</div>
-      <div class="an-depth" title="${x.count}/${x.g.target}">${depthDots}</div>
+      <div class="an-depth" data-tip="${x.count}/${x.g.target}">${depthDots}</div>
       <div class="an-stats">
         <span><b>${x.count}</b> ${t('anPlayers')}</span>
         ${state.hideCapa ? '' : `<span><b>${Math.round(x.avgCa)}</b> ${t('anAvgCa')}</span>
@@ -2908,10 +3275,15 @@ $('detail-backdrop').onclick = closeDetail;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
 // ---------- UI-bediening ----------
-['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
+['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-growth-min', 'f-growth-max', 'f-height-min', 'f-height-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
   let tm; $(id).addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(applyFilters, 150); });
 });
-['f-eu', 'f-myclub', 'f-tstatus', 'f-contract', 'f-shortlist'].forEach(id => $(id).addEventListener('change', applyFilters));
+['f-eu', 'f-myclub', 'f-tstatus', 'f-contract', 'f-shortlist', 'f-wonderkid', 'f-foot', 'f-new'].forEach(id => $(id).addEventListener('change', applyFilters));
+$('f-hist-period').addEventListener('change', async () => {
+  await setHistPeriod($('f-hist-period').value);
+  renderTable();     // groeikolom leest andere peildata
+  applyFilters();
+});
 $('btn-adv').onclick = advDialog;
 $('f-staffrole').addEventListener('change', applyFilters);
 // Divisie-zoekbalk: filter terwijl je typt + eigen suggestie-dropdown (app-stijl, i.p.v.
@@ -2950,6 +3322,7 @@ $('btn-clear').onclick = () => {
   document.querySelectorAll('#filters input[type=text], #filters input[type=number]').forEach(i => i.value = '');
   document.querySelectorAll('#filters input[type=checkbox]').forEach(i => i.checked = false);
   $('f-staffrole').value = ''; $('f-interest').value = '0'; $('f-contract').value = ''; $('f-tstatus').value = '';
+  $('f-foot').value = '';
   state.advF = []; saveAdv();
   activePos.clear();
   document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on'));
@@ -2964,32 +3337,38 @@ $('btn-report').onclick = reportBug;
 $('es-report').onclick = reportBug;
 checkUpdate();
 
-// Ko-fi-glow: af en toe (minstens 8 uur ertussen, en dan nog maar een deel van de
-// starts) krijgt het koffie-icoon even een zachte gloed, 20-90 s na het opstarten.
-// Verdwijnt weer na een paar klikken ergens in de app of vanzelf na 90 s; klikken op
-// het icoon zelf opent gewoon Ko-fi. Bewust subtiel, geen popup.
-function maybeCoffeeGlow() {
+// Ko-fi-glow: het koffie-icoon pulseert even zacht op het moment dat de tool je net iets
+// heeft opgeleverd (spelerskaart opgeslagen, shortlist geexporteerd). Hooguit één keer per
+// dag, 12 seconden, daarna vanzelf stil. Klikken op het icoon opent Ko-fi en dooft hem.
+//
+// De vorige versie hing aan een willekeurige timer 20-90 s na het opstarten en ging uit na
+// vier klikken ergens in de app. In een tool waarin je constant sorteert en profielen opent
+// haal je die vier binnen enkele seconden, precies in dat tijdvak: de gloed was daardoor in
+// de praktijk nooit langer dan een moment zichtbaar (26-07 nagemeten).
+function coffeeGlow() {
+  if (kofiOff()) return;   // "vraag het niet meer" geldt ook voor de gloed
   const last = +localStorage.getItem('fmss_glow_at') || 0;
-  if (Date.now() - last < 8 * 3600e3) return;
-  if (Math.random() > 0.4) return;
+  if (Date.now() - last < 24 * 3600e3) return;
+  // Nooit twee vragen tegelijk: staat het seizoensrapport open, dan blijft het icoon stil.
+  const dn = $('donate-nudge');
+  if (dn && !dn.classList.contains('hidden')) return;
   localStorage.setItem('fmss_glow_at', String(Date.now()));
-  setTimeout(() => {
-    const btn = $('btn-coffee');
-    btn.classList.add('glow');
-    let clicks = 0;
-    const stop = () => { btn.classList.remove('glow'); document.removeEventListener('click', onClick); };
-    const onClick = () => { if (++clicks >= 4) stop(); };
-    document.addEventListener('click', onClick);
-    setTimeout(stop, 90e3);
-  }, 20e3 + Math.random() * 70e3);
+  const btn = $('btn-coffee');
+  if (!btn) return;
+  btn.classList.add('glow');
+  const stop = () => { btn.classList.remove('glow'); btn.removeEventListener('click', stop); };
+  btn.addEventListener('click', stop);
+  setTimeout(stop, 12e3);
 }
-maybeCoffeeGlow();
+// Supporter-staat (goudkleurig icoon) overleeft herstarts.
+if (localStorage.getItem('fmss_supporter') === '1') $('btn-coffee').classList.add('supporter');
+checkSetupState();
 
 // inklapbare filtersecties (voorkeur onthouden)
 // Eerste gebruik (geen opgeslagen stand): secundaire secties dicht zodat de zijbalk op
 // één scherm past (progressive disclosure). Eigen klikgedrag wordt daarna onthouden.
 const rawSecs = localStorage.getItem('fmss_secs');
-const collapsedSecs = new Set(rawSecs ? JSON.parse(rawSecs) : ['presets', 'role', 'financial', 'origin', 'availability']);
+const collapsedSecs = new Set(rawSecs ? JSON.parse(rawSecs) : ['presets', 'role', 'development', 'physical', 'financial', 'origin', 'availability']);
 document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
   const key = sec.dataset.sec;
   if (collapsedSecs.has(key)) sec.classList.add('collapsed');
@@ -3049,10 +3428,12 @@ function applyHideCapa() {
   document.body.classList.toggle('hide-meta', state.hideMeta);
   // Verborgen filters leegmaken zodat ze niet stiekem blijven filteren. CA/PA/vraagprijs
   // vallen onder de hidden-stats-toggle; meta onder zijn eigen toggle.
-  if (state.hideCapa) ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-fee'].forEach(id => { const e = $(id); if (e) e.value = ''; });
+  if (state.hideCapa) ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-fee', 'f-growth-min', 'f-growth-max'].forEach(id => { const e = $(id); if (e) e.value = ''; });
+  if (state.hideCapa) { const n = $('f-new'); if (n) n.checked = false; }   // groei-afgeleid
   if (state.hideMeta) ['f-meta-min', 'f-meta-max'].forEach(id => { const e = $(id); if (e) e.value = ''; });
   if (hiddenStatCol(state.sortKey)) { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
   updateAdvBtn();   // regels op verborgen data tellen niet mee zolang de toggle uit staat
+  renderDevSection(); renderIntakeBar();
   if (state.mode === 'analysis') renderAnalysis(); else applyFilters();
   if (state.selected) showDetail(state.selected);
 }
@@ -3134,8 +3515,11 @@ function applyLang() {
   renderClubBadge();
   renderVerWarn();
   buildStaffRoles();
+  buildFootOptions();
   buildRoleSelect();
   buildDivisions();
+  renderDevSection();
+  renderIntakeBar();
   renderPresets();
   applyFilters();
   if (state.selected) showDetail(state.selected);
@@ -3152,6 +3536,14 @@ function setMode(mode) {
   $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
   $('fg-role').style.display = mode === 'staff' || isAn ? 'none' : '';
   $('f-meta-row').style.display = mode === 'staff' ? 'none' : '';   // meta-score bestaat niet voor staf
+  // Staf heeft geen lengte, voet of PA-groei in de dump; die filters horen daar niet.
+  $('fg-physical').style.display = mode === 'staff' ? 'none' : '';
+  $('f-wonderkid-row').style.display = mode === 'staff' ? 'none' : '';
+  renderDevSection();   // historie wordt alleen voor spelers bijgehouden
+  renderIntakeBar();
+  // Kolom bestaat niet in deze modus: anders sorteert de tabel stilzwijgend op een
+  // kolom die er niet staat en toont de kop nergens een pijltje.
+  if (hiddenStatCol(state.sortKey)) { state.sortKey = mode === 'staff' ? 'wage' : 'ca'; state.sortDir = -1; }
   $('sl-bar').classList.toggle('hidden', mode !== 'shortlist');
   renderMyTeamChips();
   document.body.classList.toggle('mode-analysis', isAn);

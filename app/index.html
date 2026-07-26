@@ -104,7 +104,30 @@
       <div class="frow capa-row"><span>CA</span><div class="range2"><input type="number" id="f-ca-min" placeholder="–">–<input type="number" id="f-ca-max" placeholder="–"></div></div>
       <div class="frow capa-row"><span>PA</span><div class="range2"><input type="number" id="f-pa-min" placeholder="–">–<input type="number" id="f-pa-max" placeholder="–"></div></div>
       <div class="frow meta-row" id="f-meta-row"><span>Meta <span class="col-help" data-help="metaHint">?</span></span><div class="range2"><input type="number" id="f-meta-min" placeholder="–">–<input type="number" id="f-meta-max" placeholder="–"></div></div>
+      <label class="chk capa-row" id="f-wonderkid-row"><input type="checkbox" id="f-wonderkid"> <span data-i18n="wonderkidOnly">Alleen wonderkids</span> <span class="col-help" data-help="wonderkidHint">?</span></label>
       <button id="btn-adv" type="button"></button>
+    </div>
+
+    <div class="fsection" data-sec="development" id="fg-development" style="display:none">
+      <div class="fsec-head" data-i18n="development">Ontwikkeling</div>
+      <div class="frow"><span data-i18n="histPeriod">Periode</span>
+        <select id="f-hist-period">
+          <option value="last" data-i18n="hp_last">Sinds vorige dump</option>
+          <option value="m6" data-i18n="hp_m6">Afgelopen 6 maanden</option>
+          <option value="y1" data-i18n="hp_y1">Afgelopen jaar</option>
+          <option value="season" data-i18n="hp_season">Dit seizoen</option>
+          <option value="all" data-i18n="hp_all">Sinds we meten</option>
+        </select></div>
+      <div class="frow"><span><span data-i18n="growthRange">Groei</span> <span class="col-help" data-help="growthHint">?</span></span>
+        <div class="range2"><input type="number" id="f-growth-min" placeholder="–">–<input type="number" id="f-growth-max" placeholder="–"></div></div>
+      <label class="chk"><input type="checkbox" id="f-new"> <span data-i18n="onlyNew">Alleen nieuwe spelers</span> <span class="col-help" data-help="onlyNewHint">?</span></label>
+    </div>
+
+    <div class="fsection" data-sec="physical" id="fg-physical">
+      <div class="fsec-head" data-i18n="physical">Fysiek</div>
+      <div class="frow"><span data-i18n="heightCm">Lengte (cm)</span><div class="range2"><input type="number" id="f-height-min" placeholder="–">–<input type="number" id="f-height-max" placeholder="–"></div></div>
+      <div class="frow"><span data-i18n="foot">Voet</span>
+        <select id="f-foot"><option value="" data-i18n="all">Alle</option></select></div>
     </div>
 
     <div class="fsection" data-sec="financial">
@@ -129,7 +152,7 @@
 
     <div class="fsection" data-sec="availability">
       <div class="fsec-head" data-i18n="availability">Beschikbaarheid</div>
-      <div class="frow"><span data-i18n="interestmin">Interesse ≥</span>
+      <div class="frow"><span><span data-i18n="interestmin">Wil naar jou ≥</span> <span class="col-help" data-help="interestHint">?</span></span>
         <select id="f-interest">
           <option value="0" data-i18n="all">Alle</option>
           <option value="25" data-i18n="int_small">Klein</option>
@@ -165,6 +188,7 @@
         <span data-i18n="exportcsv">Shortlist exporteren (CSV)</span>
       </button>
     </div>
+    <div id="intake-bar" class="hidden"></div>
     <div id="chipbar"></div>
     <div id="table-wrap">
       <table id="grid">
@@ -192,6 +216,7 @@
           <button id="es-report" data-i18n="reportBug">Probleem melden…</button></div>
       </div>
       <div id="es-error" class="hidden"></div>
+      <div id="es-setup" class="hidden"></div>
     </div>
   </section>
 

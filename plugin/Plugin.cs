@@ -12,7 +12,7 @@ public class Plugin : BasePlugin
 {
     public const string Id = "com.mavarobli.fmsuperscout";
     public const string Name = "FMSuperScout";
-    public const string Version = "0.1.38";
+    public const string Version = "0.1.39";
 
     internal static new ManualLogSource Log;
 

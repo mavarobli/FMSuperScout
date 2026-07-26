@@ -29,6 +29,9 @@ internal static class Dumper
     // Speler/staf-ontdubbeling: ruwe staftelling en hoeveel daarvan óók als speler voorkwam.
     internal static int DiagStaffRaw;
     internal static int DiagStaffAlsoPlayer;
+    // Spelers die in de selectie van meer dan één club staan (= huurrelatie, zie PickSquad).
+    internal static HashSet<uint> MultiClub = new();
+    internal static List<string> MultiClubSample = new();
 
     private const int ChunkSize = 32 * 1024 * 1024; // 32 MB leesblokken
 
@@ -91,6 +94,7 @@ internal static class Dumper
         GameYear = 0; ClubCount = 0; LinkedViaSquad = 0; VtGp = 0;
         DiagMyTeam = 0; DateVotes = new(); AllOffHist = new();
         DiagStaffRaw = 0; DiagStaffAlsoPlayer = 0;
+        MultiClub = new HashSet<uint>(); MultiClubSample = new List<string>();
         // Fase-timing: waar gaat de tijd heen? Elke Phase() logt de duur sinds de vorige.
         PhaseLog = new List<string>();
         long tPrev = 0;
@@ -258,11 +262,12 @@ internal static class Dumper
         WriteStatus("scanning", players.Count, staff.Count, null, 0.87);
 
         // ---- Squad-gebaseerde clubkoppeling (authoritatief) ----
-        // Loop clubs → teams → spelerslijst. Elke speler krijgt de club van zijn selectie;
-        // bij meerdere selecties wint het eerste elftal (laagste teamtype). Ook: welke club
-        // heeft de human-manager als teammanager → jouw club.
+        // Loop clubs → teams → spelerslijst. Elke speler krijgt de club van zijn selectie.
+        // Ook: welke club heeft de human-manager als teammanager → jouw club.
         var mgrAddrs = new HashSet<ulong>(managers.Select(x => x.person));
         var squadClub = new Dictionary<uint, (string club, int tt, int rep, string div)>();
+        MultiClub = new HashSet<uint>();
+        MultiClubSample = new List<string>();
         DiagMyTeam = 0;
         foreach (ulong club in clubObjs)
         {
@@ -292,8 +297,7 @@ internal static class Dumper
                 {
                     ulong pp = mem.Ptr(pb + pi * 8);
                     if (pp == 0 || !personToUid.TryGetValue(pp, out uint puid)) continue;
-                    if (!squadClub.TryGetValue(puid, out var cur) || tt < cur.tt)
-                        squadClub[puid] = (cname, tt, trep, CompNameOf(mem, team));
+                    PickSquad(squadClub, players, puid, cname, tt, trep, CompNameOf(mem, team));
                 }
             }
         }
@@ -363,8 +367,7 @@ internal static class Dumper
                             if (q != 0 && personToUid.TryGetValue(q, out puid)) { hitOff = off; break; }
                         }
                     if (hitOff == -1) continue;
-                    if (!squadClub.TryGetValue(puid, out var cur2) || tt < cur2.tt)
-                        squadClub[puid] = (cname, tt, trep, tdiv);
+                    PickSquad(squadClub, players, puid, cname, tt, trep, tdiv);
                 }
             }
         }
@@ -586,6 +589,44 @@ internal static class Dumper
     // Fallback-club via contract-keten: contract(0xA8)→team(0x10)→club(0x30). Voor spelers
     // buiten geladen competities (die niet in een selectie-object staan). De squad-walk
     // overschrijft dit met de authoritatieve club. Ook gebruikt voor staf/manager.
+    // Welke selectie-hit wint voor deze speler?
+    //
+    // Binnen dezelfde club: het hoogste elftal (laagste teamtype), zoals altijd.
+    // Bij twee verschillende clubs staat de speler op huurbasis ergens anders. De moederclub
+    // kennen we al uit de contract-keten (OwnerClub), dus de ándere club is waar hij speelt.
+    // Dat is bewust géén teamtype-vergelijking meer: de oude regel "laagste teamtype wint"
+    // koos bij een verhuurde eerste-elftalspeler willekeurig de moederclub, waarna club en
+    // moederclub gelijk werden en de huur onzichtbaar was (26-07: 167 huren op 51.753 spelers,
+    // allemaal teamtype 0 — jeugd- en reserveverhuur werd structureel gemist).
+    private static void PickSquad(Dictionary<uint, (string club, int tt, int rep, string div)> squad,
+                                  Dictionary<uint, Person> players,
+                                  uint uid, string cname, int tt, int trep, string div)
+    {
+        if (!squad.TryGetValue(uid, out var cur)) { squad[uid] = (cname, tt, trep, div); return; }
+
+        bool take;
+        if (cur.club == cname)
+        {
+            take = tt < cur.tt;
+        }
+        else
+        {
+            string parent = players.TryGetValue(uid, out var pe) ? pe.OwnerClub : null;
+            bool curIsParent = parent != null && cur.club == parent;
+            bool newIsParent = parent != null && cname == parent;
+            if (curIsParent == newIsParent) take = tt < cur.tt;   // geen van beide (of allebei) de moederclub
+            else take = curIsParent;                              // de niet-moederclub is waar hij speelt
+
+            if (MultiClub.Add(uid) && MultiClubSample.Count < 25)
+            {
+                string name = pe?.Name ?? "?";
+                string won = take ? cname : cur.club, lost = take ? cur.club : cname;
+                MultiClubSample.Add($"{name,-24} speelt: {won}  ·  ook in selectie: {lost}  ·  moederclub: {parent ?? "-"}");
+            }
+        }
+        if (take) squad[uid] = (cname, tt, trep, div);
+    }
+
     private static (string name, int rep, string div) ResolveClub(MemScan m, ulong person)
     {
         ulong con = m.Ptr(person + (ulong)Fields.PERO_FULL_CONTRACT);
@@ -934,9 +975,24 @@ internal static class Dumper
             w.WriteLine();
 
             // Huur-overzicht: moederclub (volledig contract) ≠ huidige squad-club.
-            w.WriteLine("=== Huur-overzicht (moederclub ≠ huidige club, top 40) ===");
-            foreach (var p in players.Values.Where(x => x.OwnerClub != null && x.OwnerClub != x.Club).Take(40))
-                w.WriteLine($"  {p.Name,-24} speelt: {p.Club ?? "-"}  ·  moederclub: {p.OwnerClub}");
+            var loans = players.Values.Where(x => x.OwnerClub != null && x.OwnerClub != x.Club).ToList();
+            w.WriteLine($"=== Huur-overzicht: {loans.Count:N0} huurrelaties (moederclub ≠ huidige club) ===");
+            w.WriteLine($"  spelers in meer dan één clubselectie: {MultiClub.Count:N0}");
+            var ttHist = loans.GroupBy(x => x.TeamType).OrderBy(g => g.Key);
+            w.WriteLine("  per teamtype: " + string.Join(" · ", ttHist.Select(g => $"tt{g.Key}={g.Count():N0}")));
+            if (MyClub != null)
+            {
+                int inMine = loans.Count(x => x.Club == MyClub), outMine = loans.Count(x => x.OwnerClub == MyClub);
+                w.WriteLine($"  bij mijn club: {inMine} gehuurd · {outMine} verhuurd");
+            }
+            w.WriteLine("  Eerste 40:");
+            foreach (var p in loans.Take(40))
+                w.WriteLine($"    {p.Name,-24} speelt: {p.Club ?? "-"}  ·  moederclub: {p.OwnerClub}");
+            w.WriteLine();
+            // Dubbele selectie-hits: hier koos PickSquad de niet-moederclub. Valse positieven
+            // zouden hier zichtbaar worden (bv. een B-elftal dat als aparte club telt).
+            w.WriteLine("=== Speler in twee clubselecties (steekproef, check in FM) ===");
+            foreach (var s in MultiClubSample) w.WriteLine("  " + s);
         }
         catch (Exception e) { Plugin.Log.LogWarning("Diag schrijven mislukt: " + e.Message); }
     }
