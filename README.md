@@ -4,67 +4,94 @@
 
 <h1 align="center">FMSuperScout</h1>
 
-<p align="center">A fast, accurate scouting tool for <strong>Football Manager 26</strong> (Windows).</p>
+<p align="center">A fast, open source scouting tool for <strong>Football Manager 26</strong> (Windows).</p>
+
+<p align="center">
+  <a href="https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Setup.exe"><strong>Download the installer</strong></a>
+  ·
+  <a href="CHANGELOG.md">Changelog</a>
+  ·
+  <a href="TROUBLESHOOTING.md">Troubleshooting</a>
+</p>
 
 ---
 
-FMSuperScout reads the full database of your open save (players **and** staff), including what FM
-normally hides: **CA/PA**, hidden personality attributes and FM's **real transfer value**. You get
-a snappy, spreadsheet-style app with search, filters, role ratings, comparison and squad analysis
-over 45,000+ people. Monster saves work too: a 100+ league database with 635k people loads in
-about 17 seconds.
+Press **F9** in your save and the full loaded database, 45,000+ players and staff, is pulled out
+of memory in about 10 seconds. Including what FM normally hides: **CA and PA**, hidden personality
+attributes and FM's **real transfer value**. After that everything is instant. Monster saves work
+too: 635k people across 100+ leagues loads in about 17 seconds.
 
-Two parts: a small **BepInEx plugin** that dumps the database to JSON from inside the game, and a
-**local web app** where you search, filter and compare. No internet, no accounts, data never
-leaves your PC.
+Two parts: a small **BepInEx plugin** that reads the database from inside the game, and a **local
+web app** where you search, filter and compare. No internet, no accounts, no ads, nothing leaves
+your PC.
 
 > Single-player use only. The plugin **only reads** memory, it never writes to the game.
 
-## Features
+<!-- Screenshots: drop the PNGs in docs/img/ with these names and they appear here. -->
+<p align="center">
+  <img src="docs/img/players.png" alt="Player list with the growth column and filters" width="90%">
+</p>
 
-- **Search and filter**: name/club, age, CA, PA, value, asking price, wage, nationality, EU/EEA,
-  contract status, transfer status (for sale, for loan), division (with smart search). Pick
-  positions on a clickable pitch.
-- **Attribute filter**: min/max thresholds on any attribute ("Pace 15+"), hidden characteristics
-  and personality included. Rules combine, show as removable chips and save into presets.
-- **Tactical role ratings**: 19 FM roles scored from the key attributes; sortable column plus a
-  "best roles" panel per profile.
-- **Player comparison**: up to 3 side by side, FM-style bars, hidden stats included.
-- **Squad analysis**: flags thin depth, aging and missing succession per position group, and
-  scouts candidates for the gap in one click.
-- **Player profile**: attributes in FM colours and grouping, personality and hidden
-  characteristics, a CA/PA gauge and a potential projection per attribute. Opens beside the
-  list or as a centered popup, your choice in Settings.
-- **Shareable player card**: one click saves a PNG of any player in FM's own visual
-  language: scout stars for current and potential ability, the full attribute grid in FM
-  colours, best roles and finances. Wonderkids get a gold card. Built for showing off that
-  one insane regen.
-- **Loan-aware**: players on loan show in blue with their parent club in the tooltip and on
-  the profile; under the My club filter your own loaned-out players show in red.
-- **Development trends**: every dump adds a compact local snapshot, and player profiles grow
-  a chart of CA/PA and value over time (dots mark real changes). Stored delta-only, a few
-  MB per season, entirely on your own disk.
-- **Growth and Intake Radar**: sort the world by how much CA a player gained since any
-  reference date, filter on it, and get a heads-up on youth intake day listing every newgen
-  that appeared worldwide since your last dump, best potential first. This is what the
-  saved snapshots make possible and it is the one thing a tool without memory cannot do.
-- **Market value from memory**: FM's actual transfer value for most players, a calibrated
-  estimate for the rest (see *Accuracy*).
-- **Asking price and transfer interest**: estimates based on contract, transfer status, age,
-  reputation gap and wages, including the FIFA under-18 transfer rule.
+## What it does that other tools do not
+
+**It remembers.** Every time you press F9 the app stores a small snapshot. Nothing else reads your
+save over time, and that unlocks two things no tool without memory can do:
+
+- **Growth.** Pick a period (since your last dump, 6 months, a year, this season) and every player
+  gets a number: how much CA he gained since then. Green up, red down. Sort the world by it, or
+  filter on it. "Everyone who gained 10 or more CA in the last year" is one filter.
+- **Intake Radar.** On youth intake day a bar tells you how many newgens appeared worldwide since
+  your last dump and who the best one is. One click shows them all, sorted by potential. To a tool
+  that only reads the present, a brand new 16-year-old with PA 178 looks like every other
+  16-year-old.
+
+**A meta score built on real testing.** Every outfield player gets a 1-20 score weighted by
+[FM-Arena's attribute testing](https://fm-arena.com/table/26-player-attributes-testing): what
+actually wins matches in the engine. Two players with equal CA? The higher meta score usually
+performs better.
+
+**Shareable player cards.** One click saves a PNG in FM's own visual language: scout stars for
+current and potential ability, the full attribute grid in FM colours, best roles and finances.
+Wonderkids get a gold card. Built for showing off that one insane regen.
+
+<p align="center">
+  <img src="docs/img/profile.png" alt="Player profile with development charts" width="90%">
+</p>
+
+## Everything else
+
+- **Filters that stack**: name/club, age, CA, PA, meta, value, asking price, wage, nationality,
+  EU/EEA, contract, transfer status, division (smart search), **height**, **preferred foot**, and
+  a one-tick **wonderkid** filter. Pick positions on a clickable pitch.
+- **Attribute filter**: min/max on any attribute ("Pace 15+"), hidden characteristics and
+  personality included. Rules combine, show as removable chips and save into presets.
+- **Saved presets**: the complete filter setup, positions and role, under one name.
+- **Tactical role ratings**: 19 FM roles scored from the key attributes, as a sortable column and
+  a "best roles" panel per player.
+- **Player comparison**: up to 3 side by side with FM-style bars, hidden stats included.
+- **Squad analysis**: thin depth, aging and missing succession per position group, with one click
+  to scout candidates for the gap.
+- **Development charts** per player: CA/PA and value over time, with the change over the period.
+- **Loan-aware**: loaned players show in blue with their parent club, your own loaned-out players
+  in red under the My club filter.
+- **Market value from memory**: FM's actual transfer value for most players, a calibrated estimate
+  for the rest (see *Accuracy*).
+- **Asking price and transfer interest**: estimates from contract, transfer status, age,
+  reputation gap and wages, including the FIFA under-18 rule.
 - **Shortlist** (★) with its own tab and CSV export.
-- **Settings**: NL/EN, GBP/EUR, and a toggle to hide all hidden stats at once for those who
-  consider them cheating (the meta score has its own toggle, so you can keep either one).
-- **One-click update**: the app checks the latest release about once a day and shows a
-  dismissible notification. One click downloads the new installer, verifies its SHA-256
-  against the release and starts it. Nothing installs without your click, no tracking.
+- **Settings**: NL/EN, GBP/EUR, and one toggle to hide CA/PA and all hidden stats for people who
+  consider reading them cheating (the meta score has its own toggle).
+- **One-click update**: the app checks for a new release about once a day and shows a dismissible
+  notice. One click downloads the installer, verifies its SHA-256 against the release and starts
+  it. Nothing installs without your click, no tracking.
 
 ## Install (end users)
 
 One installer does everything: the viewer app, the BepInEx mod layer **and** the in-game plugin.
 No coding needed, nothing else to download.
 
-1. Grab **`FMSuperScout-Setup.exe`** from the [Releases](https://github.com/mavarobli/FMSuperScout/releases) page.
+1. Download **[FMSuperScout-Setup.exe](https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Setup.exe)**
+   (or pick a version from the [Releases](https://github.com/mavarobli/FMSuperScout/releases) page).
 2. Windows SmartScreen may warn about an unknown publisher, since the installer isn't code-signed.
    Click **More info → Run anyway**. Want to verify first? Check the file's SHA-256 against the
    release notes: `Get-FileHash .\FMSuperScout-Setup.exe -Algorithm SHA256`.
@@ -158,27 +185,17 @@ by the model tests in [`test/`](test/).
 | `plugin/` | C# source of the BepInEx plugin |
 | `installer/` | Icon generator, launcher, PowerShell installer, package builder |
 | `test/` | Zero-dependency model tests (`npm test`) |
-| `docs/` | Value-model, .fmf-format and status/backlog notes |
+| `docs/` | Value model, .fmf format, release notes and backlog |
 
 ## Where this fits
 
-FM26 has a healthy set of tools that read hidden data from memory, several of them very good
-and several of them free. This one is worth a look if you want:
+FM26 has a healthy set of tools that read hidden data from memory, several of them very good and
+several of them free. If you want to *edit* your save, want deep match statistics with xG and
+per-90s, or want an overlay inside the game itself, other tools do those things well and this one
+does not.
 
-- **The whole database in one go, then instant everything.** F9 pulls your full loaded save
-  (45k+ players) in about 10 seconds. After that, search while you type, sort 48k rows and
-  stack filters with no pauses. A 635k-person monster save loads in about 17 seconds.
-- **Squad needs analysis**: depth, aging and succession per position group, one click to scout
-  candidates for the gap.
-- **A meta score built on [FM-Arena's attribute testing](https://fm-arena.com/table/26-player-attributes-testing)**,
-  so you can sort the world by what actually wins matches in the engine.
-- **Shareable player cards** as PNG, in FM's own visual language.
-- **Development trends** across your save's seasons, stored locally.
-- **A one-click toggle to hide CA/PA and all hidden stats**, if you consider reading them cheating.
-- **Open source**, so you can read exactly what it does with your system.
-
-If you want to *edit* your save, want deep match statistics with xG and per-90s, or want an
-overlay inside the game itself, other tools do those things and this one does not.
+Pick this one for the speed, the development tracking, and because it is open source: you can read
+exactly what it does with your system.
 
 ## Support
 

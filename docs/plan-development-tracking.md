@@ -5,7 +5,7 @@ real dump (51,845 players) and history file (25 dates, 59,046 players, 12.1 MB).
 
 ## 0. The one design decision
 
-Mark asked for three things: an intake feature, a growth filter field, and a growth column.
+mavarobli asked for three things: an intake feature, a growth filter field, and a growth column.
 They should not be three features. They are **one mechanism with three faces**:
 
 ```
@@ -219,9 +219,9 @@ on the day FM actually places him at a club. "New" therefore means "he exists no
 
 ## 8. Decisions
 
-1. **Staff history: no.** Decided 26-07. Only players are snapshotted, so the growth column
+1. **Staff history: no.** Besloten 26-07. Only players are snapshotted, so the growth column
    hides in staff mode, same as the meta column.
-2. **Growth of CA only.** Decided 26-07. No value-growth column in v1, even though the data
+2. **Growth of CA only.** Besloten 26-07. No value-growth column in v1, even though the data
    is already stored.
 3. **Radar presentation: open.** Banner versus card, see below.
 
