@@ -12,7 +12,7 @@ public class Plugin : BasePlugin
 {
     public const string Id = "com.mavarobli.fmsuperscout";
     public const string Name = "FMSuperScout";
-    public const string Version = "0.1.39";
+    public const string Version = "0.1.40";
 
     internal static new ManualLogSource Log;
 
@@ -55,7 +55,19 @@ public class Plugin : BasePlugin
             try
             {
                 if (!System.IO.File.Exists(RequestFile)) continue;
+                // De vlag bevat de aanmaaktijd (Date.now(), ms sinds epoch). Een vlag die is
+                // blijven liggen (bv. geschreven vlak voor FM afsloot) werd bij de volgende
+                // FM-start binnen een seconde opgepikt en vuurde een dump af tijdens het
+                // opstarten — vóór game_plugin.dll geladen is (issue #7). Ouder dan 2 minuten
+                // (of onleesbaar): weggooien zonder dump.
+                string raw = System.IO.File.ReadAllText(RequestFile).Trim();
                 System.IO.File.Delete(RequestFile);
+                long nowMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                if (!long.TryParse(raw, out long flagMs) || nowMs - flagMs > 120_000)
+                {
+                    Log.LogWarning($"Verlopen/onleesbaar data-verzoek genegeerd (vlag: '{raw}').");
+                    continue;
+                }
                 TryStartDump("web-app");
             }
             catch { /* volgende tick opnieuw */ }

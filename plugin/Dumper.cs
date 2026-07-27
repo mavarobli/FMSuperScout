@@ -112,7 +112,15 @@ internal static class Dumper
                            $"game_plugin {mem.GpBase:X}-{mem.GpEnd:X}");
         DetectGameVersion(mem);
         if (mem.GpBase == 0)
-            Plugin.Log.LogWarning("game_plugin.dll niet gevonden! Person-objecten leven daar — dump zal leeg zijn.");
+        {
+            // game_plugin.dll (de native database) laadt pas ná de BepInEx-chainloader, tijdens
+            // het opstarten van FM. Een dump in dat venster is gegarandeerd leeg — vroeger
+            // schreef die een lege dump.json over de goede heen (issue #7). Nu: afbreken,
+            // bestaande dump met rust laten.
+            Plugin.Log.LogError("game_plugin.dll niet geladen — dump afgebroken, bestaande dump.json blijft staan.");
+            WriteError("FM26 is still starting up (game database not loaded yet). Load your save, then try again.");
+            return;
+        }
 
         var players = new Dictionary<uint, Person>();
         var staff = new Dictionary<uint, Person>();
@@ -437,6 +445,18 @@ internal static class Dumper
 
         Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
+
+        // Vangnet: een geladen save heeft altijd spelers. 0 spelers én 0 staf betekent dat de
+        // scan zelf faalde (save niet geladen, of offsets verschoven na een FM-patch). Zo'n
+        // lege dump mag nooit een bestaande, goede dump.json overschrijven. Diag wél schrijven:
+        // die is juist nu nodig voor een probleemrapport.
+        if (players.Count == 0 && staff.Count == 0)
+        {
+            WriteDiag(mem, players, staff, offsetHist, candidates, sw.ElapsedMilliseconds);
+            Plugin.Log.LogError("0 spelers en 0 staf gevonden — dump niet weggeschreven, bestaande dump.json blijft staan.");
+            WriteError("The scan found no players. Is your save fully loaded? If it is, FMSuperScout may need an update for this FM version.");
+            return;
+        }
         WriteStatus("scanning", players.Count, staff.Count, null, 0.90);
 
         WriteJson(players.Values, staff.Values);

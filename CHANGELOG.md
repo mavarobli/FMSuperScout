@@ -5,6 +5,28 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-07-27
+
+Plugin: v0.1.40. Two bug reports, one shared root: an empty or older dump was treated
+worse than it deserved, and in one case the app destroyed good data.
+
+### Fixed
+- The plugin no longer writes an empty dump over a good one. A dump triggered while FM26
+  was still starting up (before the game database module is loaded) used to overwrite
+  dump.json with zero players. It now stops with a clear message and leaves the existing
+  dump alone. The same guard applies whenever a scan finds zero players and zero staff,
+  which on a loaded save never legitimately happens.
+- A leftover data request no longer fires a dump during FM's next startup. The request
+  the app writes for "New data" now expires after two minutes; the plugin ignores and
+  removes anything older. Previously a request written moments before FM closed was
+  picked up seconds into the next launch, producing exactly the empty dump above.
+- Dumps made by a plugin older than 0.1.34 load again. Since 1.2.0 the app refused them
+  with a misleading "the dump is incomplete" error, because it demanded a meta field that
+  old plugins never wrote. A complete old dump now loads normally and shows a banner
+  suggesting a fresh F9 instead. Genuinely incomplete files are still rejected.
+- The "could not load" screen now has a "New data" button, so there is a way to request
+  a fresh dump right where the problem shows up, next to Try again and Report a problem.
+
 ## [1.3.0] - 2026-07-26
 
 Plugin: v0.1.39.

@@ -36,7 +36,7 @@ function jread(key, fallback) {
 try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.removeItem(k)); } catch { }
 const GBP_TO_EUR = 1.16;
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -155,6 +155,7 @@ const I18N = {
     c_meta: 'Meta', metaLabel: 'Meta-score',
     metaHint: 'Meta-score (1-20): gewogen gemiddelde van de attributen die volgens FM-Arena\'s match-engine-tests wedstrijden winnen. Snelheid en Versnelling tellen veruit het zwaarst, daarna Sprongkracht en Dribbelen.\n\n15+ elite, 13-15 sterk, 11-13 degelijk.\n\nTwee spelers met gelijke CA? Die met de hoogste Meta presteert meestal beter op het veld. Positie en rol tellen niet mee; keepers krijgen geen score.',
     verWarn: 'FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x. Data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
+    verWarnOldDump: 'Deze data komt van een oudere FMSuperScout-plugin. Alles werkt, maar haal verse data op (F9 in FM26 met je save geladen) voor het beste resultaat.',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -270,6 +271,7 @@ const I18N = {
     c_meta: 'Meta', metaLabel: 'Meta score',
     metaHint: 'Meta score (1-20): a weighted average of the attributes that win matches according to FM-Arena\'s match-engine tests. Pace and Acceleration count heaviest by far, then Jumping Reach and Dribbling.\n\n15+ elite, 13-15 strong, 11-13 decent.\n\nTwo players with equal CA? The one with the higher Meta score usually performs better on the pitch. Position and role are ignored; goalkeepers get no score.',
     verWarn: 'FM version {v} detected; memory reading is calibrated for {s}.x. Data may be unreliable until FMSuperScout is updated.',
+    verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM26 with your save loaded) for the best results.',
   },
 };
 const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
@@ -1266,7 +1268,11 @@ async function loadDump(force = false) {
     }
     // Volledigheidscheck: een dump die midden in het schrijven is gelezen (of afgebroken
     // stream) mag nooit stilletjes als geldige — maar halve — spelerslijst doorgaan.
-    if (!data._complete || !data.meta || !data.meta.pluginVersion)
+    // "generated" staat sinds de allereerste release in elk metablok; "pluginVersion" pas
+    // sinds plugin 0.1.34. Op die laatste weigeren gooide complete dumps van oudere plugins
+    // weg met een misleidende "onvolledig"-melding (issue #8) — die krijgen nu een
+    // waarschuwingsbanner (zie renderVerWarn) in plaats van een fout.
+    if (!data._complete || !data.meta || !data.meta.generated)
       throw new Error(t('dumpIncomplete'));
     b.className = 'hidden';
     // Spookrecords eruit: FM genereert newgens alvast in het geheugen (o.a. voor de
@@ -1392,10 +1398,14 @@ function renderEmptyState() {
     (loadError.crash ? '' : `<pre class="es-err-detail">${escHtml(loadError.msg)}</pre>`) +
     `<div class="es-help">` +
       `<button id="es-err-reload">${escHtml(t('esErrReload'))}</button>` +
+      `<button id="es-err-fetch">${escHtml(t('fetch'))}</button>` +
       `<button id="es-err-report">${escHtml(t('reportBug'))}</button>` +
     `</div>`;
   errBox.classList.remove('hidden');
   $('es-err-reload').onclick = () => loadDump(true);   // force: langs de crash-detector
+  // Uitweg die er niet was (issue #8): een verse dump vragen, zelfde route als de knop
+  // "Nieuwe data" in de balk — mét de FM-draait-check en de niet-opgepikt-time-out.
+  $('es-err-fetch').onclick = () => $('btn-fetch').onclick();
   $('es-err-report').onclick = reportBug;
 }
 function renderDumpInfo() {
@@ -1421,12 +1431,17 @@ function renderDumpInfo() {
   }
 }
 // Waarschuwing als de dump uit een andere FM-versie komt dan waarop de offsets zijn gepind:
-// de geheugen-uitlezing kan dan stilletjes verkeerde waarden geven.
+// de geheugen-uitlezing kan dan stilletjes verkeerde waarden geven. Zelfde banner voor een
+// dump van een plugin ouder dan 0.1.34 (geen pluginVersion in het metablok): wel laden,
+// maar aanraden verse data op te halen.
 function renderVerWarn() {
   const el = $('ver-warn');
   const m = state.meta;
   if (m.gameVersion && m.versionOk === false) {
     el.innerHTML = bannerMsg('warning', tf('verWarn', { v: m.gameVersion, s: m.supportedVersion || '26.3' }));
+    el.classList.remove('hidden');
+  } else if (m.generated && !m.pluginVersion) {
+    el.innerHTML = bannerMsg('warning', t('verWarnOldDump'));
     el.classList.remove('hidden');
   } else el.classList.add('hidden');
 }
