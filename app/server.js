@@ -12,8 +12,11 @@ const { spawn, execFile } = require('child_process');
 
 const PORT = Number(process.env.PORT) || 8765;
 const APP_DIR = __dirname;
-// De plugin schrijft dumps hierheen:
-const DATA_DIR = path.join(os.homedir(), 'AppData', 'Local', 'FMSuperScout');
+// De plugin schrijft dumps hierheen. Zelfde bron als de plugin (%LOCALAPPDATA%): bij een
+// verplaatst/redirected profiel wijkt homedir+AppData af en keken app en plugin naar
+// verschillende mappen ("F9 werkt, app blijft leeg").
+const DATA_DIR = path.join(
+  process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'FMSuperScout');
 
 // App-modus (standalone venster): server sluit zichzelf af zodra het venster dicht is.
 // Het sluiten van het venster wordt betrouwbaar gemeld via /api/bye (pagehide-beacon).
@@ -207,7 +210,8 @@ function latestDump() {
       .filter(f => f.startsWith('dump') && f.endsWith('.json'))
       .map(f => {
         const full = path.join(DATA_DIR, f);
-        return { full, mtime: fs.statSync(full).mtimeMs };
+        const st = fs.statSync(full);
+        return { full, mtime: st.mtimeMs, size: st.size };
       })
       .sort((a, b) => b.mtime - a.mtime);
     return files[0] || null;
@@ -285,7 +289,7 @@ const server = http.createServer((req, res) => {
       hasDump: !!dump,
       dumpFile: dump ? path.basename(dump.full) : null,
       dumpTime: dump ? dump.mtime : null,
-      dumpSize: dump ? fs.statSync(dump.full).size : null,
+      dumpSize: dump ? dump.size : null,   // uit latestDump: geen losse stat die kan racen met een F9-herschrijf
       appMode: APP_MODE,
       plugin,
     }));
@@ -416,10 +420,15 @@ const server = http.createServer((req, res) => {
     }
     res.writeHead(200, {
       'Content-Type': 'application/json',
-      'Content-Length': fs.statSync(dump.full).size,
+      'Content-Length': dump.size,
       'Cache-Control': 'no-store',
     });
-    fs.createReadStream(dump.full).pipe(res);
+    // Zonder error-handler is een leesfout (dump net vervangen/gelockt door de plugin) een
+    // unhandled 'error'-event dat het hele proces killt. Afbreken; de app meldt dan zelf
+    // een onvolledige dump en de volgende poging slaagt gewoon.
+    const rs = fs.createReadStream(dump.full);
+    rs.on('error', () => res.destroy());
+    rs.pipe(res);
     return;
   }
 
@@ -432,8 +441,15 @@ const server = http.createServer((req, res) => {
     return;
   }
   res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream' });
-  fs.createReadStream(full).pipe(res);
+  const sf = fs.createReadStream(full);
+  sf.on('error', () => res.destroy());
+  sf.pipe(res);
 });
+
+// Vangnet: één onverwachte synchrone fout in een request-handler (bestandsrace met de
+// plugin, exotisch fs-gedrag) mag nooit de hele server meenemen — dat toonde zich in het
+// veld als "Lost connection to the local server". Loggen en doordraaien.
+process.on('uncaughtException', e => console.error('Onverwachte fout (server draait door):', e));
 
 const URL_LOCAL = `http://localhost:${PORT}`;
 

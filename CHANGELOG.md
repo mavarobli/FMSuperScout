@@ -5,6 +5,83 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-03
+
+Plugin: v0.1.41. Two themes: stability (the whole "works on my machine, buggy on yours"
+class of problems, traced through issue reports, attached logs and a full code review)
+and USD support.
+
+### Added
+- USD as a third currency next to GBP and EUR. Like the euro, the rate is FM26's own
+  fixed one (frozen around the mid-2025 database lock): £1 = $1.35. All money in the
+  dump stays internal GBP; only display and filter input convert.
+
+### Fixed
+
+App:
+- The local server no longer dies on a file race with the plugin (a stat or stream read
+  colliding with an F9 rewrite of dump.json). This was the likely source of the "Lost
+  connection to the local server" reports: the process simply crashed. Streams now abort
+  cleanly and one unexpected error can no longer take the server down.
+- No more false "FM26 is not picking up the request" after a fast successful scan. The
+  15-second watchdog is cancelled as soon as the plugin reports scanning, done or error;
+  previously a small save could scan entirely between two polls and still get the red
+  banner. The very first dump on a fresh install now auto-loads too, and the banner links
+  straight to the troubleshooting fix when the request genuinely goes unanswered.
+- The app reads its data folder from %LOCALAPPDATA%, like the plugin, instead of deriving
+  it from the home folder. On redirected Windows profiles the two pointed at different
+  places: F9 worked, the app stayed empty forever.
+- A stalled scan is detected: status "scanning" with a status file older than 15 seconds
+  now says the scan appears to have stopped, instead of an eternal progress bar when FM
+  was closed or crashed mid-scan.
+- Growth: a reference period longer than the recorded history no longer marks every
+  player as "new"; the reference date clamps to the earliest snapshot (as the code
+  comment already promised).
+- EU/EEA detection recognises nation names in German, French, Spanish, Italian,
+  Portuguese, Hungarian and Turkish, next to Dutch and English. FM writes nation names in
+  its interface language; in an unrecognised language the EU filter matched nobody and
+  every under-18 was treated as a non-EU minor. A language-independent nation ID stays on
+  the backlog as the structural fix.
+- Billions were labeled " mld" (Dutch) even with the app in English; now "B" in English.
+- An unknown currency or language value in localStorage (older version, synced profile)
+  no longer produces NaN prices or a blank app; both fall back to a valid default.
+- The reload button on the error screen accidentally passed force=true and bypassed the
+  crash detector it was supposed to respect.
+- In-game dates are parsed as local midnight; west of UTC, ages and the season boundary
+  could shift by a day.
+- CSV export revokes its download URL after five seconds instead of immediately; Firefox
+  could abort the download.
+- Presets: the growth period no longer counts as an active filter, so the "no active
+  filters to save" warning works again.
+- Table cells and detail fields that render game strings without a custom renderer
+  (nationality, foot, staff role, position, compare header) now escape HTML, matching
+  the existing escaping of names and clubs. Only relevant for custom databases with
+  markup in names, but now consistent.
+
+Plugin (v0.1.41):
+- A partially readable scan can no longer overwrite a good dump.json. Unreadable memory
+  is retried in 1 MB windows and counted; if more than 10% stayed unreadable (typically a
+  scan during save load/unload), the existing dump is kept and a clear error is shown.
+- A click on New data can no longer be lost to a half-written request flag: the flag is
+  validated before deletion, and a fresh-but-garbled flag gets one retry tick instead of
+  being discarded as expired.
+- After a mid-write failure (full disk, antivirus lock) the temp-file handle is released
+  immediately; follow-up dumps no longer fail on "file in use" until FM restarts.
+- status.json is written atomically (tmp + rename), player/staff counts no longer flap to
+  zero during the JSON write phase, and error texts containing control characters no
+  longer produce unreadable JSON exactly when an error needed displaying.
+- Objects sitting precisely on a 32 MB scan-chunk boundary are no longer missed (windows
+  now overlap by 16 bytes).
+- A corrupt day-of-year 366 in a non-leap year no longer rolls a contract date into
+  January 1 of the following year.
+
+### Changed
+- Troubleshooting: new section 4d on the "FM26 is not picking up the request" loop
+  caused by FM26 relaunching itself during startup, which makes the mod loader skip
+  the process you actually play in (UnityDoorstop #34). Documents the check
+  (LogOutput.log frozen at an older session) and the `steam_appid.txt` fix from
+  issue #7. Section 4c now points there.
+
 ## [1.3.1] - 2026-07-27
 
 Plugin: v0.1.40. Two bug reports, one shared root: an empty or older dump was treated

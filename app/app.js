@@ -9,7 +9,7 @@ const state = {
   sortKey: 'ca', sortDir: -1,
   selected: null,
   cur: localStorage.getItem('fmss_cur') || '£',
-  lang: localStorage.getItem('fmss_lang') || 'nl',
+  lang: ['nl', 'en'].includes(localStorage.getItem('fmss_lang')) ? localStorage.getItem('fmss_lang') : 'nl',
   showPot: false,
   myTeam: 'all',   // teamchip bij "Mijn club": all | first | res | youth
   hideCapa: localStorage.getItem('fmss_hidecapa') === '1',
@@ -34,9 +34,12 @@ function jread(key, fallback) {
 // Resten van het oude mijlpaal-nudgesysteem (25/500/2000 profielen), vervangen door het
 // seizoensrapport. Eenmalig opruimen zodat oude installs geen dode sleutels meeslepen.
 try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.removeItem(k)); } catch { }
-const GBP_TO_EUR = 1.16;
+// FM26 rekent intern in GBP en toont andere valuta met eigen vaste koersen (bevroren rond
+// de database-lock, medio 2025). €: gekalibreerd tegen in-game waarden (docs/value-model.md).
+// $: xe.com-koers uit diezelfde periode; verifieer tegen FM's eigen USD-weergave.
+const CUR_RATE = { '£': 1, '€': 1.16, '$': 1.35 };
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -108,6 +111,8 @@ const I18N = {
     dumpError: 'Uitlezen mislukt', fmNotRunning: 'Start eerst Football Manager 26 en laad je save.',
     dumpIncomplete: 'De dump is onvolledig (FM26 was er waarschijnlijk nog mee bezig). Probeer het zo opnieuw.',
     reqNoPickup: 'FM26 pikt het verzoek niet op. Is je save geladen? Probeer anders F9 in de game, of herstart FM26.',
+    reqNoPickupMore: 'Blijft dit terugkomen? Lees de fix',
+    scanStalled: 'De scan lijkt gestopt (is FM26 afgesloten of gecrasht?). Herstart FM26 en probeer opnieuw.',
     serverGone: 'Geen verbinding met de lokale server. Sluit dit venster en start FMSuperScout opnieuw.',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_loan: 'te huur', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
@@ -224,6 +229,8 @@ const I18N = {
     dumpError: 'Read failed', fmNotRunning: 'Start Football Manager 26 and load your save first.',
     dumpIncomplete: 'The dump is incomplete (FM26 was probably still writing it). Try again in a moment.',
     reqNoPickup: 'FM26 is not picking up the request. Is your save loaded? Try F9 in the game, or restart FM26.',
+    reqNoPickupMore: 'Keeps coming back? Read the fix',
+    scanStalled: 'The scan appears to have stopped (was FM26 closed, or did it crash?). Restart FM26 and try again.',
     serverGone: 'Lost connection to the local server. Close this window and start FMSuperScout again.',
     tag_free: 'free', tag_listed: 'listed', tag_loan: 'for loan', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
@@ -274,7 +281,9 @@ const I18N = {
     verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM26 with your save loaded) for the best results.',
   },
 };
-const t = k => (I18N[state.lang][k] ?? I18N.nl[k] ?? k);
+// Onbekende taalcode (oude versie in localStorage, gesynct profiel) mag de app niet
+// slopen vóór er ook maar iets gerenderd is → altijd via een geldige tabel.
+const t = k => ((I18N[state.lang] || I18N.en)[k] ?? I18N.nl[k] ?? k);
 
 // ================= SVG-iconen =================
 // Eén stijl (stroke, currentColor) die aansluit bij de bestaande UI-iconen; geen emoji.
@@ -338,21 +347,61 @@ const ATTR_LABEL = {
     AerialReach: 'Aerial Reach', CommandOfArea: 'Command of Area', Communication: 'Communication', Eccentricity: 'Eccentricity', Handling: 'Handling', Kicking: 'Kicking', OneOnOnes: 'One on Ones', Punching: 'Punching', Reflexes: 'Reflexes', RushingOut: 'Rushing Out', Throwing: 'Throwing',
   },
 };
-const attrName = k => (ATTR_LABEL[state.lang][k] ?? k);
+const attrName = k => ((ATTR_LABEL[state.lang] || ATTR_LABEL.en)[k] ?? k);
 // FM sorteert attributen binnen een groep alfabetisch in de taal van de game; wij dus ook,
 // op de vertaalde naam. Gebruikt door profiel, vergelijking en het attribuutfilter.
 const sortByLabel = keys => [...keys].sort((a, b) => attrName(a).localeCompare(attrName(b), state.lang));
 
 // ---------- EU/EEA-landen ----------
+// Landnamen komen uit de dump in de TAAL WAARIN FM DRAAIT. Daarom staat dezelfde lijst
+// hier in de gangbare FM-talen; ontbreekt de taal, dan herkent de app geen enkel EU-land
+// (filter leeg + elke minderjarige als niet-EU behandeld). Structurele fix — een
+// taalonafhankelijk land-ID uit het geheugen — staat in de backlog.
 const EU_NATIONS = new Set([
+  // nl
   'Nederland', 'België', 'Duitsland', 'Frankrijk', 'Italië', 'Spanje', 'Portugal', 'Ierland',
   'Oostenrijk', 'Polen', 'Zweden', 'Denemarken', 'Finland', 'Tsjechië', 'Slowakije', 'Hongarije',
   'Roemenië', 'Bulgarije', 'Griekenland', 'Kroatië', 'Slovenië', 'Luxemburg', 'Estland', 'Letland',
   'Litouwen', 'Malta', 'Cyprus', 'Noorwegen', 'IJsland', 'Liechtenstein', 'Zwitserland',
-  // EN nation names (voor als FM Engels draait)
+  // en
   'Netherlands', 'Belgium', 'Germany', 'France', 'Italy', 'Spain', 'Ireland', 'Austria', 'Poland',
-  'Sweden', 'Denmark', 'Czechia', 'Slovakia', 'Hungary', 'Romania', 'Bulgaria', 'Greece', 'Croatia',
-  'Slovenia', 'Luxembourg', 'Estonia', 'Latvia', 'Lithuania', 'Norway', 'Iceland', 'Switzerland',
+  'Sweden', 'Denmark', 'Czechia', 'Czech Republic', 'Slovakia', 'Hungary', 'Romania', 'Bulgaria',
+  'Greece', 'Croatia', 'Slovenia', 'Luxembourg', 'Estonia', 'Latvia', 'Lithuania', 'Norway',
+  'Iceland', 'Switzerland',
+  // de
+  'Niederlande', 'Belgien', 'Deutschland', 'Frankreich', 'Italien', 'Spanien', 'Irland',
+  'Österreich', 'Schweden', 'Dänemark', 'Finnland', 'Tschechien', 'Slowakei', 'Ungarn',
+  'Rumänien', 'Bulgarien', 'Griechenland', 'Kroatien', 'Slowenien', 'Luxemburg', 'Estland',
+  'Lettland', 'Litauen', 'Zypern', 'Norwegen', 'Island', 'Schweiz',
+  // fr
+  'Pays-Bas', 'Belgique', 'Allemagne', 'Italie', 'Espagne', 'Irlande', 'Autriche', 'Pologne',
+  'Suède', 'Danemark', 'Finlande', 'Tchéquie', 'République tchèque', 'Slovaquie', 'Hongrie',
+  'Roumanie', 'Bulgarie', 'Grèce', 'Croatie', 'Slovénie', 'Estonie', 'Lettonie', 'Lituanie',
+  'Malte', 'Chypre', 'Norvège', 'Islande', 'Suisse',
+  // es
+  'Países Bajos', 'Bélgica', 'Alemania', 'Francia', 'España', 'Irlanda', 'Polonia', 'Suecia',
+  'Dinamarca', 'Finlandia', 'Chequia', 'República Checa', 'Eslovaquia', 'Hungría', 'Rumanía',
+  'Rumania', 'Grecia', 'Croacia', 'Eslovenia', 'Luxemburgo', 'Letonia', 'Lituania', 'Chipre',
+  'Noruega', 'Islandia', 'Suiza',
+  // it
+  'Paesi Bassi', 'Belgio', 'Germania', 'Spagna', 'Portogallo', 'Svezia', 'Danimarca',
+  'Cechia', 'Repubblica Ceca', 'Slovacchia', 'Ungheria', 'Croazia', 'Lussemburgo', 'Lettonia',
+  'Lituania', 'Cipro', 'Norvegia', 'Islanda', 'Svizzera',
+  // pt
+  'Países Baixos', 'Holanda', 'Alemanha', 'França', 'Itália', 'Espanha', 'Áustria', 'Polónia',
+  'Polônia', 'Suécia', 'Chéquia', 'República Tcheca', 'Eslováquia', 'Hungria', 'Roménia',
+  'Romênia', 'Bulgária', 'Grécia', 'Croácia', 'Eslovénia', 'Eslovênia', 'Estónia', 'Estônia',
+  'Letónia', 'Letônia', 'Lituânia', 'Islândia', 'Suíça',
+  // hu
+  'Hollandia', 'Németország', 'Franciaország', 'Olaszország', 'Spanyolország', 'Portugália',
+  'Írország', 'Ausztria', 'Lengyelország', 'Svédország', 'Dánia', 'Finnország', 'Csehország',
+  'Szlovákia', 'Magyarország', 'Görögország', 'Horvátország', 'Szlovénia', 'Észtország',
+  'Lettország', 'Litvánia', 'Málta', 'Ciprus', 'Norvégia', 'Izland', 'Svájc',
+  // tr
+  'Hollanda', 'Belçika', 'Almanya', 'Fransa', 'İtalya', 'İspanya', 'Portekiz', 'İrlanda',
+  'Avusturya', 'Polonya', 'İsveç', 'Danimarka', 'Finlandiya', 'Çekya', 'Slovakya', 'Macaristan',
+  'Romanya', 'Bulgaristan', 'Yunanistan', 'Hırvatistan', 'Slovenya', 'Lüksemburg', 'Estonya',
+  'Letonya', 'Litvanya', 'Kıbrıs', 'Norveç', 'İzlanda', 'Lihtenştayn', 'İsviçre',
 ].map(s => s.toLowerCase()));
 const isEu = p => (p.nat || []).some(n => EU_NATIONS.has((n || '').toLowerCase()));
 
@@ -369,15 +418,23 @@ function histRefDate() {
   const gd = state.meta.gameDate;
   const dates = state.hist ? state.hist.dates : null;
   if (!gd || !dates || dates.length < 2) return null;
-  const d = new Date(gd);
-  const iso = x => x.toISOString().slice(0, 10);
-  switch (state.histPeriod) {
-    case 'last': return dates[dates.length - 2];
-    case 'm6': { const x = new Date(d); x.setMonth(x.getMonth() - 6); return iso(x); }
-    case 'season': { const y = seasonYearOf(); return y ? `${y}-07-01` : dates[0]; }
-    case 'all': return dates[0];
-    default: { const x = new Date(d); x.setFullYear(x.getFullYear() - 1); return iso(x); }
-  }
+  const d = parseGameDate(gd);
+  // Lokaal formatteren, consistent met parseGameDate: toISOString zou ten westen van UTC
+  // een dag terugvallen.
+  const iso = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  const r = (() => {
+    switch (state.histPeriod) {
+      case 'last': return dates[dates.length - 2];
+      case 'm6': { const x = new Date(d); x.setMonth(x.getMonth() - 6); return iso(x); }
+      case 'season': { const y = seasonYearOf(); return y ? `${y}-07-01` : dates[0]; }
+      case 'all': return dates[0];
+      default: { const x = new Date(d); x.setFullYear(x.getFullYear() - 1); return iso(x); }
+    }
+  })();
+  // De belofte uit de comment hierboven waarmaken: peildatum vóór de eerste momentopname
+  // wordt de vroegste datum. Zonder clamp kreeg iedereen het stempel "nieuw" zodra de
+  // historie korter was dan de gekozen periode. (ISO-strings vergelijken lexicografisch.)
+  return r && r < dates[0] ? dates[0] : r;
 }
 // Basislijn onder CA 40 is geen echte speler maar een half ingevuld record (FM vult
 // newgens en niet-gescoute spelers gaandeweg aan). Zonder deze ondergrens bestaat de
@@ -562,11 +619,11 @@ const hiddenStatCol = k => (state.hideCapa && (k === 'ca' || k === 'pa' || k ===
 // ---------- geld ----------
 function fmtMoney(v) {
   if (v == null) return '–';
-  let val = v, sym = '£';
-  if (state.cur === '€') { val = v * GBP_TO_EUR; sym = '€'; }
+  const sym = CUR_RATE[state.cur] ? state.cur : '£';   // onbekende localStorage-waarde → £
+  const val = v * CUR_RATE[sym];
   if (val === 0) return sym + '0';
   const abs = Math.abs(val);
-  if (abs >= 1e9) return sym + (val / 1e9).toFixed(2) + ' mld';
+  if (abs >= 1e9) return sym + (val / 1e9).toFixed(2) + (state.lang === 'en' ? 'B' : ' mld');
   if (abs >= 1e6) return sym + (val / 1e6).toFixed(1) + 'M';
   if (abs >= 1e3) return sym + Math.round(val / 1e3) + 'K';
   return sym + Math.round(val);
@@ -587,8 +644,12 @@ function getAge(p) {
   }
   return p.age;
 }
+// In-game datums ('yyyy-mm-dd') als LOKALE middernacht parsen. new Date('yyyy-mm-dd') is
+// UTC-middernacht; wie daarna lokale velden leest (getMonth/getDate) zit ten westen van
+// UTC een dag te vroeg: leeftijden en de seizoensgrens verschoven voor Amerikaanse gebruikers.
+const parseGameDate = s => new Date(String(s) + 'T00:00:00');
 function gameNow() {
-  const g = state.meta.gameDate ? new Date(state.meta.gameDate) : new Date();
+  const g = state.meta.gameDate ? parseGameDate(state.meta.gameDate) : new Date();
   return new Date(state.refYear, g.getMonth(), g.getDate());
 }
 
@@ -612,7 +673,7 @@ const PLAYER_COLS = [
   { key: 'sl', label: '★', star: true, w: 34 },
   { key: 'name', label: 'c_name', get: p => p.name, name: true, w: 180 },
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p), w: 50 },
-  { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => p.pos || '<span class="dim">–</span>', w: 95 },
+  { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => p.pos ? escHtml(p.pos) : '<span class="dim">–</span>', w: 95 },
   { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
   { key: 'div', label: 'c_div', get: p => p.div || '', render: p => p.div ? escHtml(p.div) : '<span class="dim">–</span>', defHidden: true, w: 170 },
   { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
@@ -1287,7 +1348,7 @@ async function loadDump(force = false) {
     state._clubWages = null;       // loonrang-cache (vraagprijs) opnieuw opbouwen
     // Peiljaar (voor leeftijdsberekening) automatisch uit de in-game datum; geen UI-veld meer.
     if (state.meta.gameDate) {
-      const g = new Date(state.meta.gameDate);
+      const g = parseGameDate(state.meta.gameDate);
       state.refYear = state.meta.gameYear || g.getFullYear();
       state.refDoy = Math.floor((g - new Date(g.getFullYear(), 0, 0)) / 864e5);
     } else if (state.meta.gameYear) {
@@ -1587,7 +1648,7 @@ const parseMoney = s => {
   if (!m) return null;
   let v = parseFloat(m[1]);
   if (m[2] === 'K') v *= 1e3; else if (m[2] === 'M') v *= 1e6; else if (m[2] === 'MLD' || m[2] === 'B') v *= 1e9;
-  if (state.cur === '€') v /= GBP_TO_EUR;
+  v /= CUR_RATE[state.cur] || 1;   // invoer in gekozen valuta → intern GBP
   return isNaN(v) ? null : v;
 };
 function monthsUntil(expires) {
@@ -1789,7 +1850,11 @@ function snapshotFilters() {
   if (adv.length) s.adv = adv.map(r => ({ ...r }));
   return s;
 }
-const presetIsEmpty = s => !s.pos.length && !Object.keys(s.text).length && !Object.keys(s.check).length && !Object.keys(s.select).length && !(s.adv || []).length;
+// f-hist-period heeft altijd een waarde (standaard 'y1') en telt dus niet als "actief
+// filter" — anders was de lege-preset-waarschuwing onbereikbaar en sleepte elke preset
+// stilletjes een groeiperiode mee die de gebruiker nooit aanraakte.
+const presetIsEmpty = s => !s.pos.length && !Object.keys(s.text).length && !Object.keys(s.check).length
+  && !Object.keys(s.select).some(k => k !== 'f-hist-period') && !(s.adv || []).length;
 function applyPreset(s) {
   $('btn-clear').onclick();                       // schone lei
   $('f-role').value = '';                         // rol hoort bij de preset, niet bij de vorige zoektocht
@@ -2157,7 +2222,9 @@ function renderVisible() {
       if (c.dimNull && !v) return `<td class="dim">–</td>`;
       if (c.fmt) v = c.fmt(v);
       if (v == null || v === '') v = '–';
-      return `<td class="${c.num ? 'num' : ''} ${c.cls || ''} ${c.tdCls ? c.tdCls(p) : ''}">${v}</td>`;
+      // v is hier altijd platte tekst (kolommen met HTML gebruiken render) en kan uit
+      // game-data komen (nationaliteit, staf-rol) → escapen, custom databases kunnen alles bevatten.
+      return `<td class="${c.num ? 'num' : ''} ${c.cls || ''} ${c.tdCls ? c.tdCls(p) : ''}">${escHtml(String(v))}</td>`;
     }).join('');
     return `<tr data-i="${idx}" class="${state.selected === p ? 'sel' : ''}${idx % 2 ? ' even' : ''}" style="height:${ROW_H}px">${tds}</tr>`;
   }).join('') + spacer(botPad);
@@ -2223,8 +2290,9 @@ function exportShortlist() {
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
+  // revoke pas ná de download (Firefox breekt hem anders af) — zelfde patroon als downloadPlayerCard
   a.download = 'fmsuperscout-shortlist.csv';
-  a.click(); URL.revokeObjectURL(a.href);
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   showToast(all.length + ' → CSV', 'check');
   coffeeGlow();
 }
@@ -2331,10 +2399,10 @@ function showDetail(p) {
   let html = `<h2>${escHtml(p.name)} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${starSvg(18)}</span>
     <button class="copybtn" title="${t('copyBtnTip')}">${icon('clipboard', 13)}</button>
     <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">${icon('compare', 13)}</button>${isPlayer && p.attrs ? `<button class="cardbtn" title="${t('cardBtnTip')}">${icon('card', 13)}</button>` : ''}</h2>
-  <div class="sub">${getAge(p)} · ${natsLabel(p)}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
+  <div class="sub">${getAge(p)} · ${escHtml(natsLabel(p))}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
   ${gauge}
   <div class="kv">
-    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${p.pos || '–'}</div><div><b>${t('foot')}</b> ${footLabel(p)}</div>` : `<div><b>${t('c_role')}</b> ${p.job || '–'}</div>`}
+    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${escHtml(p.pos || '–')}</div><div><b>${t('foot')}</b> ${escHtml(footLabel(p))}</div>` : `<div><b>${t('c_role')}</b> ${escHtml(p.job || '–')}</div>`}
     <div><b>${t('estval')}</b> ${valTxt}</div>
     ${!state.hideCapa && feeEstimate(p).v > 0 ? `<div><b>${t('c_fee')}</b> ${fmtMoney(feeEstimate(p).v * 0.85)} – ${fmtMoney(feeEstimate(p).v * 1.15)}</div>` : ''}
     <div><b>${t('wageLabel')}</b> ${fmtMoney(p.wage)}</div>
@@ -2911,7 +2979,7 @@ function bumpStat(k) { try { localStorage.setItem(k, String((+localStorage.getIt
 // seizoensjaar uit de dump (zelfde grens, want dat ís een seizoensjaar).
 function seasonYearOf() {
   const ds = state.meta.gameDate;
-  if (ds) { const d = new Date(ds); if (!isNaN(d)) return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1; }
+  if (ds) { const d = parseGameDate(ds); if (!isNaN(d)) return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1; }
   return state.meta.gameYear || 0;
 }
 function maybeSeasonReport() {
@@ -3060,7 +3128,7 @@ function openCompare() {
       const bits = [val, p.wage > 0 ? fmtMoney(p.wage) + ' p/w' : null,
         p.expires ? String(p.expires).slice(0, 4) : null].filter(Boolean).join(' · ');
       return `<div class="cmp-cell"><div class="cmp-name">${escHtml(p.name)}</div>` +
-        `<div class="cmp-meta">${getAge(p)} · ${p.pos || p.job || ''} · ${p.club ? escHtml(p.club) : '–'}` +
+        `<div class="cmp-meta">${getAge(p)} · ${escHtml(p.pos || p.job || '')} · ${p.club ? escHtml(p.club) : '–'}` +
         `${bits ? `<br>${bits}` : ''}` +
         `${p.attrs ? `<br><span class="cmp-winsb">${tf('cmpWinsBadge', { n: wins[i] })}</span>` : ''}</div></div>`;
     }).join('') +
@@ -3486,12 +3554,17 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('settings-
 
 // nieuwe data ophalen (trigger de plugin)
 let fetchTimeout = null;
+// Loopt er een "Nieuwe data"-verzoek? Baseline = dumpTime op het moment van de klik, zodat
+// poll() een verse dump ook herkent als er nog nooit een dump was (eerste keer na installatie)
+// of als de scan zo snel klaar is dat de 'scanning'-status tussen twee polls valt.
+let fetchPending = false, fetchBaseDumpTime = null;
 $('btn-fetch').onclick = async () => {
   const b = $('banner');
   try {
     const st = await (await fetch('/api/fmstatus')).json();
     if (!st.running) { b.className = 'scanning error'; b.innerHTML = bannerMsg('warning', t('fmNotRunning')); b.onclick = null; return; }
     await fetch('/api/refresh', { method: 'POST' });
+    fetchPending = true; fetchBaseDumpTime = lastDumpTime;
     b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('reqSent')); b.onclick = null;
     // Vangnet: pikt de plugin het verzoek niet op (state wordt nooit 'scanning'), dan
     // een duidelijke hint i.p.v. een eeuwige zandloper. poll() annuleert deze time-out
@@ -3501,8 +3574,13 @@ $('btn-fetch').onclick = async () => {
       try {
         const s2 = await (await fetch('/api/status')).json();
         if (s2.plugin && s2.plugin.state === 'scanning') return;   // toch nog gestart
+        if (s2.dumpTime && s2.dumpTime !== fetchBaseDumpTime) return;   // dump kwam er wél (snelle scan)
+        fetchPending = false;
         b.className = 'scanning error';
-        b.innerHTML = bannerMsg('warning', t('reqNoPickup'));
+        // Structureel niet opgepikt = vrijwel altijd de FM-zelfherstart die de mod-laag
+        // eruit gooit (TROUBLESHOOTING.md 4d) → link direct naar de fix.
+        b.innerHTML = bannerMsg('warning', t('reqNoPickup')) +
+          ` <a href="https://github.com/mavarobli/FMSuperScout/blob/main/TROUBLESHOOTING.md#4d-fm26-is-not-picking-up-the-request-on-every-single-attempt" target="_blank" rel="noopener">${escHtml(t('reqNoPickupMore'))}</a>`;
         b.onclick = () => { b.className = 'hidden'; };
       } catch { }
     }, 15000);
@@ -3581,7 +3659,10 @@ $('tab-players').onclick = () => setMode('players');
 $('tab-staff').onclick = () => setMode('staff');
 $('tab-shortlist').onclick = () => setMode('shortlist');
 $('tab-analysis').onclick = () => setMode('analysis');
-$('btn-reload').onclick = loadDump;
+// Niet direct koppelen: dan wordt het MouseEvent als force=true doorgegeven en
+// omzeilt elke klik de OOM-crashdetectie die loadDump(true) juist als bewuste
+// escape-hatch heeft.
+$('btn-reload').onclick = () => loadDump();
 
 // ---------- teamchips: 1e/2e/jeugd binnen "Mijn club" ----------
 // Zichtbaar zodra het "Mijn club"-vinkje aanstaat én de dump teamType-data heeft
@@ -3613,26 +3694,44 @@ async function poll() {
     const pl = st.plugin;
     if (pl && pl.state === 'scanning') {
       clearTimeout(fetchTimeout);   // plugin heeft het verzoek opgepikt
-      b.className = 'scanning';
-      // Plugin v0.1.2+ schrijft echte scanvoortgang (0..1) in status.json; oudere
-      // plugins niet — dan de oude tekstbanner zonder balk.
-      b.innerHTML = typeof pl.progress === 'number'
-        ? bannerProgress('hourglass', t('dumping'), pl.progress)
-        : bannerMsg('hourglass', t('dumping'));
+      // De plugin ververst status.json tijdens een scan minstens elke ~2s. Staat er
+      // "scanning" maar is het bestand 15s+ oud, dan is FM26 mid-scan gestopt/gecrasht:
+      // zonder deze check bleef de voortgangsbalk eeuwig staan.
+      if (typeof pl.mtime === 'number' && Date.now() - pl.mtime > 15000) {
+        b.className = 'scanning error';
+        b.innerHTML = bannerMsg('warning', t('scanStalled'));
+        b.onclick = () => { b.className = 'hidden'; };
+      } else {
+        b.className = 'scanning';
+        // Plugin v0.1.2+ schrijft echte scanvoortgang (0..1) in status.json; oudere
+        // plugins niet — dan de oude tekstbanner zonder balk.
+        b.innerHTML = typeof pl.progress === 'number'
+          ? bannerProgress('hourglass', t('dumping'), pl.progress)
+          : bannerMsg('hourglass', t('dumping'));
+      }
     }
     else if (pl && pl.state === 'error') {
+      clearTimeout(fetchTimeout); fetchPending = false;   // plugin hééft gereageerd; geen "pikt het niet op" eroverheen
       b.className = 'scanning error';
       b.innerHTML = bannerMsg('warning', t('dumpError') + (pl.error ? ': ' + pl.error : ''));
       b.onclick = null;
     }
     else if (pl && pl.state === 'done') {
-      if ((st.dumpTime && st.dumpTime !== lastDumpTime && lastDumpTime !== null) || lastPluginState === 'scanning') {
+      // Nieuwe dump herkennen langs drie routes: (1) dumpTime veranderd t.o.v. een eerder
+      // bekende dump, (2) we zagen de scan lopen, (3) een klik op "Nieuwe data" en er ligt
+      // een andere dump dan bij die klik — dekt snelle scans die tussen twee polls vallen
+      // én de allereerste dump op een verse installatie (lastDumpTime was toen nog null).
+      const fresh = (st.dumpTime && st.dumpTime !== lastDumpTime && lastDumpTime !== null)
+        || lastPluginState === 'scanning'
+        || (fetchPending && st.dumpTime && st.dumpTime !== fetchBaseDumpTime);
+      if (fresh) {
+        clearTimeout(fetchTimeout); fetchPending = false;
         // Nieuwe dump klaar → automatisch laden; de groene balk is alleen nog een
         // korte bevestiging (verdwijnt vanzelf), geen klik meer nodig.
         loadDump().then(ok => {
           if (!ok) return;   // laadfout: loadDump toont zelf het foutscherm en de foutbanner
           b.className = 'done';
-          b.innerHTML = bannerMsg('check', `${t('dumpLoaded')} (${pl.players.toLocaleString()} · ${pl.staff.toLocaleString()})`);
+          b.innerHTML = bannerMsg('check', `${t('dumpLoaded')} (${(pl.players ?? 0).toLocaleString()} · ${(pl.staff ?? 0).toLocaleString()})`);
           b.onclick = () => { b.className = 'hidden'; };
           setTimeout(() => { if (b.className === 'done') b.className = 'hidden'; }, 6000);
         });

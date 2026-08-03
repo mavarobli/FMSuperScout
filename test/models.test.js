@@ -43,6 +43,16 @@ test('parseMoney: eenheden en randgevallen (£)', () => {
   assert.equal(M.parseMoney('   '), null);
 });
 
+test('parseMoney: valuta terug naar interne GBP', () => {
+  const near = (a, b) => Math.abs(a - b) < 1;   // deling geeft floating-point-ruis
+  M.state.cur = '€';
+  assert.ok(near(M.parseMoney('1.16M'), 1_000_000), '€1,16M → £1M');
+  M.state.cur = '$';
+  assert.ok(near(M.parseMoney('1.35M'), 1_000_000), '$1,35M → £1M');
+  M.state.cur = '£';
+  assert.equal(M.parseMoney('1M'), 1_000_000);
+});
+
 // ---------- monthsUntil ----------
 test('monthsUntil: t.o.v. in-game datum', () => {
   assert.equal(M.monthsUntil(null), null);

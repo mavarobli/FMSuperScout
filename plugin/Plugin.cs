@@ -12,7 +12,7 @@ public class Plugin : BasePlugin
 {
     public const string Id = "com.mavarobli.fmsuperscout";
     public const string Name = "FMSuperScout";
-    public const string Version = "0.1.40";
+    public const string Version = "0.1.41";
 
     internal static new ManualLogSource Log;
 
@@ -60,14 +60,25 @@ public class Plugin : BasePlugin
                 // FM-start binnen een seconde opgepikt en vuurde een dump af tijdens het
                 // opstarten — vóór game_plugin.dll geladen is (issue #7). Ouder dan 2 minuten
                 // (of onleesbaar): weggooien zonder dump.
+                //
+                // Eerst valideren, dán pas verwijderen. De app schrijft de vlag niet-atomair
+                // (truncate + write): een poll-tick precies in dat venster las '' of een
+                // afgekapt getal, en verwijderde de klik vervolgens ongezien. Ziet de inhoud
+                // er mis uit terwijl het bestand kraakvers is, dan is het vrijwel zeker zo'n
+                // halve read → één tick later opnieuw proberen. Echt rot (oud) → opruimen.
                 string raw = System.IO.File.ReadAllText(RequestFile).Trim();
-                System.IO.File.Delete(RequestFile);
                 long nowMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 if (!long.TryParse(raw, out long flagMs) || nowMs - flagMs > 120_000)
                 {
+                    bool fresh = false;
+                    try { fresh = (System.DateTime.UtcNow - System.IO.File.GetLastWriteTimeUtc(RequestFile)).TotalSeconds < 10; }
+                    catch { }
+                    if (fresh) continue;   // waarschijnlijk mid-write gelezen; volgende tick klopt hij wel
+                    System.IO.File.Delete(RequestFile);
                     Log.LogWarning($"Verlopen/onleesbaar data-verzoek genegeerd (vlag: '{raw}').");
                     continue;
                 }
+                System.IO.File.Delete(RequestFile);
                 TryStartDump("web-app");
             }
             catch { /* volgende tick opnieuw */ }

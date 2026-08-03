@@ -75,7 +75,40 @@ disk, the game is not needed for viewing) and click Try again.
 Since v1.1.1 the plugin picks up app requests on its own background thread, and
 the app shows a hint after 15 seconds if the game does not respond. If that hint
 appears: check that a save is loaded, or press F9 in the game; a full FM26 restart
-fixes the rare case where the game session ignores hotkeys entirely.
+fixes the rare case where the game session ignores hotkeys entirely. If the hint
+keeps coming back on every attempt, even after a full restart, read 4d.
+
+## 4d. "FM26 is not picking up the request" on every single attempt
+
+If F9 and "New data" are both dead in every session, while everything worked
+before and nothing changed on your side, FM26 is probably restarting itself
+during launch and dropping the mod layer on the way.
+
+What happens: FM26 sometimes closes and relaunches itself while starting up (a
+known FM bug, you can see it when the black console window appears and then the
+game comes back without one). The mod loader marks the first process as handled;
+the relaunched process inherits that mark and the loader skips it (known Doorstop
+bug, [UnityDoorstop #34](https://github.com/NeighTools/UnityDoorstop/issues/34)).
+The game you actually play then has no plugin at all: F9 does nothing, no
+status.json appears, and requests from the app are never picked up.
+
+How to check: open `BepInEx\LogOutput.log` in your FM26 folder. That file is
+rewritten on every start where the mod layer runs. If its content is from an
+older session (yesterday's date, a session you already closed), the mod layer is
+not running in your current game.
+
+The fix: create a plain text file called `steam_appid.txt` in your FM26 folder,
+next to `fm.exe`, containing exactly this and nothing else:
+
+```
+3551340
+```
+
+That answers FM's "was I launched correctly?" check locally, so the game never
+relaunches itself and the mod layer stays in. Found by a user in
+[issue #7](https://github.com/mavarobli/FMSuperScout/issues/7), confirmed
+working. If F9 ever goes dead again, first check whether the close-and-relaunch
+pattern is back.
 
 ## 5. Game version
 

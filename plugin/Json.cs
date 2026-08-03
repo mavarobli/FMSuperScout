@@ -4,11 +4,12 @@ using System.Text;
 namespace FMSuperScout;
 
 /// <summary>Minimalistische, snelle JSON-writer (geen dependencies).</summary>
-public sealed class JsonWriter
+public sealed class JsonWriter : System.IDisposable
 {
     private readonly StreamWriter _w;
     private readonly StringBuilder _sb = new(1 << 16);
     private bool _needComma;
+    private bool _closed;
 
     public JsonWriter(string path)
     {
@@ -74,9 +75,21 @@ public sealed class JsonWriter
 
     public void Close()
     {
+        if (_closed) return;
+        _closed = true;
         _w.Write(_sb);
         _sb.Clear();
         _w.Flush();
         _w.Dispose();
+    }
+
+    // Vangnet bij een mid-write exception (volle schijf, AV-blokkade): zonder Dispose bleef
+    // de StreamWriter het .tmp-bestand vasthouden tot een willekeurige GC, waarna élke
+    // volgende dumppoging strandde op "file in use". Niets meer schrijven, alleen loslaten.
+    public void Dispose()
+    {
+        if (_closed) return;
+        _closed = true;
+        try { _w.Dispose(); } catch { }
     }
 }

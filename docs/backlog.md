@@ -86,6 +86,12 @@ write, version alignment). Deliberately deferred:
 13. **In-game date precision**: the "memory" date comes from the team schedule (next
     fixture), so it can run a few days ahead of the real calendar day. Fine for
     history dating (monotonic, stable); diagnostics now labels it "team-schema".
+14. **Language-independent nation ID (research)**: nation names in the dump are in FM's
+    interface language, so the EU/EEA filter and the FIFA art. 19 minor rule depend on a
+    hardcoded name list (now 9 languages, added 08-2026). The structural fix is dumping a
+    nation UID or an is-EU flag read from the nation object in memory — same kind of
+    discovery work as the gender bit (see item on women's football): find candidate
+    offsets via known nation pairs, validate across saves. Uncertain outcome, parked.
 
 ## 1. Full standalone installer (.exe) - BUILT (15-07); to be tested by mavarobli
 

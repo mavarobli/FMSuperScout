@@ -61,8 +61,12 @@ internal static class Dumper
             string errField = error == null ? "" : $",\"error\":\"{JsonEscape(error)}\"";
             string progField = progress < 0 ? "" :
                 ",\"progress\":" + System.Math.Clamp(progress, 0, 1).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
-            File.WriteAllText(Path.Combine(OutDir, "status.json"),
+            // tmp + move: WriteAllText trunceert ter plekke, waardoor de app een half
+            // statusbestand kon lezen (één gemiste poll-tick). Move op zelfde volume is atomair.
+            string sf = Path.Combine(OutDir, "status.json");
+            File.WriteAllText(sf + ".tmp",
                 $"{{\"state\":\"{state}\",\"players\":{players},\"staff\":{staff},\"at\":\"{DateTime.Now:s}\"{progField}{errField}}}");
+            File.Move(sf + ".tmp", sf, true);
         }
         catch { }
     }
@@ -70,8 +74,13 @@ internal static class Dumper
     // Foutstatus wegschrijven zodat de web-app niet eeuwig op "scanning" blijft hangen.
     public static void WriteError(string message) => WriteStatus("error", 0, 0, message);
 
-    private static string JsonEscape(string s) =>
-        (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", " ").Replace("\r", " ").Replace("\t", " ");
+    // Ook overige control-chars (< 0x20) neutraliseren: een exceptionmelding met zo'n teken
+    // maakte anders ongeldige status.json op precies het moment dat er een fout te tonen was.
+    private static string JsonEscape(string s)
+    {
+        s = (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+        return new string(s.Select(c => c < ' ' ? ' ' : c).ToArray());
+    }
 
     // 0xFFFFFFFF is FM's "niet ingesteld"-sentinel → onbekend (-1). Anders de waarde.
     private static long Money(uint v) => v == 0xFFFFFFFF ? -1 : v;
@@ -137,7 +146,7 @@ internal static class Dumper
         // een lock. De hoofdscan is veruit de langste fase → die krijgt 0..0.85 van de balk.
         ulong totalBytes = 0;
         foreach (var r in mem.ScanRegions) totalBytes += r.size;
-        long doneBytes = 0, lastProgMs = 0;
+        long doneBytes = 0, lastProgMs = 0, unreadBytes = 0;
         ulong modLo = mem.ModLo, modHi = mem.ModHi;   // snelle inline-afwijzing in de hotloop
         object progLock = new();
         var regions = mem.ScanRegions.Where(r => r.size >= 0x40).ToList();
@@ -171,9 +180,20 @@ internal static class Dumper
                         ulong chunkBase = start + scanned;
                         if (!mem.ReadBlock(chunkBase, buf, want))
                         {
-                            scanned += (ulong)want;
-                            Interlocked.Add(ref doneBytes, want);
-                            continue;
+                            // Eén onleesbare pagina mag geen 32 MB data kosten: probeer een
+                            // kleiner venster (1 MB). Lukt ook dat niet, tel het als onleesbaar —
+                            // die teller bepaalt straks of dit resultaat een bestaande dump mag
+                            // vervangen (een scan tijdens save-unload leest half geheugen en
+                            // leverde anders stilletjes een uitgedunde dump op).
+                            int fine = (int)System.Math.Min((ulong)(1 << 20), size - scanned);
+                            if (want <= fine || !mem.ReadBlock(chunkBase, buf, fine))
+                            {
+                                scanned += (ulong)fine;
+                                Interlocked.Add(ref doneBytes, fine);
+                                Interlocked.Add(ref unreadBytes, fine);
+                                continue;
+                            }
+                            want = fine;
                         }
                         for (int i = 0; i + 0x10 <= want; i += 8)
                         {
@@ -237,8 +257,12 @@ internal static class Dumper
                                 }
                             }
                         }
-                        scanned += (ulong)want;
-                        long done = Interlocked.Add(ref doneBytes, want);
+                        // 16 bytes overlappen met het volgende venster: een object dat precies op
+                        // de chunkgrens begint viel anders in géén van beide vensters (de lus eist
+                        // i+0x10 <= want). Dubbel gezien = onschuldig, de uid-checks ontdubbelen.
+                        int step = (ulong)want < size - scanned ? want - 16 : want;
+                        scanned += (ulong)step;
+                        long done = Interlocked.Add(ref doneBytes, step);
                         long now = sw.ElapsedMilliseconds;
                         if (now - Interlocked.Read(ref lastProgMs) >= 500 && totalBytes > 0 && Monitor.TryEnter(progLock))
                         {
@@ -456,6 +480,23 @@ internal static class Dumper
             Plugin.Log.LogError("0 spelers en 0 staf gevonden — dump niet weggeschreven, bestaande dump.json blijft staan.");
             WriteError("The scan found no players. Is your save fully loaded? If it is, FMSuperScout may need an update for this FM version.");
             return;
+        }
+        // Tweede vangnet: was een flink deel van het geheugen onleesbaar (save aan het
+        // laden/ontladen, geheugendruk), dan is dit resultaat vrijwel zeker uitgedund. Het
+        // haalt de 0-spelers-check hierboven niet, maar mag een bestaande, goede dump ook
+        // niet vervangen. Zonder bestaande dump: wél schrijven (iets > niets), met logregel.
+        double unreadFrac = totalBytes > 0 ? (double)Interlocked.Read(ref unreadBytes) / totalBytes : 0;
+        if (unreadFrac > 0.10)
+        {
+            int pct = (int)System.Math.Round(unreadFrac * 100);
+            Plugin.Log.LogWarning($"{pct}% van de scanregio's was onleesbaar ({players.Count} spelers gevonden).");
+            if (File.Exists(Path.Combine(OutDir, "dump.json")))
+            {
+                WriteDiag(mem, players, staff, offsetHist, candidates, sw.ElapsedMilliseconds);
+                Plugin.Log.LogError("Dump niet weggeschreven — bestaande dump.json blijft staan. Probeer opnieuw met volledig geladen save.");
+                WriteError($"The scan could not read {pct}% of FM's memory (was the game still loading?). Your existing data was kept, try again in a moment.");
+                return;
+            }
         }
         WriteStatus("scanning", players.Count, staff.Count, null, 0.90);
 
@@ -730,6 +771,7 @@ internal static class Dumper
     {
         var (year, doy) = DecodeFmDate(raw);
         if (year < 2000) return null; // contractdatums zijn 2025+; <2000 = sentinel/geen contract
+        if (doy > (DateTime.IsLeapYear(year) ? 366 : 365)) return null; // 366 in niet-schrikkeljaar rolde door naar 1 jan van het jaar erna
         try { return new DateTime(year, 1, 1).AddDays(doy - 1).ToString("yyyy-MM-dd"); }
         catch { return null; }
     }
@@ -813,7 +855,7 @@ internal static class Dumper
         // geladen worden (of de lezing botsen met het schrijven).
         string path = Path.Combine(OutDir, "dump.json");
         string tmp = path + ".tmp";
-        var j = new JsonWriter(tmp);
+        using var j = new JsonWriter(tmp);   // 'using': ook bij een schrijffout gaat de tmp-handle dicht
         j.BeginObj();
         j.Key("meta"); j.BeginObj();
         j.Prop("generated", DateTime.Now.ToString("s"));
@@ -847,22 +889,26 @@ internal static class Dumper
         if (players is ICollection<Person> pc) total += pc.Count;
         if (staff is ICollection<Person> sc) total += sc.Count;
 
+        int pcnt = players is ICollection<Person> pc2 ? pc2.Count : 0;
+        int scnt = staff is ICollection<Person> sc2 ? sc2.Count : 0;
         j.Key("players"); j.BeginArr();
-        foreach (var p in players) { WritePerson(j, p, true); WriteJsonProgress(++written, total); }
+        foreach (var p in players) { WritePerson(j, p, true); WriteJsonProgress(++written, total, pcnt, scnt); }
         j.EndArr();
 
         j.Key("staff"); j.BeginArr();
-        foreach (var p in staff) { WritePerson(j, p, false); WriteJsonProgress(++written, total); }
+        foreach (var p in staff) { WritePerson(j, p, false); WriteJsonProgress(++written, total, pcnt, scnt); }
         j.EndArr();
         j.EndObj();
         j.Close();
         File.Move(tmp, path, true);
     }
 
-    private static void WriteJsonProgress(int written, int total)
+    // Met de echte aantallen: de eerdere 0,0 liet de tellers in status.json terugflappen
+    // naar nul tijdens de schrijffase.
+    private static void WriteJsonProgress(int written, int total, int players, int staff)
     {
         if (total > 0 && written % 8192 == 0)
-            WriteStatus("scanning", 0, 0, null, 0.90 + 0.10 * written / total);
+            WriteStatus("scanning", players, staff, null, 0.90 + 0.10 * written / total);
     }
 
     private static void WritePerson(JsonWriter j, Person p, bool isPlayer)
