@@ -74,6 +74,15 @@ internal static class Dumper
     // Foutstatus wegschrijven zodat de web-app niet eeuwig op "scanning" blijft hangen.
     public static void WriteError(string message) => WriteStatus("error", 0, 0, message);
 
+    // De lopende scan; TryStartDump geeft via ReleaseScan() de geheugen-momentopname vrij
+    // zodra de dump klaar of gesneuveld is. Eén tegelijk, bewaakt door _dumpBusy.
+    private static MemScan CurrentScan;
+    internal static void ReleaseScan()
+    {
+        var m = CurrentScan; CurrentScan = null;
+        m?.ReleaseSnapshot();
+    }
+
     // Ook overige control-chars (< 0x20) neutraliseren: een exceptionmelding met zo'n teken
     // maakte anders ongeldige status.json op precies het moment dat er een fout te tonen was.
     private static string JsonEscape(string s)
@@ -110,6 +119,13 @@ internal static class Dumper
         void Phase(string name) { long now = sw.ElapsedMilliseconds; PhaseLog.Add($"{name}: {now - tPrev} ms"); tPrev = now; }
 
         var mem = new MemScan();
+        // Bijgehouden zodat TryStartDump's finally de VA-kloon op élk pad vrijgeeft
+        // (ook bij een exception mid-scan) — zolang de kloon leeft, kost elke door FM
+        // gewijzigde pagina een copy-on-write-kopie.
+        CurrentScan = mem;
+        Plugin.Log.LogInfo(mem.Snapshotted
+            ? "Scan leest uit een bevroren geheugen-momentopname (VA-kloon)."
+            : $"Geen snapshot beschikbaar ({mem.SnapshotError ?? "onbekend"}) — scan leest live geheugen (zoals vóór 0.1.42).");
         Phase("MemScan-ctor (image-reads)");
         if (mem.GaBase == 0)
         {
@@ -978,7 +994,7 @@ internal static class Dumper
             string path = Path.Combine(OutDir, "diagnostics.txt");
             using var w = new StreamWriter(path, false);
             w.WriteLine($"FMSuperScout diagnostics — {DateTime.Now}");
-            w.WriteLine($"Scanregio's: {m.ScanRegions.Count}");
+            w.WriteLine($"Scanregio's: {m.ScanRegions.Count}  ·  snapshot (VA-kloon): {(m.Snapshotted ? "ja" : $"nee, live gelezen ({m.SnapshotError ?? "onbekend"})")}");
             w.WriteLine($"GameAssembly.dll: {m.GaBase:X}-{m.GaEnd:X}");
             w.WriteLine($"game_plugin.dll:  {m.GpBase:X}-{m.GpEnd:X}");
             w.WriteLine($"Kandidaten: {candidates:N0}  (vtable in game_plugin: {VtGp:N0})");

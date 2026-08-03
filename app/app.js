@@ -39,7 +39,7 @@ try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.r
 // $: xe.com-koers uit diezelfde periode; verifieer tegen FM's eigen USD-weergave.
 const CUR_RATE = { '£': 1, '€': 1.16, '$': 1.35 };
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -733,7 +733,12 @@ function clubLabel(p) {
   // Transfervrij: streepje met tooltip (de status-pill "clubloos" vertelt het al).
   return `<span class="dim" data-help="clubless">–</span>`;
 }
+// Gememoiseerd per speler (_ev); zie metaScore. Consumers lezen het object alleen.
 function estValue(p) {
+  if (p._ev !== undefined) return p._ev;
+  return p._ev = estValueCalc(p);
+}
+function estValueCalc(p) {
   if (p.value != null && p.value > 0) return { v: p.value, est: false, lo: Math.round(p.value * 0.85), hi: Math.round(p.value * 1.15) };
   if (!p.ca || p.ca < 1) return { v: null, est: false };
   if (isFree(p)) return { v: 0, est: true };
@@ -832,7 +837,12 @@ function feeMultiplier(p) {
 
   return Math.min(p.notForSale ? 2.2 : 1.7, Math.max(0.4, f));
 }
+// Gememoiseerd per speler (_fee); zie metaScore.
 function feeEstimate(p) {
+  if (p._fee !== undefined) return p._fee;
+  return p._fee = feeEstimateCalc(p);
+}
+function feeEstimateCalc(p) {
   const ev = estValue(p);
   if (ev.v == null) return { v: null };
   if (ev.v === 0) return { v: 0 };
@@ -865,7 +875,14 @@ function myWageCeiling() {
   return state._wageCeil;
 }
 // Logistische kans (0-100) dat een speler een overstap naar mijn club ziet zitten.
+// Gememoiseerd per speler (_int); het label bevat vertaalde tekst, dus de cache is
+// gestempeld met de taal en wordt bij een taalwissel per speler opnieuw berekend.
 function interestEstimate(p) {
+  if (p._int !== undefined && p._intL === state.lang) return p._int;
+  p._intL = state.lang;
+  return p._int = interestEstimateCalc(p);
+}
+function interestEstimateCalc(p) {
   const myRep = state.meta.myClubRep || 0;
   if (!myRep) return null;
   if (p.club && (p.club || '').toLowerCase() === (state.meta.myClub || '').toLowerCase()) return null; // eigen speler
@@ -1138,14 +1155,18 @@ const META_W = {
   Strength: 1.9, FirstTouch: 1.5, Composure: 1.2, WorkRate: 1.1, Finishing: 1.1, Flair: 1.1,
   LongShots: 1.0, Aggression: 1.0, Heading: 0.6, OffTheBall: 0.5,
 };
+// Per speler gememoiseerd (_meta): de invoer verandert alleen bij een nieuwe dump, en dan
+// zijn het verse objecten. Zonder cache werd dit bij sorteren/filteren op Meta voor élke
+// rij per toetsaanslag herberekend.
 function metaScore(p) {
-  if (!p.attrs || (p.posArr || []).includes('GK')) return null;
+  if (p._meta !== undefined) return p._meta;
+  if (!p.attrs || (p.posArr || []).includes('GK')) return p._meta = null;
   let sum = 0, w = 0;
   for (const k in META_W) {
     const v = p.attrs[k];
     if (v != null) { sum += v * META_W[k]; w += META_W[k]; }
   }
-  return w ? sum / w : null;
+  return p._meta = w ? sum / w : null;
 }
 function metaHtml(p) {
   const s = metaScore(p);
@@ -1346,6 +1367,10 @@ async function loadDump(force = false) {
     state.meta = data.meta || {};
     state._wageCeil = undefined;   // loonplafond opnieuw berekenen voor deze dump
     state._clubWages = null;       // loonrang-cache (vraagprijs) opnieuw opbouwen
+    state._nowTs = undefined;      // "nu"-tijdstip volgt de nieuwe in-game datum (monthsUntil)
+    _expTsCache.clear();           // contractdatum → timestamp-cache leegmaken
+    // Per-speler memo's (_meta/_ev/_fee/_int/_q) hoeven niet gewist: de parser levert
+    // verse objecten, de oude nemen hun cache mee het geheugen uit.
     // Peiljaar (voor leeftijdsberekening) automatisch uit de in-game datum; geen UI-veld meer.
     if (state.meta.gameDate) {
       const g = parseGameDate(state.meta.gameDate);
@@ -1365,6 +1390,7 @@ async function loadDump(force = false) {
     buildStaffRoles();
     buildFootOptions();
     buildDivisions();   // divisiefilter vullen zodra er dump-data met divisies is
+    renderTable();      // nieuwe dump kan de kolomset raken (bv. groei-kolom)
     applyFilters();
     // Historie komt ná de eerste render binnen: de lijst hoeft er niet op te wachten.
     // Trends bijwerken en daarna pas de groeidata ophalen: de momentopname van déze dump
@@ -1651,11 +1677,16 @@ const parseMoney = s => {
   v /= CUR_RATE[state.cur] || 1;   // invoer in gekozen valuta → intern GBP
   return isNaN(v) ? null : v;
 };
+// Contractdatums clusteren op een handvol unieke waarden (30-06, 31-12 per jaar), dus een
+// klein Map'je vervangt honderdduizenden Date-allocaties per filterslag. "Nu" is per dump
+// constant (state._nowTs, gewist in loadDump).
+const _expTsCache = new Map();
 function monthsUntil(expires) {
   if (!expires) return null;
-  const exp = new Date(expires);
-  if (isNaN(exp)) return null;
-  return (exp - gameNow()) / (1000 * 60 * 60 * 24 * 30.44);
+  let ts = _expTsCache.get(expires);
+  if (ts === undefined) { ts = +new Date(expires); _expTsCache.set(expires, ts); }
+  if (isNaN(ts)) return null;
+  return (ts - (state._nowTs ??= +gameNow())) / (1000 * 60 * 60 * 24 * 30.44);
 }
 
 function applyFilters() {
@@ -1694,7 +1725,10 @@ function applyFilters() {
   state.filtered = rows.filter(p => {
     if (!p.name || !p.name.trim() || p.name.trim() === '?') return false;   // naamloze stubs verbergen
       if (onlySl && !state.shortlist.has(p.id)) return false;
-    if (name && !((p.name || '').toLowerCase().includes(name) || (p.club || '').toLowerCase().includes(name))) return false;
+    // Zoek-haystack per speler cachen: 2 toLowerCase-allocaties per rij per toetsaanslag
+    // wordt één .includes op een vaste string. Een NUL-teken (\u0000) als scheiding kan nooit in de
+    // zoekterm zitten, dus de matchsemantiek (naam óf club bevat de term) is identiek.
+    if (name && !(p._q ??= ((p.name || '') + '\u0000' + (p.club || '')).toLowerCase()).includes(name)) return false;
     const age = getAge(p);
     if (age < ageMin || age > ageMax) return false;
     if ((p.ca ?? 0) < caMin || (p.ca ?? 0) > caMax) return false;
@@ -1753,7 +1787,10 @@ function applyFilters() {
   sortRows();
   renderChips(buildChips());
   updateSecDots();
-  renderTable();
+  // Alleen de rijen; de kolomkoppen hangen niet van filters af. Aanroepers die de
+  // kolomset wél veranderen (modus, taal, verborgen stats, nieuwe dump) doen zelf
+  // renderTable() — een volledige headerrebuild + hermeting per toetsaanslag was zonde.
+  renderVisible();
 }
 
 // Stip op de sectiekop zodra er binnen die sectie een filter actief is; zo zie je ook
@@ -2238,10 +2275,21 @@ function renderVisible() {
     };
   });
 }
+let lastScrollRow = -1;
 $('table-wrap').addEventListener('scroll', () => {
   if (renderQueued) return;
   renderQueued = true;
-  requestAnimationFrame(() => { renderQueued = false; renderVisible(); });
+  requestAnimationFrame(() => {
+    renderQueued = false;
+    // Horizontaal scrollen en verticale deltas binnen dezelfde rij verschuiven het
+    // zichtbare rijvenster niet — dan is opnieuw renderen (50 rijen innerHTML +
+    // handlers per frame) verspilling. Andere aanroepers van renderVisible (filters,
+    // shortlist, valuta) blijven onvoorwaardelijk tekenen.
+    const row = Math.floor($('table-wrap').scrollTop / ROW_H);
+    if (row === lastScrollRow) return;
+    lastScrollRow = row;
+    renderVisible();
+  });
 });
 
 // ---------- klembord / toast ----------
@@ -3517,7 +3565,7 @@ function applyHideCapa() {
   if (hiddenStatCol(state.sortKey)) { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
   updateAdvBtn();   // regels op verborgen data tellen niet mee zolang de toggle uit staat
   renderDevSection(); renderIntakeBar();
-  if (state.mode === 'analysis') renderAnalysis(); else applyFilters();
+  if (state.mode === 'analysis') renderAnalysis(); else { renderTable(); applyFilters(); }
   if (state.selected) showDetail(state.selected);
 }
 $('set-profile').value = profMode();
@@ -3614,6 +3662,7 @@ function applyLang() {
   renderDevSection();
   renderIntakeBar();
   renderPresets();
+  renderTable();   // kolomkoppen zijn vertaald → header opnieuw opbouwen
   applyFilters();
   if (state.selected) showDetail(state.selected);
 }
@@ -3653,6 +3702,7 @@ function setMode(mode) {
   $('table-wrap').style.display = '';
   $('analysis').classList.add('hidden');
   if (!activeCols().find(c => c.key === state.sortKey)) { state.sortKey = 'ca'; state.sortDir = -1; }
+  renderTable();   // andere modus = andere kolomset
   applyFilters();
 }
 $('tab-players').onclick = () => setMode('players');

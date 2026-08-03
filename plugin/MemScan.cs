@@ -28,14 +28,27 @@ internal sealed class MemScan
     }
 
     [DllImport("kernel32.dll")]
-    private static extern ulong VirtualQuery(ulong lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, ulong dwLength);
+    private static extern ulong VirtualQueryEx(nint hProcess, ulong lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, ulong dwLength);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern nint GetCurrentProcess();
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(nint hObject);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool ReadProcessMemory(nint hProcess, ulong lpBaseAddress,
         byte[] lpBuffer, nuint nSize, out nuint lpNumberOfBytesRead);
+
+    // Process Snapshotting API (Win 8.1+): copy-on-write kloon van de eigen adresruimte.
+    [DllImport("kernel32.dll")]
+    private static extern uint PssCaptureSnapshot(nint processHandle, uint captureFlags, uint threadContextFlags, out nint snapshotHandle);
+    [DllImport("kernel32.dll")]
+    private static extern uint PssQuerySnapshot(nint snapshotHandle, uint informationClass, out nint buffer, uint bufferLength);
+    [DllImport("kernel32.dll")]
+    private static extern uint PssFreeSnapshot(nint processHandle, nint snapshotHandle);
+    private const uint PSS_CAPTURE_VA_CLONE = 0x00000001;
+    private const uint PSS_QUERY_VA_CLONE_INFORMATION = 1;
 
     private const uint MEM_COMMIT = 0x1000;
     private const uint MEM_PRIVATE = 0x20000;
@@ -48,7 +61,14 @@ internal sealed class MemScan
     private const uint PAGE_GUARD = 0x100;
     private const uint PAGE_NOACCESS = 0x01;
 
-    private readonly nint _proc = GetCurrentProcess();
+    // Leesbron: bij voorkeur een VA-kloon (bevroren copy-on-write-momentopname van de hele
+    // adresruimte, gemaakt in ~1 ms). Alles wat FM daarna vrijgeeft of herschrijft blijft in
+    // de kloon gewoon leesbaar, dus de scan is een consistent point-in-time-beeld in plaats
+    // van een 10-30s uitgesmeerde opname van een levend proces. Lukt de snapshot niet
+    // (oudere Windows, rechten), dan valt alles terug op live lezen zoals voorheen.
+    private nint _proc = GetCurrentProcess();
+    private nint _snap, _vaClone;
+    public bool Snapshotted { get; private set; }
 
     // Regio's om te scannen naar person-objecten: private + committed + read-write (de GC-heap).
     public readonly List<(ulong start, ulong size)> ScanRegions = new();
@@ -68,10 +88,58 @@ internal sealed class MemScan
 
     public MemScan()
     {
+        TrySnapshot();      // zet _proc op de kloon; regio's en reads gaan dan uit de momentopname
         BuildRegions();
-        FindModules();
+        FindModules();      // moduleadressen zijn identiek in de kloon
         _gp = ReadImage(GpBase, GpEnd);
         _ga = ReadImage(GaBase, GaEnd);
+    }
+
+    /// <summary>Waarom de snapshot niet lukte (leeg = wél gelukt). Gaat mee in de log en diagnostics.</summary>
+    public string SnapshotError { get; private set; }
+
+    private void TrySnapshot()
+    {
+        try
+        {
+            uint rc = PssCaptureSnapshot(GetCurrentProcess(), PSS_CAPTURE_VA_CLONE, 0, out _snap);
+            if (rc != 0)
+            {
+                // Win32-code meelogen: 8 = ONOUGH_MEMORY, 1455 = COMMITMENT_LIMIT, 5 = ACCESS_DENIED.
+                // Zonder deze code is een mislukte snapshot in het veld niet te diagnosticeren.
+                SnapshotError = $"PssCaptureSnapshot faalde (Win32 {rc}: {new System.ComponentModel.Win32Exception((int)rc).Message})";
+                _snap = 0;
+                return;
+            }
+            if (PssQuerySnapshot(_snap, PSS_QUERY_VA_CLONE_INFORMATION, out nint clone, (uint)IntPtr.Size) is uint qrc && (qrc != 0 || clone == 0))
+            {
+                SnapshotError = $"PssQuerySnapshot faalde (Win32 {qrc})";
+                PssFreeSnapshot(GetCurrentProcess(), _snap); _snap = 0;
+                return;
+            }
+            _vaClone = clone;
+            _proc = clone;
+            Snapshotted = true;
+        }
+        catch (System.Exception e)
+        {
+            SnapshotError = "uitzondering: " + e.Message;   // fallback: live lezen, zoals vóór 0.1.42
+        }
+    }
+
+    /// <summary>
+    /// Kloon vrijgeven zodra de scan klaar is: zolang hij leeft kost elke pagina die FM
+    /// wijzigt een copy-on-write-kopie. Reads vallen daarna terug op het live proces,
+    /// zodat een nakomende lezer nooit tegen een dichte handle aanloopt.
+    /// </summary>
+    public void ReleaseSnapshot()
+    {
+        if (!Snapshotted) return;
+        Snapshotted = false;
+        _proc = GetCurrentProcess();
+        try { CloseHandle(_vaClone); } catch { }
+        try { PssFreeSnapshot(GetCurrentProcess(), _snap); } catch { }
+        _vaClone = 0; _snap = 0;
     }
 
     private byte[] ReadImage(ulong start, ulong end)
@@ -132,7 +200,7 @@ internal sealed class MemScan
         int guard = 0;
         while (addr < max && guard++ < 2_000_000)
         {
-            if (VirtualQuery(addr, out var mbi, (ulong)Marshal.SizeOf<MEMORY_BASIC_INFORMATION>()) == 0)
+            if (VirtualQueryEx(_proc, addr, out var mbi, (ulong)Marshal.SizeOf<MEMORY_BASIC_INFORMATION>()) == 0)
                 break;
             if (mbi.RegionSize == 0) break;
             if (IsScannable(mbi) && mbi.RegionSize <= 512UL * 1024 * 1024)

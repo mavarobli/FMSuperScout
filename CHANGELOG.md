@@ -5,6 +5,38 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-03
+
+Plugin: v0.1.42. One fundamental change and one performance pass, both aimed at the same
+goal: trustworthy data, snappy app.
+
+### Changed
+- Performance: derived per-player values (meta score, estimated value, asking price,
+  interest, contract months, the name/club search string) are now computed once per dump
+  instead of for every row on every keystroke. Measured on a 51k-player dump: a full
+  meta pass dropped from 22 ms to 2 ms, sorting on meta or value from 73 ms to ~44 ms,
+  and typing while filtered stays allocation-free. At 300k players the difference is
+  hundreds of milliseconds per keystroke. Results are byte-identical; caches die with
+  the dump they belong to.
+- Performance: scrolling skips the re-render entirely when the visible row window has
+  not moved (horizontal scrolls, sub-row wheel deltas), and typing no longer rebuilds
+  the table header on every keystroke (mode, language and column changes still do).
+- The scan now reads from a frozen point-in-time snapshot of FM's memory (a copy-on-write
+  VA clone, captured in about a millisecond) instead of from the live, running process.
+  This removes the root cause behind the whole "partially readable scan" class of
+  problems: on big saves a 15-30 second scan raced against FM freeing memory, which
+  produced shrunken dumps in the past and false "could not read X% of FM's memory"
+  refusals in 1.4.0 (reported on the forum right after release). Everything FM frees or
+  rewrites during the scan stays readable in the snapshot, so the scan is now a
+  consistent picture of one moment. The 10% guard from 1.4.0 stays as a backstop, but
+  should no longer fire on a loaded save. If the snapshot cannot be made (old Windows,
+  restricted rights), the plugin logs it with the exact Windows error code and falls
+  back to live reading as before, still protected by the 1.4.0 guards; diagnostics.txt
+  states which mode was used. Honest trade-off: reading from the frozen snapshot is
+  slower, measured ~12.6s versus ~8s for the scan phase on a 51k-player save. That is
+  the price of a scan that cannot be corrupted by the game running underneath it, and it
+  only affects the F9/New data action, never the app itself.
+
 ## [1.4.0] - 2026-08-03
 
 Plugin: v0.1.41. Two themes: stability (the whole "works on my machine, buggy on yours"

@@ -12,7 +12,7 @@ public class Plugin : BasePlugin
 {
     public const string Id = "com.mavarobli.fmsuperscout";
     public const string Name = "FMSuperScout";
-    public const string Version = "0.1.41";
+    public const string Version = "0.1.42";
 
     internal static new ManualLogSource Log;
 
@@ -100,7 +100,11 @@ public class Plugin : BasePlugin
                 Log.LogError($"Dump mislukt: {e}");
                 Dumper.WriteError("Dump mislukt: " + e.Message);   // web-app toont dit i.p.v. eeuwig "scanning"
             }
-            finally { System.Threading.Interlocked.Exchange(ref _dumpBusy, 0); }
+            finally
+            {
+                Dumper.ReleaseScan();   // geheugen-momentopname altijd vrijgeven, ook na een fout
+                System.Threading.Interlocked.Exchange(ref _dumpBusy, 0);
+            }
         });
     }
 }
