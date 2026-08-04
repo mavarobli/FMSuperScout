@@ -27,7 +27,9 @@ function stub() {
 }
 
 function loadApp() {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'app', 'app.js'), 'utf8');
+  // nations.js gaat vóór app.js, net als de <script>-volgorde in index.html.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'app', 'nations.js'), 'utf8') + '\n'
+    + fs.readFileSync(path.join(__dirname, '..', 'app', 'app.js'), 'utf8');
   const el = () => stub();
   const documentStub = {
     getElementById: el, createElement: el, querySelector: el,
@@ -52,6 +54,7 @@ function loadApp() {
     'parseMoney', 'monthsUntil', 'getAge', 'gameNow', 'isEu', 'isFree', 'wSat', 'bestRoles',
     'rolesForPos', 'physGrowthFactor', 'mentalGrowthFactor', 'state', 'ROLE_BY_ID', 'ROLES',
     'I18N', 'ATTR_LABEL', 'ROLE_LABEL', 'CARDL', 'metaScore', 'metaPaScore',
+    'NATIONS', 'JOB_LABEL', 'natsLabel', 'jobLabel', 'fmtWage', 'wageFactor',
   ];
   const body = src + '\n;return {' + exposed.map(n => `${n}: typeof ${n} !== 'undefined' ? ${n} : undefined`).join(',') + '};';
   const factory = new Function(

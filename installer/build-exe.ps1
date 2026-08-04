@@ -36,7 +36,7 @@ $bepx = Join-Path $stage 'bepinex'
 New-Item -ItemType Directory -Force -Path "$viewer\app", $bepx | Out-Null
 
 # 1) Viewer: alleen wat de tool nodig heeft
-foreach ($f in @('server.js', 'index.html', 'app.js', 'style.css', 'logo.svg')) {
+foreach ($f in @('server.js', 'index.html', 'app.js', 'nations.js', 'style.css', 'logo.svg')) {
   Copy-Item (Join-Path $repo "app\$f") -Destination "$viewer\app" -Force
 }
 foreach ($f in @('FMSuperScout.vbs', 'icon.ico')) {

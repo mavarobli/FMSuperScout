@@ -9,6 +9,7 @@ const state = {
   sortKey: 'ca', sortDir: -1,
   selected: null,
   cur: localStorage.getItem('fmss_cur') || '£',
+  wagePer: localStorage.getItem('fmss_wageper') || 'w',   // salarisweergave: w(eek)/m(aand)/j(aar)
   lang: ['nl', 'en'].includes(localStorage.getItem('fmss_lang')) ? localStorage.getItem('fmss_lang') : 'nl',
   showPot: false,
   myTeam: 'all',   // teamchip bij "Mijn club": all | first | res | youth
@@ -60,7 +61,7 @@ const I18N = {
     supporterThanks: 'Dank je wel! Je hoort er niets meer over.',
     donateCta: '☕ Trakteer', donateLater: 'Later',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
-    age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon p/w',
+    age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon',
     esSetupTitle: 'Start Football Manager 26 eerst een keer',
     esSetupBody: 'De eerste start na de installatie duurt 1 tot 3 minuten langer en toont een zwart consolevenster. Dat hoort zo: de mod-laag bouwt eenmalig zijn bestanden. Laat het venster open staan, ook als FM lijkt te hangen.',
     esSetupHint: 'Daarna laad je je save en druk je op F9. De volgende keren start FM gewoon weer normaal.',
@@ -91,7 +92,7 @@ const I18N = {
     onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: 'Nieuwe data',
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
-    c_value: 'Waarde', c_fee: 'Vraagprijs', c_wage: 'Salaris p/w', c_expires: 'Contract tot', c_interest: 'Interesse',
+    c_value: 'Waarde', c_fee: 'Vraagprijs', c_wage: 'Salaris', c_expires: 'Contract tot', c_interest: 'Interesse',
     c_status: 'Status', c_role: 'Rol', foot: 'Voet', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Lengte', repLabel: 'Reputatie',
     c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.', c_div: 'Divisie',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
@@ -160,6 +161,8 @@ const I18N = {
     presetEmptyFilters: 'Geen actieve filters om op te slaan',
     presetSaveTitle: 'Filters opslaan', presetDelTitle: 'Filter verwijderen',
     saveBtn: 'Opslaan', deleteBtn: 'Verwijderen', cancelBtn: 'Annuleren',
+    wagePer: 'Salaris per', perWeek: 'week', perMonth: 'maand', perYear: 'jaar',
+    perWeekSuf: 'p/w', perMonthSuf: 'p/mnd', perYearSuf: 'p/jr', jobStaff: 'Staflid',
     c_meta: 'Meta', metaLabel: 'Meta-score', c_metapa: 'PA-meta',
     metaHint: 'Gewogen gemiddelde (1-20) van de attributen die volgens FM-Arena\'s match-engine-tests wedstrijden winnen; Snelheid en Versnelling tellen veruit het zwaarst. Keepers: eigen weging uit de keeperstest (Reflexen, Behendigheid).\n\n15+ elite, 13-15 sterk, 11-13 degelijk. Bij gelijke CA presteert de hoogste Meta meestal beter.',
     metaPaHint: 'Dezelfde meta-weging, toegepast op de attributen die hij op zijn potentieel (PA) naar verwachting haalt. Projectie volgt het groeiprofiel van zijn positiegroep; fysieke groei stopt na 23.\n\nUitontwikkeld = gelijk aan Meta. Sorteer hierop voor de meta-toppers van morgen.',
@@ -182,7 +185,7 @@ const I18N = {
     supporterThanks: 'Thank you! You won\'t hear about this again.',
     donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
-    age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage p/w',
+    age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage',
     esSetupTitle: 'Start Football Manager 26 once first',
     esSetupBody: 'The first launch after installing takes 1 to 3 minutes longer and shows a black console window. That is normal: the mod layer builds its files once. Leave the window open, even if FM looks stuck.',
     esSetupHint: 'After that, load your save and press F9. Later launches are back to normal speed.',
@@ -213,7 +216,7 @@ const I18N = {
     onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: 'New data',
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
-    c_value: 'Value', c_fee: 'Asking price', c_wage: 'Wage p/w', c_expires: 'Contract until', c_interest: 'Interest',
+    c_value: 'Value', c_fee: 'Asking price', c_wage: 'Wage', c_expires: 'Contract until', c_interest: 'Interest',
     c_status: 'Status', c_role: 'Role', foot: 'Foot', footR: 'Right', footL: 'Left', footB: 'Both', height: 'Height', repLabel: 'Reputation',
     c_clubrep: 'Club rep', c_worldrep: 'World rep', c_div: 'Division',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
@@ -282,6 +285,8 @@ const I18N = {
     presetEmptyFilters: 'No active filters to save',
     presetSaveTitle: 'Save filters', presetDelTitle: 'Delete filter',
     saveBtn: 'Save', deleteBtn: 'Delete', cancelBtn: 'Cancel',
+    wagePer: 'Wage per', perWeek: 'week', perMonth: 'month', perYear: 'year',
+    perWeekSuf: '/wk', perMonthSuf: '/mo', perYearSuf: '/yr', jobStaff: 'Staff member',
     c_meta: 'Meta', metaLabel: 'Meta score', c_metapa: 'PA meta',
     metaHint: 'Weighted average (1-20) of the attributes that win matches according to FM-Arena\'s match-engine tests; Pace and Acceleration count heaviest by far. Goalkeepers: own weighting from the keeper test (Reflexes, Agility).\n\n15+ elite, 13-15 strong, 11-13 decent. At equal CA the higher Meta usually performs better.',
     metaPaHint: 'The same meta weighting, applied to the attributes he is expected to reach at his potential (PA). The projection follows his position group\'s growth profile; physical growth stops after 23.\n\nFully developed = same as Meta. Sort on this for tomorrow\'s meta stars.',
@@ -304,7 +309,7 @@ const I18N = {
     supporterThanks: 'Merci ! Vous n\'en entendrez plus parler.',
     donateCta: '☕ Offrir un café', donateLater: 'Plus tard',
     position: 'Poste', clear: 'effacer', staffrole: 'Rôle du staff', quality: 'Qualité et âge',
-    age: 'Âge', financial: 'Finances', maxvalue: 'Valeur max.', maxfee: 'Prix demandé max.', maxwage: 'Salaire max. /sem',
+    age: 'Âge', financial: 'Finances', maxvalue: 'Valeur max.', maxfee: 'Prix demandé max.', maxwage: 'Salaire max.',
     esSetupTitle: 'Lancez d\'abord Football Manager 26 une fois',
     esSetupBody: 'Le premier lancement après l\'installation prend 1 à 3 minutes de plus et affiche une console noire. C\'est normal : la couche de mods génère ses fichiers une seule fois. Laissez la fenêtre ouverte, même si FM semble figé.',
     esSetupHint: 'Ensuite chargez votre sauvegarde et appuyez sur F9. Les lancements suivants seront normaux.',
@@ -335,7 +340,7 @@ const I18N = {
     onlyshortlist: 'Shortlist uniquement', clearfilters: 'Effacer les filtres', fetch: 'Nouvelles données',
     nodata: 'Aucune donnée chargée', exportcsv: 'Exporter la shortlist (CSV)',
     results: 'résultats', c_name: 'Nom', c_age: 'Âge', c_pos: 'Poste', c_club: 'Club', c_nat: 'Nat',
-    c_value: 'Valeur', c_fee: 'Prix demandé', c_wage: 'Salaire /sem', c_expires: 'Contrat jusqu\'au', c_interest: 'Intérêt',
+    c_value: 'Valeur', c_fee: 'Prix demandé', c_wage: 'Salaire', c_expires: 'Contrat jusqu\'au', c_interest: 'Intérêt',
     c_status: 'Statut', c_role: 'Rôle', foot: 'Pied', footR: 'Droit', footL: 'Gauche', footB: 'Les deux', height: 'Taille', repLabel: 'Réputation',
     c_clubrep: 'Rép. club', c_worldrep: 'Rép. mondiale', c_div: 'Division',
     estval: 'Valeur est.', wageLabel: 'Salaire', contractLabel: 'Contrat jusqu\'au', free_l: 'libre',
@@ -404,6 +409,8 @@ const I18N = {
     presetEmptyFilters: 'Aucun filtre actif à enregistrer',
     presetSaveTitle: 'Enregistrer les filtres', presetDelTitle: 'Supprimer le filtre',
     saveBtn: 'Enregistrer', deleteBtn: 'Supprimer', cancelBtn: 'Annuler',
+    wagePer: 'Salaire par', perWeek: 'semaine', perMonth: 'mois', perYear: 'an',
+    perWeekSuf: '/sem', perMonthSuf: '/mois', perYearSuf: '/an', jobStaff: 'Membre du staff',
     c_meta: 'Méta', metaLabel: 'Score méta', c_metapa: 'Méta PA',
     metaHint: 'Moyenne pondérée (1-20) des attributs qui gagnent des matchs selon les tests du moteur de FM-Arena ; Vitesse et Accélération pèsent de loin le plus lourd. Gardiens : pondération propre issue du test des gardiens (Réflexes, Agilité).\n\n15+ élite, 13-15 fort, 11-13 correct. À CA égale, le Méta le plus haut performe en général mieux.',
     metaPaHint: 'La même pondération méta, appliquée aux attributs qu\'il devrait atteindre à son potentiel (PA). La projection suit le profil de progression de son groupe de postes ; le physique cesse de progresser après 23 ans.\n\nJoueur abouti = identique au Méta. Triez dessus pour trouver les stars méta de demain.',
@@ -426,7 +433,7 @@ const I18N = {
     supporterThanks: 'Danke! Du hörst nichts mehr davon.',
     donateCta: '☕ Kaffee spendieren', donateLater: 'Später',
     position: 'Position', clear: 'leeren', staffrole: 'Mitarbeiterrolle', quality: 'Qualität & Alter',
-    age: 'Alter', financial: 'Finanzen', maxvalue: 'Max. Wert', maxfee: 'Max. Forderung', maxwage: 'Max. Gehalt /Wo',
+    age: 'Alter', financial: 'Finanzen', maxvalue: 'Max. Wert', maxfee: 'Max. Forderung', maxwage: 'Max. Gehalt',
     esSetupTitle: 'Starte Football Manager 26 zuerst einmal',
     esSetupBody: 'Der erste Start nach der Installation dauert 1 bis 3 Minuten länger und zeigt ein schwarzes Konsolenfenster. Das ist normal: Die Mod-Ebene erzeugt einmalig ihre Dateien. Fenster offen lassen, auch wenn FM zu hängen scheint.',
     esSetupHint: 'Danach Spielstand laden und F9 drücken. Die nächsten Starts laufen wieder normal.',
@@ -457,7 +464,7 @@ const I18N = {
     onlyshortlist: 'Nur Shortlist', clearfilters: 'Filter leeren', fetch: 'Neue Daten',
     nodata: 'Noch keine Daten geladen', exportcsv: 'Shortlist exportieren (CSV)',
     results: 'Treffer', c_name: 'Name', c_age: 'Alter', c_pos: 'Position', c_club: 'Verein', c_nat: 'Nat',
-    c_value: 'Wert', c_fee: 'Forderung', c_wage: 'Gehalt /Wo', c_expires: 'Vertrag bis', c_interest: 'Interesse',
+    c_value: 'Wert', c_fee: 'Forderung', c_wage: 'Gehalt', c_expires: 'Vertrag bis', c_interest: 'Interesse',
     c_status: 'Status', c_role: 'Rolle', foot: 'Fuß', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Größe', repLabel: 'Reputation',
     c_clubrep: 'Vereinsrep.', c_worldrep: 'Weltrep.', c_div: 'Liga',
     estval: 'Gesch. Wert', wageLabel: 'Gehalt', contractLabel: 'Vertrag bis', free_l: 'ablösefrei',
@@ -526,6 +533,8 @@ const I18N = {
     presetEmptyFilters: 'Keine aktiven Filter zum Speichern',
     presetSaveTitle: 'Filter speichern', presetDelTitle: 'Filter löschen',
     saveBtn: 'Speichern', deleteBtn: 'Löschen', cancelBtn: 'Abbrechen',
+    wagePer: 'Gehalt pro', perWeek: 'Woche', perMonth: 'Monat', perYear: 'Jahr',
+    perWeekSuf: '/Wo', perMonthSuf: '/Mon.', perYearSuf: '/Jahr', jobStaff: 'Mitarbeiter',
     c_meta: 'Meta', metaLabel: 'Meta-Score', c_metapa: 'PA-Meta',
     metaHint: 'Gewichteter Durchschnitt (1-20) der Attribute, die laut FM-Arenas Match-Engine-Tests Spiele gewinnen; Schnelligkeit und Antritt zählen mit Abstand am meisten. Torhüter: eigene Gewichtung aus dem Torwart-Test (Reflexe, Beweglichkeit).\n\n15+ Elite, 13-15 stark, 11-13 solide. Bei gleicher CA spielt der höhere Meta meist besser.',
     metaPaHint: 'Dieselbe Meta-Gewichtung, angewandt auf die Attribute, die er an seinem Potenzial (PA) voraussichtlich erreicht. Die Projektion folgt dem Wachstumsprofil seiner Positionsgruppe; Physis wächst nach 23 nicht mehr.\n\nAusentwickelt = gleich Meta. Sortiere danach für die Meta-Stars von morgen.',
@@ -671,7 +680,8 @@ const EU_NATIONS = new Set([
   'Romanya', 'Bulgaristan', 'Yunanistan', 'Hırvatistan', 'Slovenya', 'Lüksemburg', 'Estonya',
   'Letonya', 'Litvanya', 'Kıbrıs', 'Norveç', 'İzlanda', 'Lihtenştayn', 'İsviçre',
 ].map(s => s.toLowerCase()));
-const isEu = p => (p.nat || []).some(n => EU_NATIONS.has((n || '').toLowerCase()));
+// EU/EER-check: via het nation-ID als dat er is (taalonafhankelijk), anders de naamlijst.
+const isEu = p => { const r = natRec(p); return r ? r[4] === 1 : (p.nat || []).some(n => EU_NATIONS.has((n || '').toLowerCase())); };
 
 // Voet: de plugin schrijft NL ('Rechts'/'Links'/'Beide') in de dump → vertalen bij tonen.
 // ---------- ontwikkeling: groei t.o.v. een peildatum ----------
@@ -874,11 +884,14 @@ const NATION_EN = {
   'Nieuw-Zeeland': 'New Zealand', 'Saoedi-Arabië': 'Saudi Arabia', 'Iran': 'Iran', 'Irak': 'Iraq',
   'Verenigde Arabische Emiraten': 'United Arab Emirates', 'Qatar': 'Qatar', 'Indonesië': 'Indonesia',
 };
-// Landnamen staan in de dump in de gametaal. Bij een niet-NL app-taal tonen we de Engelse
-// naam als we de (NL-)dumpnaam kennen; anders de dumpnaam zelf. Draait FM al in de app-taal,
-// dan is de dumpnaam vanzelf goed. Taalonafhankelijk land-ID staat in de backlog (issue #15).
+// Landnamen: bij voorkeur via het taalonafhankelijke nation-ID uit de dump (natId,
+// plugin 0.1.44+) en de NATIONS-tabel uit nations.js: dan klopt de weergave in elke
+// game- én app-taal (issue #15). Oude dumps zonder natId vallen terug op de naamstring,
+// met de NL→EN-tabel voor niet-NL app-talen.
+const NAT_LANG_IDX = { nl: 0, en: 1, fr: 2, de: 3 };
+const natRec = p => (typeof NATIONS !== 'undefined' && p && p.natId && NATIONS[p.natId]) || null;
 const natLabel = n => state.lang !== 'nl' ? (NATION_EN[n] || n) : n;
-const natsLabel = p => (p.nat || []).map(natLabel).join(', ');
+const natsLabel = p => { const r = natRec(p); return r ? r[NAT_LANG_IDX[state.lang] ?? 1] : (p.nat || []).map(natLabel).join(', '); };
 
 // Kolommen die onder de "verborgen stats"-toggle vallen: CA/PA zelf, plus meta-score en
 // vraagprijs (beide afgeleid van/verweven met verborgen data, Marks keuze).
@@ -889,6 +902,12 @@ const hiddenStatCol = k => (state.hideCapa && (k === 'ca' || k === 'pa' || k ===
   || (state.hideMeta && (k === 'meta' || k === 'metapa')) || (k === 'growth' && !histReady());
 
 // ---------- geld ----------
+// Salarisweergave: de dump bewaart loon per week; alleen de wéérgave rekent om.
+// Filters en interne modellen (interesse, loonplafond) blijven op weekbasis werken.
+const WAGE_FACTOR = { w: 1, m: 52 / 12, y: 52 };
+const wageFactor = () => WAGE_FACTOR[state.wagePer] || 1;
+const fmtWage = v => v == null ? '–' : fmtMoney(v * wageFactor());
+const wageSuf = () => t(state.wagePer === 'm' ? 'perMonthSuf' : state.wagePer === 'y' ? 'perYearSuf' : 'perWeekSuf');
 function fmtMoney(v) {
   if (v == null) return '–';
   const sym = CUR_RATE[state.cur] ? state.cur : '£';   // onbekende localStorage-waarde → £
@@ -959,7 +978,7 @@ const PLAYER_COLS = [
   { key: 'metapa', label: 'c_metapa', num: true, help: 'metaPaHint', get: p => metaPaScore(p), render: p => metaPaHtml(p), w: 68 },
   { key: 'value', label: 'c_value', num: true, get: p => estValue(p).v, render: p => estHtml(p), w: 95 },
   { key: 'fee', label: 'c_fee', num: true, get: p => { const f = feeEstimate(p); return f.v == null ? -1 : f.v; }, render: p => feeHtml(p), w: 105 },
-  { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney, w: 100 },
+  { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtWage, w: 100 },
   { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls, w: 110 },
   { key: 'interest', label: 'c_interest', help: 'interestHint', get: p => { const i = interestEstimate(p); return i ? i.score : -1; }, render: p => intHtml(p), w: 110 },
   { key: 'status', label: 'c_status', get: p => 0, render: p => statusHtml(p), w: 110 },
@@ -973,12 +992,12 @@ const STAFF_COLS = [
   { key: 'sl', label: '★', star: true, w: 34 },
   { key: 'name', label: 'c_name', get: p => p.name, name: true, w: 180 },
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p), w: 50 },
-  { key: 'job', label: 'c_role', get: p => p.job || '–', w: 150 },
+  { key: 'job', label: 'c_role', get: p => jobLabel(p), w: 150 },
   { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
   { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa), w: 56 },
-  { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney, w: 100 },
+  { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtWage, w: 100 },
   { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls, w: 110 },
   { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true, w: 85 },
   { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true, w: 85 },
@@ -1396,6 +1415,22 @@ const ROLE_LABEL = {
   de: { gk: 'Torwart', sk: 'Mitspielender Torwart', cd: 'Innenverteidiger', bpd: 'Ballspielender Innenverteidiger', fb: 'Außenverteidiger', wb: 'Flügelverteidiger', dm: 'Defensiver Mittelfeldspieler', dlp: 'Tiefer Spielmacher', bwm: 'Balleroberer', cm: 'Zentraler Mittelfeldspieler', b2b: 'Box-to-Box-Spieler', ap: 'Offensiver Spielmacher', wing: 'Flügelspieler', if: 'Inverser Flügelstürmer', am: 'Offensiver Mittelfeldspieler', af: 'Vorgezogene Spitze', poacher: 'Knipser', tm: 'Zielspieler', cf: 'Komplette Spitze' },
 };
 const roleName = id => (ROLE_LABEL[state.lang]?.[id] ?? ROLE_LABEL.en[id] ?? id);
+
+// Staffuncties: de dump draagt sinds plugin 0.1.45 het functie-byte (jobId) naast de
+// NL-naamstring. Met het id vertalen we per app-taal; oude dumps of onbekende id's
+// vallen terug op de dumpstring, en het generieke "Staflid" krijgt zijn eigen sleutel.
+const JOB_LABEL = {
+  nl: { 1: 'Speler', 2: 'Coach', 3: 'Speler/Coach', 4: 'Voorzitter', 6: 'Directeur', 8: 'Algemeen directeur', 10: 'Technisch directeur', 12: 'Fysiotherapeut', 14: 'Scout', 16: 'Manager', 17: 'Speler/Manager', 20: 'Assistent-manager', 21: 'Speler/Assistent-manager', 22: 'Media-analist', 24: 'Algemeen manager', 26: 'Fitnesscoach', 27: 'Speler/Fitnesscoach', 34: 'Keeperstrainer', 35: 'Speler/Keeperstrainer', 36: 'Hoofd data-analyse', 38: 'Clubarts', 40: 'Hoofd sportwetenschap', 42: 'Data-analist', 44: 'Hoofdscout', 45: 'Speler/Hoofdscout', 46: 'Arts', 48: 'Sportwetenschapper', 49: 'Speler/Jeugdtrainer', 50: 'Hoofd fysiotherapie', 52: 'U19-manager', 54: 'Trainer eerste elftal', 64: 'Hoofd jeugdopleiding', 65: 'Speler/Hoofd jeugd', 66: 'Eigenaar', 70: 'President', 86: 'Loanmanager', 88: 'Technisch directeur', 144: 'Interim-manager' },
+  en: { 1: 'Player', 2: 'Coach', 3: 'Player/Coach', 4: 'Chairman', 6: 'Director', 8: 'Managing director', 10: 'Director of football', 12: 'Physio', 14: 'Scout', 16: 'Manager', 17: 'Player/Manager', 20: 'Assistant manager', 21: 'Player/Assistant manager', 22: 'Media analyst', 24: 'General manager', 26: 'Fitness coach', 27: 'Player/Fitness coach', 34: 'Goalkeeping coach', 35: 'Player/GK coach', 36: 'Head of data analysis', 38: 'Club doctor', 40: 'Head of sports science', 42: 'Data analyst', 44: 'Chief scout', 45: 'Player/Chief scout', 46: 'Doctor', 48: 'Sports scientist', 49: 'Player/Youth coach', 50: 'Head physio', 52: 'U19 manager', 54: 'First-team coach', 64: 'Head of youth development', 65: 'Player/Head of youth', 66: 'Owner', 70: 'President', 86: 'Loan manager', 88: 'Technical director', 144: 'Caretaker manager' },
+  fr: { 1: 'Joueur', 2: 'Entraîneur', 3: 'Joueur/Entraîneur', 4: 'Président du conseil', 6: 'Directeur', 8: 'Directeur général', 10: 'Directeur sportif', 12: 'Kinésithérapeute', 14: 'Recruteur', 16: 'Manager', 17: 'Joueur/Manager', 20: 'Adjoint', 21: 'Joueur/Adjoint', 22: 'Analyste média', 24: 'Manager général', 26: 'Préparateur physique', 27: 'Joueur/Préparateur physique', 34: 'Entraîneur des gardiens', 35: 'Joueur/Entraîneur des gardiens', 36: 'Resp. analyse de données', 38: 'Médecin du club', 40: 'Resp. sciences du sport', 42: 'Analyste de données', 44: 'Recruteur en chef', 45: 'Joueur/Recruteur en chef', 46: 'Médecin', 48: 'Scientifique du sport', 49: 'Joueur/Entraîneur de jeunes', 50: 'Kiné en chef', 52: 'Manager U19', 54: 'Entraîneur équipe première', 64: 'Resp. formation', 65: 'Joueur/Resp. formation', 66: 'Propriétaire', 70: 'Président', 86: 'Resp. des prêts', 88: 'Directeur technique', 144: 'Entraîneur intérimaire' },
+  de: { 1: 'Spieler', 2: 'Trainer', 3: 'Spielertrainer', 4: 'Vorsitzender', 6: 'Direktor', 8: 'Geschäftsführer', 10: 'Sportdirektor', 12: 'Physiotherapeut', 14: 'Scout', 16: 'Manager', 17: 'Spielermanager', 20: 'Co-Trainer', 21: 'Spieler/Co-Trainer', 22: 'Medienanalyst', 24: 'General Manager', 26: 'Fitnesstrainer', 27: 'Spieler/Fitnesstrainer', 34: 'Torwarttrainer', 35: 'Spieler/Torwarttrainer', 36: 'Leiter Datenanalyse', 38: 'Vereinsarzt', 40: 'Leiter Sportwissenschaft', 42: 'Datenanalyst', 44: 'Chefscout', 45: 'Spieler/Chefscout', 46: 'Arzt', 48: 'Sportwissenschaftler', 49: 'Spieler/Jugendtrainer', 50: 'Leitender Physiotherapeut', 52: 'U19-Trainer', 54: 'Trainer 1. Mannschaft', 64: 'Leiter Nachwuchs', 65: 'Spieler/Nachwuchsleiter', 66: 'Eigentümer', 70: 'Präsident', 86: 'Leihspielermanager', 88: 'Technischer Direktor', 144: 'Interimstrainer' },
+};
+const jobLabel = p => {
+  const L = JOB_LABEL[state.lang] || JOB_LABEL.en;
+  if (p && p.jobId && L[p.jobId]) return L[p.jobId];
+  if (p && p.job === 'Staflid') return t('jobStaff');
+  return (p && p.job) || '–';
+};
 const ROLE_BY_ID = Object.fromEntries(ROLES.map(r => [r.id, r]));
 // Rolscore op de 1-20 schaal; key-attributen tellen dubbel. Vereist attributen (spelers).
 function roleScore(p, role) {
@@ -1841,9 +1876,15 @@ function renderClubBadge() {
   $('club-badge').title = t('clickClubFilter') + (rep ? ` · ${t('repWord')} ${rep}` : '');
 }
 function buildStaffRoles() {
+  // Optie-values blijven de rauwe dumpstring (daar filtert applyFilters op); alleen het
+  // label vertaalt mee via jobId. Zo blijven opgeslagen presets geldig over talen heen.
   const cur = $('f-staffrole').value;
-  const jobs = [...new Set(state.staff.map(s => s.job).filter(Boolean))].sort();
-  $('f-staffrole').innerHTML = `<option value="">${t('all')}</option>` + jobs.map(j => `<option>${escHtml(j)}</option>`).join('');
+  const byJob = new Map();
+  for (const s of state.staff) if (s.job && !byJob.has(s.job)) byJob.set(s.job, s);
+  const items = [...byJob.values()].map(s => ({ v: s.job, l: jobLabel(s) }))
+    .sort((a, b) => a.l.localeCompare(b.l, uiLocale()));
+  $('f-staffrole').innerHTML = `<option value="">${t('all')}</option>` +
+    items.map(x => `<option value="${escHtml(x.v)}">${escHtml(x.l)}</option>`).join('');
   $('f-staffrole').value = cur;
 }
 // Voetkeuze uit de dump zelf: de plugin leest de tekst zoals FM hem toont, dus die is
@@ -2008,7 +2049,9 @@ function applyFilters() {
   const wantMetaPa = state.mode !== 'staff' && !state.hideCapa && (mpMin > 0 || mpMax < 99);
   const price = parseMoney($('f-price').value);
   const fee = parseMoney($('f-fee').value);
-  const wage = parseMoney($('f-wage').value);
+  // Max. loon-invoer volgt de gekozen weergaveperiode; intern vergelijken we per week.
+  const wageIn = parseMoney($('f-wage').value);
+  const wage = wageIn == null ? null : wageIn / wageFactor();
   const nat = $('f-nat').value.trim().toLowerCase();
   // Ontwikkeling: alleen actief met historie én zichtbare CA (groei is CA-afgeleid).
   const devOn = histReady() && !state.hideCapa && state.mode !== 'staff';
@@ -2046,7 +2089,8 @@ function applyFilters() {
     if (price != null && (estValue(p).v ?? Infinity) > price) return false;
     if (fee != null && (feeEstimate(p).v ?? Infinity) > fee) return false;
     if (wage != null && (p.wage ?? Infinity) > wage) return false;
-    if (nat && !(p.nat || []).some(n => n.toLowerCase().includes(nat) || natLabel(n).toLowerCase().includes(nat))) return false;
+    if (nat && !((p.nat || []).some(n => n.toLowerCase().includes(nat) || natLabel(n).toLowerCase().includes(nat))
+      || natsLabel(p).toLowerCase().includes(nat))) return false;
     if (onlyWk && !isWonderkid(p)) return false;
     if (onlyNew && !isNewSince(p)) return false;
     // Onbekende groei (nieuw, of te dunne basislijn) valt buiten een ingestelde grens,
@@ -2430,7 +2474,11 @@ function measureRowH() {
   }
   return false;
 }
-function colLabel(c) { return c.star ? starSvg(13) : (c.label.startsWith('c_') || I18N.nl[c.label] ? t(c.label) : c.label); }
+function colLabel(c) {
+  if (c.star) return starSvg(13);
+  const base = c.label.startsWith('c_') || I18N.nl[c.label] ? t(c.label) : c.label;
+  return c.key === 'wage' ? base + ' ' + wageSuf() : base;   // salarisperiode in de kop
+}
 function colWidths() { return state.colW[modeKey()] || (state.colW[modeKey()] = {}); }
 function saveColW() { localStorage.setItem('fmss_colw', JSON.stringify(state.colW)); }
 function renderTable() {
@@ -2642,7 +2690,7 @@ function exportShortlist() {
   const lines = [cols.join(',')];
   for (const p of all) {
     const i = interestEstimate(p);
-    lines.push([p.name, p.pos || p.job || '', getAge(p), p.club || '', (p.nat || []).map(natLabel).join('/'),
+    lines.push([p.name, p.pos || jobLabel(p), getAge(p), p.club || '', natsLabel(p),
       ...(withCapa ? [p.ca, p.pa] : []), estValue(p).v ?? '', ...(withCapa ? [feeEstimate(p).v ?? ''] : []), p.wage ?? '', p.expires || '', i ? i.label : ''].map(esc).join(','));
   }
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
@@ -2760,10 +2808,10 @@ function showDetail(p) {
   <div class="sub">${getAge(p)} · ${escHtml(natsLabel(p))}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
   ${gauge}
   <div class="kv">
-    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${escHtml(p.pos || '–')}</div><div><b>${t('foot')}</b> ${escHtml(footLabel(p))}</div>` : `<div><b>${t('c_role')}</b> ${escHtml(p.job || '–')}</div>`}
+    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${escHtml(p.pos || '–')}</div><div><b>${t('foot')}</b> ${escHtml(footLabel(p))}</div>` : `<div><b>${t('c_role')}</b> ${escHtml(jobLabel(p))}</div>`}
     <div><b>${t('estval')}</b> ${valTxt}</div>
     ${!state.hideCapa && feeEstimate(p).v > 0 ? `<div><b>${t('c_fee')}</b> ${fmtMoney(feeEstimate(p).v * 0.85)} – ${fmtMoney(feeEstimate(p).v * 1.15)}</div>` : ''}
-    <div><b>${t('wageLabel')}</b> ${fmtMoney(p.wage)}</div>
+    <div><b>${t('wageLabel')}</b> ${fmtWage(p.wage)}${p.wage > 0 ? ` <span class="dim">${wageSuf()}</span>` : ''}</div>
     ${p.worldRep ? `<div><b>${t('repLabel')}</b> ${p.worldRep}</div>` : ''}
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
     ${p.ownerClub && p.ownerClub !== p.club ? `<div><b>${t('ownerLabel')}</b> ${escHtml(p.ownerClub)}</div>` : ''}
@@ -3057,7 +3105,7 @@ function buildCardModel(p) {
     ca, pa, hideNum, hexNum: state.hideMeta ? null : meta != null ? meta.toFixed(1) : '–',
     groups: cardGroups(p, isGk), roles,
     value: ev.v > 0 ? (ev.est ? '~' : '') + fmtMoney(ev.v) : '–',
-    ask, wage: p.wage > 0 ? fmtMoney(p.wage) : '–', contract: fmtDate(p.expires) || '–',
+    ask, wage: p.wage > 0 ? fmtWage(p.wage) + ' ' + wageSuf() : '–', contract: fmtDate(p.expires) || '–',
     status: st, rep, injury, snap: 'FM26' + (snapDate ? ' · ' + snapDate : ''),
   };
 }
@@ -3535,10 +3583,10 @@ function openCompare() {
     players.map((p, i) => {
       const ev = estValue(p);
       const val = ev.v > 0 ? fmtMoney(ev.v) : null;
-      const bits = [val, p.wage > 0 ? fmtMoney(p.wage) + ' p/w' : null,
+      const bits = [val, p.wage > 0 ? fmtWage(p.wage) + ' ' + wageSuf() : null,
         p.expires ? String(p.expires).slice(0, 4) : null].filter(Boolean).join(' · ');
       return `<div class="cmp-cell"><div class="cmp-name">${escHtml(p.name)}</div>` +
-        `<div class="cmp-meta">${getAge(p)} · ${escHtml(p.pos || p.job || '')} · ${p.club ? escHtml(p.club) : '–'}` +
+        `<div class="cmp-meta">${getAge(p)} · ${escHtml(p.pos || jobLabel(p))} · ${p.club ? escHtml(p.club) : '–'}` +
         `${bits ? `<br>${bits}` : ''}` +
         `${p.attrs ? `<br><span class="cmp-winsb">${tf('cmpWinsBadge', { n: wins[i] })}</span>` : ''}</div></div>`;
     }).join('') +
@@ -3555,7 +3603,7 @@ function openCompare() {
   body += row(t('cmpValue'), players.map(p => estValue(p).v), { fmt: fmtMoney, hi: null });
   if (!state.hideCapa)
     body += row(t('c_fee'), players.map(p => { const f = feeEstimate(p); return f.v > 0 ? f.v : null; }), { fmt: fmtMoney, hi: false });
-  body += row(t('wageLabel'), players.map(p => p.wage), { fmt: fmtMoney, hi: false });
+  body += row(t('wageLabel') + ' ' + wageSuf(), players.map(p => p.wage), { fmt: fmtWage, hi: false });
   body += row(t('c_age'), players.map(p => getAge(p)), { hi: false });
   body += row(t('height'), players.map(p => p.height || null), { fmt: v => v + ' cm', hi: null });
   body += textRow(t('contractLabel'), players.map(p => fmtDate(p.expires)));
@@ -3925,6 +3973,13 @@ $('sel-cur').addEventListener('change', () => {
   localStorage.setItem('fmss_cur', state.cur);
   renderVisible(); if (state.selected) showDetail(state.selected);
 });
+// salarisperiode-dropdown
+$('sel-wageper').value = state.wagePer;
+$('sel-wageper').addEventListener('change', () => {
+  state.wagePer = $('sel-wageper').value;
+  localStorage.setItem('fmss_wageper', state.wagePer);
+  applyLang();   // kolomkop, filterlabel, profiel en tabel volgen de nieuwe periode
+});
 // taal-dropdown
 $('sel-lang').value = state.lang;
 $('sel-lang').addEventListener('change', () => {
@@ -4029,6 +4084,10 @@ function applyLang() {
   // ?-helpteksten tonen via de eigen app-tooltip (zie initHelpTip), niet meer via title.
   $('f-name').placeholder = t('searchph');
   $('btn-coffee').title = t('donateBtn');
+  // Max. loon-label draagt de gekozen salarisperiode (de generieke data-i18n-pass hierboven
+  // zette alleen de kale tekst).
+  const mw = document.querySelector('[data-i18n="maxwage"]');
+  if (mw) mw.textContent = t('maxwage') + ' ' + wageSuf();
   $('set-version').textContent = 'FMSuperScout v' + APP_VERSION;
   $('upd-note').textContent = '';   // checkresultaat is een momentopname in de oude taal
   updateAdvBtn();

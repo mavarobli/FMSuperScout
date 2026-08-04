@@ -11,9 +11,20 @@ new release is built, so the Unreleased section below is what the next release s
   native speakers welcome), role names, player card and squad analysis. Number and date
   formatting follows the chosen language. A key-parity test guards that every language
   stays complete.
-- Groundwork for language-independent nation handling (issue #15): the plugin now dumps a
-  stable nation ID (`natId`) next to the name. The app does not use it yet; a later
-  release maps IDs to names and makes the EU check language-free.
+- Language-independent nations (fixes the core of issue #15): the plugin dumps FM's
+  stable nation ID (`natId`) next to the name, and the app carries a 228-nation table
+  (nations.js) with names in all four app languages plus an EU/EEA flag. Nation display
+  and the EU check now work whatever language the game runs in. The EU flag follows
+  citizenship, so French and Dutch overseas territories (Guadeloupe, Curaçao, Tahiti and
+  the like) now correctly count as EU. Old dumps without `natId` fall back to name
+  matching as before.
+- Wage per week, month or year: new setting next to the currency. The wage column
+  header, profile, comparison, player card and the max-wage filter all follow the chosen
+  period; data stays weekly internally.
+- Staff roles translate with the app language: the plugin dumps the job byte (`jobId`,
+  plugin 0.1.45) and the app translates it (NL/EN/FR/DE). The staff-role filter keeps
+  raw values, so saved presets survive language switches. Old dumps show the Dutch
+  strings as before.
 
 ### Changed
 - Help tooltips now appear after a short delay (450 ms) instead of instantly, so moving

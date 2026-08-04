@@ -696,7 +696,8 @@ internal static class Dumper
         {
             e.Wage = Money(m.U32(con + Fields.CON_WEEKLY_WAGE));
             e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
-            e.Job = JobName(m.U8(con + 0x26));   // pero.Pcjo — echte functie uit contract
+            e.JobId = m.U8(con + 0x26);          // pero.Pcjo — functie-byte; app vertaalt per taal
+            e.Job = JobName(e.JobId);
         }
         if (string.IsNullOrEmpty(e.Job)) e.Job = "Staflid";
         e.Gender = (m.U8(person + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
@@ -1071,6 +1072,7 @@ internal static class Dumper
         else
         {
             j.Prop("job", p.Job);
+            if (p.JobId > 0) j.Prop("jobId", p.JobId);   // taalonafhankelijk; app vertaalt
             j.Key("staffAttrs"); j.BeginObj();
             foreach (var kv in p.StaffAttrs) { j.Key(kv.Key); j.Val((long)kv.Value); }
             j.EndObj();
@@ -1184,6 +1186,7 @@ internal sealed class Person
     public int BirthDoy;
     public List<string> Nat = new();
     public uint NatId;          // DB-UID van het (eerste) land — taalonafhankelijk (issue #15)
+    public int JobId;           // functie-byte uit het contract — taalonafhankelijk
     public string Club;
     public string OwnerClub;    // moederclub (volledig contract); ≠ Club bij huur
     public string Div;
