@@ -2499,7 +2499,8 @@ function showDetail(p) {
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
     ${p.ownerClub && p.ownerClub !== p.club ? `<div><b>${t('ownerLabel')}</b> ${escHtml(p.ownerClub)}</div>` : ''}
     ${p.height ? `<div><b>${t('height')}</b> ${p.height} cm</div>` : ''}
-    ${isPlayer && !state.hideMeta && metaScore(p) != null ? `<div data-help="metaHint"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span>${!state.hideCapa && metaPaScore(p) - metaScore(p) >= 0.05 ? ` <span class="dim">·</span> <b>${t('c_metapa')}</b> <span class="${roleClass(metaPaScore(p))}">${metaPaScore(p).toFixed(1)}</span>` : ''} <span class="col-help">?</span></div>` : ''}
+    ${isPlayer && !state.hideMeta && metaScore(p) != null ? `<div data-help="metaHint"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
+    ${isPlayer && !state.hideMeta && !state.hideCapa && metaPaScore(p) != null ? `<div data-help="metaPaHint"><b>${t('c_metapa')}</b> <span class="${roleClass(metaPaScore(p))}">${metaPaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
   </div>`;
 
   const flags = [];
