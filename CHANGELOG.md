@@ -7,41 +7,32 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [1.4.2] - 2026-08-04
 
-Plugin: v0.1.43. Theme: one real crash fixed at the root, and a scan that adapts to any
-Windows PC — big or small saves, fast or slow machines — instead of assuming a happy path.
+Plugin: v0.1.43. A crash fix and a scan that adapts to the machine it runs on.
 
 ### Fixed
-- The "Index was out of range (Parameter 'startIndex')" dump failure (issue #16). Root
-  cause: a corrupt metadata pointer near the top of the 64-bit address space made an
-  internal bounds check wrap around, so a bogus candidate produced a negative array
-  index deep in the scan. Whether it hit depended on what happened to be in FM's heap,
-  which is why it appeared "suddenly" and then failed every retry in that session. The
-  bounds math is now overflow-safe, and as a second line of defence one broken scan
-  region can no longer kill the whole dump: it is counted as unreadable and the scan
-  moves on.
-- Scanning is fast again (1.4.1 regression). The frozen-snapshot read introduced in
-  1.4.1 turned out to be the wrong default: it slowed every scan down and on
-  memory-pressed machines the snapshot itself failed (Win32 1450, reported in issue
-  #13), falling back to the exact live scan it was meant to replace. The scan now reads
-  live by default (the fast pre-1.4.1 way) and only retries once from a frozen snapshot
-  when the live pass could not read more than 10% of FM's memory. Nobody pays the
-  snapshot cost unless it demonstrably buys them a better dump.
+- "Index was out of range (Parameter 'startIndex')" dump failures (issue #16). A corrupt
+  metadata pointer near the top of the 64-bit address space caused an integer overflow
+  in a bounds check, producing a negative array index during the scan. It depended on
+  heap contents, so it started suddenly and then failed on every retry. The bounds check
+  is now overflow-safe, and one broken scan region can no longer fail the whole dump:
+  it counts as unreadable and the scan continues.
+- Scanning is fast again (1.4.1 regression). The snapshot read from 1.4.1 slowed every
+  scan down, and on memory-pressed machines the snapshot itself failed with Win32 1450
+  (issue #13) and fell back to a live scan anyway. The scan now reads live by default
+  and retries once from a snapshot when the live pass could not read more than 10% of
+  FM's memory.
 
 ### Changed
-- The scan adapts to the machine it runs on: read buffers and module caches are
-  allocated once and reused across scans (repeated scans no longer grow FM's memory
-  footprint, a contributor to the random snapshot/read failures on tight machines), the
-  worker count drops when physical memory is low, the big module cache is skipped
-  entirely when it would not fit, and the plugin compacts its heap after every scan.
-- Field reports got teeth: every scan logs free physical/commit memory and the read
-  source (live or snapshot), diagnostics.txt records both plus per-phase timing, and
-  "Report a problem…" now auto-embeds that telemetry block in the prefilled GitHub
-  issue so reports are self-contained even without attachments. The unreadable-memory
-  error message now names the likely cause (Windows low on memory) and what to do.
-- Settings menu restructured: preferences grouped on top, then a divider, then an
-  about-row with the version and a new "Check for updates" action (manual check that
-  bypasses the 20-hour cache and reopens a dismissed update notice), and "Report a
-  problem…" at the bottom.
+- Lower memory footprint: read buffers and module caches are allocated once and reused,
+  the worker count drops when physical memory is low, the module cache is skipped when
+  it does not fit, and the plugin compacts its heap after every scan.
+- Better field reports: every scan logs free physical/commit memory and the read source,
+  diagnostics.txt records both plus per-phase timing, and "Report a problem…" embeds
+  that telemetry in the prefilled GitHub issue. The unreadable-memory error now names
+  the likely cause and the fix.
+- Settings menu restructured: preferences on top, then version with a "Check for
+  updates" action (skips the 20-hour cache, reopens a dismissed notice), then "Report
+  a problem…".
 
 ## [1.4.1] - 2026-08-03
 
