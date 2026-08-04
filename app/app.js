@@ -40,7 +40,7 @@ try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.r
 // $: xe.com-koers uit diezelfde periode; verifieer tegen FM's eigen USD-weergave.
 const CUR_RATE = { '£': 1, '€': 1.16, '$': 1.35 };
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.5.0';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -163,7 +163,7 @@ const I18N = {
     saveBtn: 'Opslaan', deleteBtn: 'Verwijderen', cancelBtn: 'Annuleren',
     scanDb: 'Database', dbMen: 'Mannen', dbWomen: 'Vrouwen', dbBoth: 'Beide',
     genderLabel: 'Geslacht', womenNote: 'Geldt vanaf de volgende scan (F9)',
-    scanDbHint: 'Wat de volgende scan (F9) inleest. Bij Beide verschijnt een geslacht-filter in de zijbalk.',
+    scanDbHint: 'Kies welk geslacht de scan inleest bij de volgende F9: alleen mannen, alleen vrouwen, of allebei. Bij Beide verschijnt een geslacht-filter in de zijbalk.',
     wagePer: 'Salaris per', perWeek: 'week', perMonth: 'maand', perYear: 'jaar',
     perWeekSuf: 'p/w', perMonthSuf: 'p/mnd', perYearSuf: 'p/jr', jobStaff: 'Staflid',
     c_meta: 'Meta', metaLabel: 'Meta-score', c_metapa: 'PA-meta',
@@ -290,7 +290,7 @@ const I18N = {
     saveBtn: 'Save', deleteBtn: 'Delete', cancelBtn: 'Cancel',
     scanDb: 'Database', dbMen: 'Men', dbWomen: 'Women', dbBoth: 'Both',
     genderLabel: 'Gender', womenNote: 'Applies from the next scan (F9)',
-    scanDbHint: 'What the next scan (F9) loads. With Both, a gender filter appears in the sidebar.',
+    scanDbHint: 'Choose which gender the next scan (F9) loads: men only, women only, or both. With Both, a gender filter appears in the sidebar.',
     wagePer: 'Wage per', perWeek: 'week', perMonth: 'month', perYear: 'year',
     perWeekSuf: '/wk', perMonthSuf: '/mo', perYearSuf: '/yr', jobStaff: 'Staff member',
     c_meta: 'Meta', metaLabel: 'Meta score', c_metapa: 'PA meta',
@@ -417,7 +417,7 @@ const I18N = {
     saveBtn: 'Enregistrer', deleteBtn: 'Supprimer', cancelBtn: 'Annuler',
     scanDb: 'Base de données', dbMen: 'Hommes', dbWomen: 'Femmes', dbBoth: 'Les deux',
     genderLabel: 'Sexe', womenNote: 'Valable à partir du prochain scan (F9)',
-    scanDbHint: 'Ce que le prochain scan (F9) charge. Avec Les deux, un filtre sexe apparaît dans la barre latérale.',
+    scanDbHint: 'Choisissez quel sexe le prochain scan (F9) charge : hommes seuls, femmes seules, ou les deux. Avec Les deux, un filtre sexe apparaît dans la barre latérale.',
     wagePer: 'Salaire par', perWeek: 'semaine', perMonth: 'mois', perYear: 'an',
     perWeekSuf: '/sem', perMonthSuf: '/mois', perYearSuf: '/an', jobStaff: 'Membre du staff',
     c_meta: 'Méta', metaLabel: 'Score méta', c_metapa: 'Méta PA',
@@ -544,7 +544,7 @@ const I18N = {
     saveBtn: 'Speichern', deleteBtn: 'Löschen', cancelBtn: 'Abbrechen',
     scanDb: 'Datenbank', dbMen: 'Männer', dbWomen: 'Frauen', dbBoth: 'Beide',
     genderLabel: 'Geschlecht', womenNote: 'Gilt ab dem nächsten Scan (F9)',
-    scanDbHint: 'Was der nächste Scan (F9) lädt. Bei Beide erscheint ein Geschlechtsfilter in der Seitenleiste.',
+    scanDbHint: 'Wähle, welches Geschlecht der nächste Scan (F9) lädt: nur Männer, nur Frauen oder beide. Bei Beide erscheint ein Geschlechtsfilter in der Seitenleiste.',
     wagePer: 'Gehalt pro', perWeek: 'Woche', perMonth: 'Monat', perYear: 'Jahr',
     perWeekSuf: '/Wo', perMonthSuf: '/Mon.', perYearSuf: '/Jahr', jobStaff: 'Mitarbeiter',
     c_meta: 'Meta', metaLabel: 'Meta-Score', c_metapa: 'PA-Meta',

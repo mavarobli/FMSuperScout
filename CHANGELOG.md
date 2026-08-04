@@ -5,6 +5,11 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-04
+
+Plugin: v0.1.46. The community release: meta for everyone, four languages,
+language-independent data and the women's database.
+
 ### Added
 - Women's football (requested on the forum). New "Database" setting: men, women or
   both; the plugin (0.1.46) reads the choice at the next F9. With "both", a gender
