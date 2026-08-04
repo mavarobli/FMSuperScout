@@ -6,10 +6,10 @@ new release is built, so the Unreleased section below is what the next release s
 ## [Unreleased]
 
 ### Added
-- Women's football as a setting (requested on the forum). Toggle "Include women's
-  football" in settings; the plugin (0.1.46) reads the choice at the next F9 and scans
-  the women's database too. Off by default so men's saves stay lean. Women's players
-  carry a `gender` field in the dump for future filtering.
+- Women's football (requested on the forum). New "Database" setting: men, women or
+  both; the plugin (0.1.46) reads the choice at the next F9. With "both", a gender
+  filter appears in the sidebar (only when the loaded data is actually mixed). Defaults
+  to men, so existing saves stay lean.
 - French and German as app languages, next to Dutch and English. Full translations of the
   UI, help texts, attribute names (following common FM terminology; corrections from
   native speakers welcome), role names, player card and squad analysis. Number and date

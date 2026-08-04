@@ -306,18 +306,23 @@ const server = http.createServer((req, res) => {
       req.on('end', () => {
         try {
           const inp = JSON.parse(body || '{}');
-          const out = { includeWomen: !!inp.includeWomen };
-          fs.writeFileSync(cf, JSON.stringify(out));
+          const db = ['men', 'women', 'both'].includes(inp.db) ? inp.db : 'men';
+          fs.writeFileSync(cf, JSON.stringify({ db }));
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(out));
+          res.end(JSON.stringify({ db }));
         } catch { res.writeHead(400); res.end(); }
       });
       return;
     }
-    let out = { includeWomen: false };
-    try { out.includeWomen = fs.readFileSync(cf, 'utf8').includes('"includeWomen":true'); } catch { }
+    let db = 'men';
+    try {
+      const raw = fs.readFileSync(cf, 'utf8');
+      const m = raw.match(/"db":"(men|women|both)"/);
+      // Oud schema (kort in omloop geweest): includeWomen:true betekende "beide".
+      db = m ? m[1] : (raw.includes('"includeWomen":true') ? 'both' : 'men');
+    } catch { }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(out));
+    res.end(JSON.stringify({ db }));
     return;
   }
 

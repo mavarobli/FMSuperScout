@@ -55,12 +55,16 @@
       <option value="side" data-i18n="profSide">Rechts</option>
       <option value="popup" data-i18n="profPopup">Popup</option>
     </select></div>
+  <div class="set-row"><span><span data-i18n="scanDb">Database</span> <span class="col-help" data-help="scanDbHint">?</span></span>
+    <select id="sel-db">
+      <option value="men" data-i18n="dbMen">Mannen</option>
+      <option value="women" data-i18n="dbWomen">Vrouwen</option>
+      <option value="both" data-i18n="dbBoth">Beide</option>
+    </select></div>
   <label class="set-row set-toggle"><span data-i18n="showHidden">Verborgen stats tonen</span>
     <input type="checkbox" id="set-hidecapa"></label>
   <label class="set-row set-toggle"><span data-i18n="showMeta">Meta-score tonen</span>
     <input type="checkbox" id="set-hidemeta"></label>
-  <label class="set-row set-toggle"><span><span data-i18n="includeWomen">Vrouwenvoetbal meenemen</span> <span class="col-help" data-help="includeWomenHint">?</span></span>
-    <input type="checkbox" id="set-women"></label>
   <div class="set-div"></div>
   <div class="set-about">
     <span id="set-version"></span>
@@ -99,6 +103,15 @@
     <div class="fsection" id="fg-pitch" data-sec="pitch">
       <div class="fsec-head" data-i18n="position">Positie</div>
       <div id="pitch-wrap"></div>
+    </div>
+
+    <div class="fgroup" id="fg-gender" style="display:none">
+      <label data-i18n="genderLabel">Geslacht</label>
+      <select id="f-gender">
+        <option value="" data-i18n="dbBoth">Beide</option>
+        <option value="m" data-i18n="dbMen">Mannen</option>
+        <option value="v" data-i18n="dbWomen">Vrouwen</option>
+      </select>
     </div>
 
     <div class="fgroup" id="fg-staffrole" style="display:none">

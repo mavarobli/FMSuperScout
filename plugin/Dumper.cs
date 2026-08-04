@@ -80,8 +80,8 @@ internal static class Dumper
     // Foutstatus wegschrijven zodat de web-app niet eeuwig op "scanning" blijft hangen.
     public static void WriteError(string message) => WriteStatus("error", 0, 0, message);
 
-    // Vrouwendatabase meescannen (Instellingen in de app → scan-config.json).
-    private static bool IncludeWomen;
+    // Database-keuze: 0 = mannen, 1 = vrouwen, 2 = beide (Instellingen → scan-config.json).
+    private static int ScanDb;
 
     // De lopende scan; TryStartDump geeft via ReleaseScan() de geheugen-momentopname vrij
     // zodra de dump klaar of gesneuveld is. Eén tegelijk, bewaakt door _dumpBusy.
@@ -128,11 +128,16 @@ internal static class Dumper
         var sw = Stopwatch.StartNew();
         Plugin.Log.LogInfo("FMSuperScout: geheugen scannen…");
         Directory.CreateDirectory(OutDir);
-        // Vrouwenvoetbal meenemen? De app schrijft die keuze naar scan-config.json
-        // (Instellingen). Per scan gelezen: een omgezette toggle geldt vanaf de
-        // eerstvolgende F9. Standaard uit, zodat mannen-saves compact blijven.
-        try { IncludeWomen = File.ReadAllText(Path.Combine(OutDir, "scan-config.json")).Contains("\"includeWomen\":true"); }
-        catch { IncludeWomen = false; }
+        // Database-keuze (Instellingen in de app → scan-config.json): mannen, vrouwen of
+        // beide. Per scan gelezen, dus een omgezette keuze geldt vanaf de eerstvolgende
+        // F9. Standaard mannen, zodat bestaande saves compact blijven.
+        try
+        {
+            string cfg = File.ReadAllText(Path.Combine(OutDir, "scan-config.json"));
+            ScanDb = cfg.Contains("\"db\":\"women\"") ? 1
+                   : cfg.Contains("\"db\":\"both\"") || cfg.Contains("\"includeWomen\":true") ? 2 : 0;
+        }
+        catch { ScanDb = 0; }
         WriteStatus("scanning", 0, 0);
         // Alle dump-specifieke statische staat resetten: mislukt de detectie in déze save,
         // dan mogen badge, Mijn club-filter en historie niet stilletjes op de vorige
@@ -303,9 +308,10 @@ internal static class Dumper
                                 ushort ca = mem.U16(basePtr + Fields.PLAO_CA);
                                 ushort pa = mem.U16(basePtr + Fields.PLAO_PA);
                                 if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
-                                // Vrouwenvoetbal alleen inladen als de gebruiker dat aanzet
-                                // (person+0x19 bit 0x10 = vrouw).
-                                if (!IncludeWomen && (mem.U8(p + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0) { L.Women++; continue; }
+                                // Databasekeuze: sla het niet-gekozen geslacht over
+                                // (person+0x19 bit 0x10 = vrouw). ScanDb 2 = beide → niets overslaan.
+                                bool female = (mem.U8(p + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0;
+                                if (female ? ScanDb == 0 : ScanDb == 1) { L.Women++; continue; }
                                 L.OffsetHist[off] = L.OffsetHist.GetValueOrDefault(off) + 1;
                                 if (!L.Players.ContainsKey(uid))
                                 {
@@ -387,8 +393,8 @@ internal static class Dumper
             Plugin.Log.LogWarning($"{(int)System.Math.Round(unreadFrac * 100)}% van de scanregio's was live onleesbaar — herkansing met snapshot volgt.");
             return DumpResult.RetryWithSnapshot;
         }
-        Plugin.Log.LogInfo($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten · " +
-            (IncludeWomen ? "vrouwenvoetbal meegeladen" : $"{women:N0} vrouwen overgeslagen"));
+        Plugin.Log.LogInfo($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten · database: " +
+            (ScanDb == 2 ? "beide (niets overgeslagen)" : ScanDb == 1 ? $"vrouwen ({women:N0} mannen overgeslagen)" : $"mannen ({women:N0} vrouwen overgeslagen)"));
         Dumper.AllOffHist = allOffHist;
         Dumper.VtGp = vtGp;
         WriteStatus("scanning", players.Count, staff.Count, null, 0.87);

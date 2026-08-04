@@ -161,8 +161,9 @@ const I18N = {
     presetEmptyFilters: 'Geen actieve filters om op te slaan',
     presetSaveTitle: 'Filters opslaan', presetDelTitle: 'Filter verwijderen',
     saveBtn: 'Opslaan', deleteBtn: 'Verwijderen', cancelBtn: 'Annuleren',
-    includeWomen: 'Vrouwenvoetbal meenemen', womenNote: 'Geldt vanaf de volgende scan (F9)',
-    includeWomenHint: 'Scant ook de vrouwendatabase mee bij de eerstvolgende F9. Nodig voor saves met vrouwenvoetbal; in een mannensave wordt de lijst gemengd. De keuze wordt naast de app ook door de plugin gelezen.',
+    scanDb: 'Database', dbMen: 'Mannen', dbWomen: 'Vrouwen', dbBoth: 'Beide',
+    genderLabel: 'Geslacht', womenNote: 'Geldt vanaf de volgende scan (F9)',
+    scanDbHint: 'Wat de volgende scan (F9) inleest. Bij Beide verschijnt een geslacht-filter in de zijbalk.',
     wagePer: 'Salaris per', perWeek: 'week', perMonth: 'maand', perYear: 'jaar',
     perWeekSuf: 'p/w', perMonthSuf: 'p/mnd', perYearSuf: 'p/jr', jobStaff: 'Staflid',
     c_meta: 'Meta', metaLabel: 'Meta-score', c_metapa: 'PA-meta',
@@ -287,8 +288,9 @@ const I18N = {
     presetEmptyFilters: 'No active filters to save',
     presetSaveTitle: 'Save filters', presetDelTitle: 'Delete filter',
     saveBtn: 'Save', deleteBtn: 'Delete', cancelBtn: 'Cancel',
-    includeWomen: "Include women's football", womenNote: 'Applies from the next scan (F9)',
-    includeWomenHint: "Also scans the women's database on the next F9. Needed for women's saves; in a men's save the list becomes mixed. The plugin reads this choice too.",
+    scanDb: 'Database', dbMen: 'Men', dbWomen: 'Women', dbBoth: 'Both',
+    genderLabel: 'Gender', womenNote: 'Applies from the next scan (F9)',
+    scanDbHint: 'What the next scan (F9) loads. With Both, a gender filter appears in the sidebar.',
     wagePer: 'Wage per', perWeek: 'week', perMonth: 'month', perYear: 'year',
     perWeekSuf: '/wk', perMonthSuf: '/mo', perYearSuf: '/yr', jobStaff: 'Staff member',
     c_meta: 'Meta', metaLabel: 'Meta score', c_metapa: 'PA meta',
@@ -413,8 +415,9 @@ const I18N = {
     presetEmptyFilters: 'Aucun filtre actif à enregistrer',
     presetSaveTitle: 'Enregistrer les filtres', presetDelTitle: 'Supprimer le filtre',
     saveBtn: 'Enregistrer', deleteBtn: 'Supprimer', cancelBtn: 'Annuler',
-    includeWomen: 'Inclure le football féminin', womenNote: 'Valable à partir du prochain scan (F9)',
-    includeWomenHint: 'Scanne aussi la base féminine au prochain F9. Nécessaire pour les sauvegardes féminines ; dans une sauvegarde masculine la liste devient mixte. Le plugin lit aussi ce choix.',
+    scanDb: 'Base de données', dbMen: 'Hommes', dbWomen: 'Femmes', dbBoth: 'Les deux',
+    genderLabel: 'Sexe', womenNote: 'Valable à partir du prochain scan (F9)',
+    scanDbHint: 'Ce que le prochain scan (F9) charge. Avec Les deux, un filtre sexe apparaît dans la barre latérale.',
     wagePer: 'Salaire par', perWeek: 'semaine', perMonth: 'mois', perYear: 'an',
     perWeekSuf: '/sem', perMonthSuf: '/mois', perYearSuf: '/an', jobStaff: 'Membre du staff',
     c_meta: 'Méta', metaLabel: 'Score méta', c_metapa: 'Méta PA',
@@ -539,8 +542,9 @@ const I18N = {
     presetEmptyFilters: 'Keine aktiven Filter zum Speichern',
     presetSaveTitle: 'Filter speichern', presetDelTitle: 'Filter löschen',
     saveBtn: 'Speichern', deleteBtn: 'Löschen', cancelBtn: 'Abbrechen',
-    includeWomen: 'Frauenfußball einbeziehen', womenNote: 'Gilt ab dem nächsten Scan (F9)',
-    includeWomenHint: 'Scannt beim nächsten F9 auch die Frauendatenbank. Nötig für Frauen-Spielstände; in einem Männer-Spielstand wird die Liste gemischt. Das Plugin liest diese Einstellung ebenfalls.',
+    scanDb: 'Datenbank', dbMen: 'Männer', dbWomen: 'Frauen', dbBoth: 'Beide',
+    genderLabel: 'Geschlecht', womenNote: 'Gilt ab dem nächsten Scan (F9)',
+    scanDbHint: 'Was der nächste Scan (F9) lädt. Bei Beide erscheint ein Geschlechtsfilter in der Seitenleiste.',
     wagePer: 'Gehalt pro', perWeek: 'Woche', perMonth: 'Monat', perYear: 'Jahr',
     perWeekSuf: '/Wo', perMonthSuf: '/Mon.', perYearSuf: '/Jahr', jobStaff: 'Mitarbeiter',
     c_meta: 'Meta', metaLabel: 'Meta-Score', c_metapa: 'PA-Meta',
@@ -1733,6 +1737,7 @@ async function loadDump(force = false) {
     loadError = null; renderEmptyState();
     $('empty-state').classList.add('hidden');
     buildStaffRoles();
+    buildGenderFilter();
     buildFootOptions();
     buildDivisions();   // divisiefilter vullen zodra er dump-data met divisies is
     renderTable();      // nieuwe dump kan de kolomset raken (bv. groei-kolom)
@@ -1895,6 +1900,18 @@ function buildStaffRoles() {
     items.map(x => `<option value="${escHtml(x.v)}">${escHtml(x.l)}</option>`).join('');
   $('f-staffrole').value = cur;
 }
+// Geslacht-filter: alleen zichtbaar als de geladen data écht gemengd is (scan met
+// "Beide"); in een puur mannen- of vrouwenbestand is hij ruis. Waardes m/v zijn
+// taalvast, de labels vertalen mee via dbMen/dbWomen.
+function buildGenderFilter() {
+  const rows = state.mode === 'staff' ? state.staff : state.players;
+  let men = false, women = false;
+  for (const p of rows) { if (p.gender === 1) women = true; else men = true; if (men && women) break; }
+  const mixed = men && women;
+  $('fg-gender').style.display = mixed ? '' : 'none';
+  if (!mixed && $('f-gender').value) { $('f-gender').value = ''; }
+}
+
 // Voetkeuze uit de dump zelf: de plugin leest de tekst zoals FM hem toont, dus die is
 // afhankelijk van de speltaal ("Rechts" / "Right"). Opties opbouwen uit de aanwezige
 // waarden houdt het filter goed in elke taal; het label komt uit footLabel waar we hem
@@ -2077,6 +2094,7 @@ function applyFilters() {
   const onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
   const advRules = state.mode === 'staff' ? [] : activeAdvRules();   // staf heeft geen veld-attributen
   const staffRole = $('f-staffrole').value;
+  const gsel = $('f-gender').value;   // '' = beide, 'm' = mannen, 'v' = vrouwen
   const divVal = $('f-div').value.trim().toLowerCase();   // zoekbalk: substring, hoofdletterongevoelig
   const myClub = (state.meta.myClub || '').toLowerCase();
   if (state.mode === 'shortlist') rows = [...state.players, ...state.staff];
@@ -2142,6 +2160,8 @@ function applyFilters() {
     }
     if (activePos.size && !(p.posArr || []).some(x => activePos.has(x))) return false;
     if (state.mode === 'staff' && staffRole && p.job !== staffRole) return false;
+    if (gsel === 'm' && p.gender === 1) return false;
+    if (gsel === 'v' && p.gender !== 1) return false;
     if (divVal && !(p.div || '').toLowerCase().includes(divVal)) return false;
     return true;
   });
@@ -2193,6 +2213,7 @@ function buildChips() {
   if (activePos.size) add(`${t('position')}: ${[...activePos].join(', ')}`,
     () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); });
   if (state.mode === 'staff' && $('f-staffrole').value) add($('f-staffrole').value, () => { $('f-staffrole').value = ''; });
+  if ($('f-gender').value) add(t($('f-gender').value === 'm' ? 'dbMen' : 'dbWomen'), () => { $('f-gender').value = ''; });
   if ($('f-div').value.trim()) add(`${t('divLabel')}: ${$('f-div').value.trim()}`, () => { $('f-div').value = ''; });
   range('f-age-min', 'f-age-max', t('age'));
   range('f-ca-min', 'f-ca-max', 'CA');
@@ -2237,7 +2258,7 @@ const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-m
 const PRESET_CHECK_IDS = ['f-eu', 'f-myclub', 'f-shortlist', 'f-wonderkid', 'f-new'];
 // De peilperiode hoort bewust bij de preset: "doorbraken dit seizoen" betekent niets als
 // het venster erbij wegvalt. Zie applyPreset voor het opnieuw ophalen van de groeidata.
-const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role', 'f-contract', 'f-tstatus', 'f-foot', 'f-hist-period'];
+const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role', 'f-contract', 'f-tstatus', 'f-foot', 'f-hist-period', 'f-gender'];
 function loadPresets() { try { return JSON.parse(localStorage.getItem('fmss_presets') || '[]'); } catch { return []; } }
 function storePresets(list) { localStorage.setItem('fmss_presets', JSON.stringify(list)); }
 function snapshotFilters() {
@@ -3836,6 +3857,7 @@ $('f-hist-period').addEventListener('change', async () => {
 });
 $('btn-adv').onclick = advDialog;
 $('f-staffrole').addEventListener('change', applyFilters);
+$('f-gender').addEventListener('change', applyFilters);
 // Divisie-zoekbalk: filter terwijl je typt + eigen suggestie-dropdown (app-stijl, i.p.v.
 // de native datalist die als lichte "wolk" uit de donkere UI viel).
 $('f-div').addEventListener('input', () => { renderDivSuggest(); applyFilters(); });
@@ -3871,7 +3893,7 @@ $('f-role').addEventListener('change', () => {
 $('btn-clear').onclick = () => {
   document.querySelectorAll('#filters input[type=text], #filters input[type=number]').forEach(i => i.value = '');
   document.querySelectorAll('#filters input[type=checkbox]').forEach(i => i.checked = false);
-  $('f-staffrole').value = ''; $('f-interest').value = '0'; $('f-contract').value = ''; $('f-tstatus').value = '';
+  $('f-staffrole').value = ''; $('f-gender').value = ''; $('f-interest').value = '0'; $('f-contract').value = ''; $('f-tstatus').value = '';
   $('f-foot').value = '';
   state.advF = []; saveAdv();
   activePos.clear();
@@ -3981,13 +4003,13 @@ $('sel-cur').addEventListener('change', () => {
   localStorage.setItem('fmss_cur', state.cur);
   renderVisible(); if (state.selected) showDetail(state.selected);
 });
-// Vrouwenvoetbal-toggle: de keuze leeft server-side (scan-config.json) zodat de plugin
-// hem bij F9 leest; localStorage zou de game nooit bereiken.
-fetch('/api/scan-config').then(r => r.json()).then(c => { $('set-women').checked = !!c.includeWomen; }).catch(() => { });
-$('set-women').addEventListener('change', () => {
+// Database-keuze (mannen/vrouwen/beide): leeft server-side (scan-config.json) zodat de
+// plugin hem bij F9 leest; localStorage zou de game nooit bereiken.
+fetch('/api/scan-config').then(r => r.json()).then(c => { $('sel-db').value = c.db || 'men'; }).catch(() => { });
+$('sel-db').addEventListener('change', () => {
   fetch('/api/scan-config', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ includeWomen: $('set-women').checked }),
+    body: JSON.stringify({ db: $('sel-db').value }),
   }).then(() => showToast(t('womenNote'), 'check')).catch(() => { });
 });
 // salarisperiode-dropdown
@@ -4112,6 +4134,7 @@ function applyLang() {
   renderClubBadge();
   renderVerWarn();
   buildStaffRoles();
+  buildGenderFilter();
   buildFootOptions();
   buildRoleSelect();
   buildDivisions();
@@ -4132,6 +4155,7 @@ function setMode(mode) {
   $('tab-analysis').classList.toggle('active', isAn);
   $('fg-pitch').style.display = mode === 'staff' || isAn ? 'none' : '';
   $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
+  buildGenderFilter();   // spelers- en staflijst kunnen apart gemengd zijn
   $('fg-role').style.display = mode === 'staff' || isAn ? 'none' : '';
   $('f-meta-row').style.display = mode === 'staff' ? 'none' : '';   // meta-score bestaat niet voor staf
   $('f-metapa-row').style.display = mode === 'staff' ? 'none' : '';
