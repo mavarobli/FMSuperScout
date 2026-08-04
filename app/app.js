@@ -160,8 +160,9 @@ const I18N = {
     presetEmptyFilters: 'Geen actieve filters om op te slaan',
     presetSaveTitle: 'Filters opslaan', presetDelTitle: 'Filter verwijderen',
     saveBtn: 'Opslaan', deleteBtn: 'Verwijderen', cancelBtn: 'Annuleren',
-    c_meta: 'Meta', metaLabel: 'Meta-score',
-    metaHint: 'Meta-score (1-20): gewogen gemiddelde van de attributen die volgens FM-Arena\'s match-engine-tests wedstrijden winnen. Snelheid en Versnelling tellen veruit het zwaarst, daarna Sprongkracht en Dribbelen.\n\n15+ elite, 13-15 sterk, 11-13 degelijk.\n\nTwee spelers met gelijke CA? Die met de hoogste Meta presteert meestal beter op het veld. Positie en rol tellen niet mee; keepers krijgen geen score.',
+    c_meta: 'Meta', metaLabel: 'Meta-score', c_metapa: 'PA-meta',
+    metaHint: 'Meta-score (1-20): gewogen gemiddelde van de attributen die volgens FM-Arena\'s match-engine-tests wedstrijden winnen. Snelheid en Versnelling tellen veruit het zwaarst, daarna Sprongkracht en Dribbelen.\n\n15+ elite, 13-15 sterk, 11-13 degelijk.\n\nTwee spelers met gelijke CA? Die met de hoogste Meta presteert meestal beter op het veld. Positie en rol tellen niet mee. Keepers krijgen een eigen weging uit FM-Arena\'s keeperstest (FM24-hertest): Reflexen en Behendigheid tellen daar het zwaarst.',
+    metaPaHint: 'PA-meta (1-20): dezelfde meta-weging, maar toegepast op de attributen die deze speler naar verwachting op zijn potentieel (PA) heeft. De projectie volgt het gemeten groeiprofiel van zijn positiegroep; fysieke groei dooft uit na 23 jaar.\n\nUitontwikkelde spelers scoren gelijk aan Meta. Sorteer hierop om de meta-toppers van morgen te vinden.',
     verWarn: 'FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x. Data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
     verWarnOldDump: 'Deze data komt van een oudere FMSuperScout-plugin. Alles werkt, maar haal verse data op (F9 in FM26 met je save geladen) voor het beste resultaat.',
   },
@@ -281,8 +282,9 @@ const I18N = {
     presetEmptyFilters: 'No active filters to save',
     presetSaveTitle: 'Save filters', presetDelTitle: 'Delete filter',
     saveBtn: 'Save', deleteBtn: 'Delete', cancelBtn: 'Cancel',
-    c_meta: 'Meta', metaLabel: 'Meta score',
-    metaHint: 'Meta score (1-20): a weighted average of the attributes that win matches according to FM-Arena\'s match-engine tests. Pace and Acceleration count heaviest by far, then Jumping Reach and Dribbling.\n\n15+ elite, 13-15 strong, 11-13 decent.\n\nTwo players with equal CA? The one with the higher Meta score usually performs better on the pitch. Position and role are ignored; goalkeepers get no score.',
+    c_meta: 'Meta', metaLabel: 'Meta score', c_metapa: 'PA meta',
+    metaHint: 'Meta score (1-20): a weighted average of the attributes that win matches according to FM-Arena\'s match-engine tests. Pace and Acceleration count heaviest by far, then Jumping Reach and Dribbling.\n\n15+ elite, 13-15 strong, 11-13 decent.\n\nTwo players with equal CA? The one with the higher Meta score usually performs better on the pitch. Position and role are ignored. Goalkeepers get their own weighting from FM-Arena\'s keeper test (FM24 retest): Reflexes and Agility count heaviest there.',
+    metaPaHint: 'PA meta (1-20): the same meta weighting, applied to the attributes this player is expected to have at his potential (PA). The projection follows the measured growth profile of his position group; physical growth fades after 23.\n\nFully developed players score the same as Meta. Sort on this to find tomorrow\'s meta stars.',
     verWarn: 'FM version {v} detected; memory reading is calibrated for {s}.x. Data may be unreliable until FMSuperScout is updated.',
     verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM26 with your save loaded) for the best results.',
   },
@@ -619,8 +621,9 @@ const natsLabel = p => (p.nat || []).map(natLabel).join(', ');
 // vraagprijs (beide afgeleid van/verweven met verborgen data, Marks keuze).
 // Groei is uit CA afgeleid, dus die valt onder dezelfde verberg-toggle. Zonder historie
 // bestaat de kolom niet: hem tonen met overal "–" zou alleen maar vragen oproepen.
-const hiddenStatCol = k => (state.hideCapa && (k === 'ca' || k === 'pa' || k === 'fee' || k === 'growth'))
-  || (state.hideMeta && k === 'meta') || (k === 'growth' && !histReady());
+// PA-meta valt onder béíde toggles: hij is uit meta-gewichten én PA afgeleid.
+const hiddenStatCol = k => (state.hideCapa && (k === 'ca' || k === 'pa' || k === 'fee' || k === 'growth' || k === 'metapa'))
+  || (state.hideMeta && (k === 'meta' || k === 'metapa')) || (k === 'growth' && !histReady());
 
 // ---------- geld ----------
 function fmtMoney(v) {
@@ -690,6 +693,7 @@ const PLAYER_COLS = [
   // de sortering zet null onderaan; met 0 zouden newgens bovenin een stijgerslijst staan.
   { key: 'growth', label: 'c_growth', num: true, help: 'growthHint', get: caGrowth, render: p => growthHtml(p), w: 74 },
   { key: 'meta', label: 'c_meta', num: true, help: 'metaHint', get: p => metaScore(p), render: p => metaHtml(p), w: 64 },
+  { key: 'metapa', label: 'c_metapa', num: true, help: 'metaPaHint', get: p => metaPaScore(p), render: p => metaPaHtml(p), w: 68 },
   { key: 'value', label: 'c_value', num: true, get: p => estValue(p).v, render: p => estHtml(p), w: 95 },
   { key: 'fee', label: 'c_fee', num: true, get: p => { const f = feeEstimate(p); return f.v == null ? -1 : f.v; }, render: p => feeHtml(p), w: 105 },
   { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtMoney, w: 100 },
@@ -1161,22 +1165,49 @@ const META_W = {
   Strength: 1.9, FirstTouch: 1.5, Composure: 1.2, WorkRate: 1.1, Finishing: 1.1, Flair: 1.1,
   LongShots: 1.0, Aggression: 1.0, Heading: 0.6, OffTheBall: 0.5,
 };
+// Keepers: eigen gewichten uit harvestgreen22's FM24-keeperhertest op FM-Arena
+// (fm-arena.com/thread/18816, winrate-effect per attribuut, 2000-7000 wedstrijden per
+// meting). FM26-keeperdata bestaat nog niet; het totale keeperseffect is volgens dezelfde
+// test grofweg een kwart van dat van veldspelers. Pressure is bij ons een
+// persoonlijkheidsveld (p.pressure), geen attrs-key; weightedMeta pakt hem daar.
+const META_GK_W = { Reflexes: 12.8, Agility: 8.0, Acceleration: 4.7, Pressure: 4.1, Pace: 3.5, AerialReach: 3.4 };
+function weightedMeta(p, attrs) {
+  const W = (p.posArr || []).includes('GK') ? META_GK_W : META_W;
+  let sum = 0, w = 0;
+  for (const k in W) {
+    const v = k === 'Pressure' ? (p.pressure > 0 ? p.pressure : null) : attrs[k];
+    if (v != null) { sum += v * W[k]; w += W[k]; }
+  }
+  return w ? sum / w : null;
+}
 // Per speler gememoiseerd (_meta): de invoer verandert alleen bij een nieuwe dump, en dan
 // zijn het verse objecten. Zonder cache werd dit bij sorteren/filteren op Meta voor élke
 // rij per toetsaanslag herberekend.
 function metaScore(p) {
   if (p._meta !== undefined) return p._meta;
-  if (!p.attrs || (p.posArr || []).includes('GK')) return p._meta = null;
-  let sum = 0, w = 0;
-  for (const k in META_W) {
-    const v = p.attrs[k];
-    if (v != null) { sum += v * META_W[k]; w += META_W[k]; }
-  }
-  return p._meta = w ? sum / w : null;
+  if (!p.attrs) return p._meta = null;
+  return p._meta = weightedMeta(p, p.attrs);
+}
+// PA-meta: dezelfde weging, toegepast op de naar PA geprojecteerde attributen
+// (projectAttrs: positie-realistisch groeiprofiel, fysiek dooft uit na 23). Zonder
+// restpotentieel is de projectie leeg en is de potentie per definitie de huidige score.
+// Max(cur, proj) vangt afrondingsdips af: potentie kan nooit onder huidig liggen.
+function metaPaScore(p) {
+  if (p._metaPa !== undefined) return p._metaPa;
+  const cur = metaScore(p);
+  if (cur == null) return p._metaPa = null;
+  const proj = projectAttrs(p);
+  if (!proj) return p._metaPa = cur;
+  const s = weightedMeta(p, proj);
+  return p._metaPa = s == null ? cur : Math.max(cur, s);
 }
 function metaHtml(p) {
   const s = metaScore(p);
   return s == null ? '<span class="dim">–</span>' : `<span class="${roleClass(s)}" data-help="metaLabel">${s.toFixed(1)}</span>`;
+}
+function metaPaHtml(p) {
+  const s = metaPaScore(p);
+  return s == null ? '<span class="dim">–</span>' : `<span class="${roleClass(s)}" data-help="metaPaHint">${s.toFixed(1)}</span>`;
 }
 // Groei in de tabel: dezelfde kleurtaal als de ontwikkelgrafiek. Nieuwe spelers krijgen
 // "nieuw" in plaats van een streepje, want dát is de informatie die je zoekt.
@@ -1702,8 +1733,10 @@ function applyFilters() {
   const caMin = +$('f-ca-min').value || 0, caMax = +$('f-ca-max').value || 999;
   const paMin = +$('f-pa-min').value || 0, paMax = +$('f-pa-max').value || 999;
   const metaMin = +$('f-meta-min').value || 0, metaMax = +$('f-meta-max').value || 99;
+  const mpMin = +$('f-metapa-min').value || 0, mpMax = +$('f-metapa-max').value || 99;
   // Meta-score bestaat alleen voor spelers met attributen (staf en keepers vallen erbuiten).
   const wantMeta = state.mode !== 'staff' && (metaMin > 0 || metaMax < 99);
+  const wantMetaPa = state.mode !== 'staff' && !state.hideCapa && (mpMin > 0 || mpMax < 99);
   const price = parseMoney($('f-price').value);
   const fee = parseMoney($('f-fee').value);
   const wage = parseMoney($('f-wage').value);
@@ -1740,6 +1773,7 @@ function applyFilters() {
     if ((p.ca ?? 0) < caMin || (p.ca ?? 0) > caMax) return false;
     if ((p.pa ?? 0) < paMin || (p.pa ?? 0) > paMax) return false;
     if (wantMeta) { const s = metaScore(p); if (s == null || s < metaMin || s > metaMax) return false; }
+    if (wantMetaPa) { const s = metaPaScore(p); if (s == null || s < mpMin || s > mpMax) return false; }
     if (price != null && (estValue(p).v ?? Infinity) > price) return false;
     if (fee != null && (feeEstimate(p).v ?? Infinity) > fee) return false;
     if (wage != null && (p.wage ?? Infinity) > wage) return false;
@@ -1806,7 +1840,7 @@ function updateSecDots() {
   const on = {
     position: activePos.size > 0,
     role: !!$('f-role').value,
-    quality: ['f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max'].some(id => val(id))
+    quality: ['f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-metapa-min', 'f-metapa-max'].some(id => val(id))
       || activeAdvRules().length > 0 || (!state.hideCapa && $('f-wonderkid').checked),
     development: histReady() && !state.hideCapa
       && (['f-growth-min', 'f-growth-max'].some(id => val(id)) || $('f-new').checked),
@@ -1843,6 +1877,7 @@ function buildChips() {
   range('f-ca-min', 'f-ca-max', 'CA');
   range('f-pa-min', 'f-pa-max', 'PA');
   range('f-meta-min', 'f-meta-max', t('c_meta'));
+  range('f-metapa-min', 'f-metapa-max', t('c_metapa'));
   if (!state.hideCapa && $('f-wonderkid').checked) add(t('wonderkidOnly'), uncheck('f-wonderkid'));
   if (histReady() && !state.hideCapa) {
     if ($('f-new').checked) add(t('onlyNew'), uncheck('f-new'));
@@ -1877,7 +1912,7 @@ function renderChips(chips) {
 // ---------- opgeslagen filterpresets ----------
 // Een preset is een momentopname van alle filtervelden (tekst, vinkjes, selects, posities
 // op het veld en de gekozen tactische rol). Bewaard in localStorage; zelfde naam = overschrijven.
-const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-growth-min', 'f-growth-max', 'f-height-min', 'f-height-max', 'f-price', 'f-fee', 'f-wage', 'f-nat', 'f-div'];
+const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-metapa-min', 'f-metapa-max', 'f-growth-min', 'f-growth-max', 'f-height-min', 'f-height-max', 'f-price', 'f-fee', 'f-wage', 'f-nat', 'f-div'];
 const PRESET_CHECK_IDS = ['f-eu', 'f-myclub', 'f-shortlist', 'f-wonderkid', 'f-new'];
 // De peilperiode hoort bewust bij de preset: "doorbraken dit seizoen" betekent niets als
 // het venster erbij wegvalt. Zie applyPreset voor het opnieuw ophalen van de groeidata.
@@ -2464,7 +2499,7 @@ function showDetail(p) {
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
     ${p.ownerClub && p.ownerClub !== p.club ? `<div><b>${t('ownerLabel')}</b> ${escHtml(p.ownerClub)}</div>` : ''}
     ${p.height ? `<div><b>${t('height')}</b> ${p.height} cm</div>` : ''}
-    ${isPlayer && !state.hideMeta && metaScore(p) != null ? `<div data-help="metaHint"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
+    ${isPlayer && !state.hideMeta && metaScore(p) != null ? `<div data-help="metaHint"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span>${!state.hideCapa && metaPaScore(p) - metaScore(p) >= 0.05 ? ` <span class="dim">·</span> <b>${t('c_metapa')}</b> <span class="${roleClass(metaPaScore(p))}">${metaPaScore(p).toFixed(1)}</span>` : ''} <span class="col-help">?</span></div>` : ''}
   </div>`;
 
   const flags = [];
@@ -3216,6 +3251,7 @@ function openCompare() {
     body += row('PA', players.map(p => p.pa));
   }
   if (!state.hideMeta) body += row(t('c_meta'), players.map(p => metaScore(p)), { fmt: v => v.toFixed(1) });
+  if (!state.hideMeta && !state.hideCapa) body += row(t('c_metapa'), players.map(p => metaPaScore(p)), { fmt: v => v.toFixed(1) });
   body += row(t('cmpValue'), players.map(p => estValue(p).v), { fmt: fmtMoney, hi: null });
   if (!state.hideCapa)
     body += row(t('c_fee'), players.map(p => { const f = feeEstimate(p); return f.v > 0 ? f.v : null; }), { fmt: fmtMoney, hi: false });
@@ -3433,7 +3469,7 @@ $('detail-backdrop').onclick = closeDetail;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
 
 // ---------- UI-bediening ----------
-['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-growth-min', 'f-growth-max', 'f-height-min', 'f-height-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
+['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-metapa-min', 'f-metapa-max', 'f-growth-min', 'f-growth-max', 'f-height-min', 'f-height-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
   let tm; $(id).addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(applyFilters, 150); });
 });
 ['f-eu', 'f-myclub', 'f-tstatus', 'f-contract', 'f-shortlist', 'f-wonderkid', 'f-foot', 'f-new'].forEach(id => $(id).addEventListener('change', applyFilters));
@@ -3602,9 +3638,9 @@ function applyHideCapa() {
   document.body.classList.toggle('hide-meta', state.hideMeta);
   // Verborgen filters leegmaken zodat ze niet stiekem blijven filteren. CA/PA/vraagprijs
   // vallen onder de hidden-stats-toggle; meta onder zijn eigen toggle.
-  if (state.hideCapa) ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-fee', 'f-growth-min', 'f-growth-max'].forEach(id => { const e = $(id); if (e) e.value = ''; });
+  if (state.hideCapa) ['f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-fee', 'f-growth-min', 'f-growth-max', 'f-metapa-min', 'f-metapa-max'].forEach(id => { const e = $(id); if (e) e.value = ''; });
   if (state.hideCapa) { const n = $('f-new'); if (n) n.checked = false; }   // groei-afgeleid
-  if (state.hideMeta) ['f-meta-min', 'f-meta-max'].forEach(id => { const e = $(id); if (e) e.value = ''; });
+  if (state.hideMeta) ['f-meta-min', 'f-meta-max', 'f-metapa-min', 'f-metapa-max'].forEach(id => { const e = $(id); if (e) e.value = ''; });
   if (hiddenStatCol(state.sortKey)) { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
   updateAdvBtn();   // regels op verborgen data tellen niet mee zolang de toggle uit staat
   renderDevSection(); renderIntakeBar();
@@ -3722,6 +3758,7 @@ function setMode(mode) {
   $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
   $('fg-role').style.display = mode === 'staff' || isAn ? 'none' : '';
   $('f-meta-row').style.display = mode === 'staff' ? 'none' : '';   // meta-score bestaat niet voor staf
+  $('f-metapa-row').style.display = mode === 'staff' ? 'none' : '';
   // Staf heeft geen lengte, voet of PA-groei in de dump; die filters horen daar niet.
   $('fg-physical').style.display = mode === 'staff' ? 'none' : '';
   $('f-wonderkid-row').style.display = mode === 'staff' ? 'none' : '';

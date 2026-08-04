@@ -45,10 +45,14 @@ save over time, and that unlocks two things no tool without memory can do:
   that only reads the present, a brand new 16-year-old with PA 178 looks like every other
   16-year-old.
 
-**A meta score built on real testing.** Every outfield player gets a 1-20 score weighted by
+**A meta score built on real testing.** Every player gets a 1-20 score weighted by
 [FM-Arena's attribute testing](https://fm-arena.com/table/26-player-attributes-testing): what
 actually wins matches in the engine. Two players with equal CA? The higher meta score usually
-performs better.
+performs better. Goalkeepers get their own weighting, based on
+[harvestgreen22's keeper attribute retest](https://fm-arena.com/thread/18816-fm24-i-re-tested-the-goalkeeper-s-attributes-using-newer-test-league/).
+Next to it sits **PA meta**: the same weighting applied to the attributes a player is expected
+to have at his potential, following the measured growth profile of his position group. Sort on
+it to find tomorrow's meta stars.
 
 **Shareable player cards.** One click saves a PNG in FM's own visual language: scout stars for
 current and potential ability, the full attribute grid in FM colours, best roles and finances.
@@ -61,7 +65,7 @@ Wonderkids get a gold card. Built for showing off that one insane regen.
 
 ## Everything else
 
-- **Filters that stack**: name/club, age, CA, PA, meta, value, asking price, wage, nationality,
+- **Filters that stack**: name/club, age, CA, PA, meta, PA meta, value, asking price, wage, nationality,
   EU/EEA, contract, transfer status, division (smart search), **height**, **preferred foot**, and
   a one-tick **wonderkid** filter. Pick positions on a clickable pitch.
 - **Attribute filter**: min/max on any attribute ("Pace 15+"), hidden characteristics and
@@ -80,11 +84,12 @@ Wonderkids get a gold card. Built for showing off that one insane regen.
 - **Asking price and transfer interest**: estimates from contract, transfer status, age,
   reputation gap and wages, including the FIFA under-18 rule.
 - **Shortlist** (★) with its own tab and CSV export.
-- **Settings**: NL/EN, GBP/EUR, and one toggle to hide CA/PA and all hidden stats for people who
-  consider reading them cheating (the meta score has its own toggle).
+- **Settings**: NL/EN, GBP/EUR/USD, and one toggle to hide CA/PA and all hidden stats for people
+  who consider reading them cheating (the meta score has its own toggle).
 - **One-click update**: the app checks for a new release about once a day and shows a dismissible
-  notice. One click downloads the installer, verifies its SHA-256 against the release and starts
-  it. Nothing installs without your click, no tracking.
+  notice, and the settings menu has a manual "Check for updates" action. One click downloads the
+  installer, verifies its SHA-256 against the release and starts it. Nothing installs without
+  your click, no tracking.
 
 ## Install (end users)
 

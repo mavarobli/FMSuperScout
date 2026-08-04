@@ -110,6 +110,15 @@ relaunches itself and the mod layer stays in. Found by a user in
 working. If F9 ever goes dead again, first check whether the close-and-relaunch
 pattern is back.
 
+## 4e. "The scan could not read X% of FM's memory"
+
+Windows is low on memory while FM holds a large save. Since 1.4.2 the scan reads
+live and automatically retries from a frozen snapshot when it misses too much; if
+you still see this error, the machine genuinely ran out of committable memory.
+Close other apps, make sure your Windows page file is system managed on a drive
+with free space, or reboot. The BepInEx log prints the free memory at each scan
+(`Geheugen: ... MB fysiek vrij`), which tells you how tight it really is.
+
 ## 5. Game version
 
 The offsets are pinned to FM **26.3.x**. The app shows an amber warning when your

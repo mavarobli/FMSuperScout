@@ -5,6 +5,15 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+### Added
+- Goalkeeper meta score. Keepers now get a meta score with their own weighting, taken from
+  harvestgreen22's FM24 keeper attribute retest on FM-Arena (Reflexes and Agility count
+  heaviest). Same Meta column, profile line, comparison and player card as outfield players.
+- PA meta: the meta weighting applied to the attributes a player is expected to have at his
+  potential (position-realistic projection, physical growth fades after 23). New sortable
+  column next to Meta, a filter row under Quality & age, and a profile line for players with
+  room left to grow. Hidden by both the hidden-stats toggle and the meta toggle.
+
 ## [1.4.2] - 2026-08-04
 
 Plugin: v0.1.43. A crash fix and a scan that adapts to the machine it runs on.
