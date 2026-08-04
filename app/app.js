@@ -161,6 +161,8 @@ const I18N = {
     presetEmptyFilters: 'Geen actieve filters om op te slaan',
     presetSaveTitle: 'Filters opslaan', presetDelTitle: 'Filter verwijderen',
     saveBtn: 'Opslaan', deleteBtn: 'Verwijderen', cancelBtn: 'Annuleren',
+    includeWomen: 'Vrouwenvoetbal meenemen', womenNote: 'Geldt vanaf de volgende scan (F9)',
+    includeWomenHint: 'Scant ook de vrouwendatabase mee bij de eerstvolgende F9. Nodig voor saves met vrouwenvoetbal; in een mannensave wordt de lijst gemengd. De keuze wordt naast de app ook door de plugin gelezen.',
     wagePer: 'Salaris per', perWeek: 'week', perMonth: 'maand', perYear: 'jaar',
     perWeekSuf: 'p/w', perMonthSuf: 'p/mnd', perYearSuf: 'p/jr', jobStaff: 'Staflid',
     c_meta: 'Meta', metaLabel: 'Meta-score', c_metapa: 'PA-meta',
@@ -285,6 +287,8 @@ const I18N = {
     presetEmptyFilters: 'No active filters to save',
     presetSaveTitle: 'Save filters', presetDelTitle: 'Delete filter',
     saveBtn: 'Save', deleteBtn: 'Delete', cancelBtn: 'Cancel',
+    includeWomen: "Include women's football", womenNote: 'Applies from the next scan (F9)',
+    includeWomenHint: "Also scans the women's database on the next F9. Needed for women's saves; in a men's save the list becomes mixed. The plugin reads this choice too.",
     wagePer: 'Wage per', perWeek: 'week', perMonth: 'month', perYear: 'year',
     perWeekSuf: '/wk', perMonthSuf: '/mo', perYearSuf: '/yr', jobStaff: 'Staff member',
     c_meta: 'Meta', metaLabel: 'Meta score', c_metapa: 'PA meta',
@@ -409,6 +413,8 @@ const I18N = {
     presetEmptyFilters: 'Aucun filtre actif à enregistrer',
     presetSaveTitle: 'Enregistrer les filtres', presetDelTitle: 'Supprimer le filtre',
     saveBtn: 'Enregistrer', deleteBtn: 'Supprimer', cancelBtn: 'Annuler',
+    includeWomen: 'Inclure le football féminin', womenNote: 'Valable à partir du prochain scan (F9)',
+    includeWomenHint: 'Scanne aussi la base féminine au prochain F9. Nécessaire pour les sauvegardes féminines ; dans une sauvegarde masculine la liste devient mixte. Le plugin lit aussi ce choix.',
     wagePer: 'Salaire par', perWeek: 'semaine', perMonth: 'mois', perYear: 'an',
     perWeekSuf: '/sem', perMonthSuf: '/mois', perYearSuf: '/an', jobStaff: 'Membre du staff',
     c_meta: 'Méta', metaLabel: 'Score méta', c_metapa: 'Méta PA',
@@ -533,6 +539,8 @@ const I18N = {
     presetEmptyFilters: 'Keine aktiven Filter zum Speichern',
     presetSaveTitle: 'Filter speichern', presetDelTitle: 'Filter löschen',
     saveBtn: 'Speichern', deleteBtn: 'Löschen', cancelBtn: 'Abbrechen',
+    includeWomen: 'Frauenfußball einbeziehen', womenNote: 'Gilt ab dem nächsten Scan (F9)',
+    includeWomenHint: 'Scannt beim nächsten F9 auch die Frauendatenbank. Nötig für Frauen-Spielstände; in einem Männer-Spielstand wird die Liste gemischt. Das Plugin liest diese Einstellung ebenfalls.',
     wagePer: 'Gehalt pro', perWeek: 'Woche', perMonth: 'Monat', perYear: 'Jahr',
     perWeekSuf: '/Wo', perMonthSuf: '/Mon.', perYearSuf: '/Jahr', jobStaff: 'Mitarbeiter',
     c_meta: 'Meta', metaLabel: 'Meta-Score', c_metapa: 'PA-Meta',
@@ -3972,6 +3980,15 @@ $('sel-cur').addEventListener('change', () => {
   state.cur = $('sel-cur').value;
   localStorage.setItem('fmss_cur', state.cur);
   renderVisible(); if (state.selected) showDetail(state.selected);
+});
+// Vrouwenvoetbal-toggle: de keuze leeft server-side (scan-config.json) zodat de plugin
+// hem bij F9 leest; localStorage zou de game nooit bereiken.
+fetch('/api/scan-config').then(r => r.json()).then(c => { $('set-women').checked = !!c.includeWomen; }).catch(() => { });
+$('set-women').addEventListener('change', () => {
+  fetch('/api/scan-config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ includeWomen: $('set-women').checked }),
+  }).then(() => showToast(t('womenNote'), 'check')).catch(() => { });
 });
 // salarisperiode-dropdown
 $('sel-wageper').value = state.wagePer;

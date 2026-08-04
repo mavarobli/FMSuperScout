@@ -296,6 +296,31 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/scan-config') {
+    // Scan-instellingen (nu: vrouwenvoetbal meenemen). De app schrijft, de plugin leest
+    // dit bestand bij elke F9; localStorage zou de game nooit bereiken.
+    const cf = path.join(DATA_DIR, 'scan-config.json');
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', c => { body += c; if (body.length > 1024) req.destroy(); });
+      req.on('end', () => {
+        try {
+          const inp = JSON.parse(body || '{}');
+          const out = { includeWomen: !!inp.includeWomen };
+          fs.writeFileSync(cf, JSON.stringify(out));
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(out));
+        } catch { res.writeHead(400); res.end(); }
+      });
+      return;
+    }
+    let out = { includeWomen: false };
+    try { out.includeWomen = fs.readFileSync(cf, 'utf8').includes('"includeWomen":true'); } catch { }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(out));
+    return;
+  }
+
   if (url.pathname === '/api/version-check') {
     // Update-check via het version.json-asset van de laatste release, server-side (de
     // asset-CDN staat geen browser-CORS toe). Functioneel gelijk aan de API-call, maar
