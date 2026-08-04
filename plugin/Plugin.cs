@@ -12,7 +12,7 @@ public class Plugin : BasePlugin
 {
     public const string Id = "com.mavarobli.fmsuperscout";
     public const string Name = "FMSuperScout";
-    public const string Version = "0.1.42";
+    public const string Version = "0.1.43";
 
     internal static new ManualLogSource Log;
 
@@ -104,6 +104,16 @@ public class Plugin : BasePlugin
             {
                 Dumper.ReleaseScan();   // geheugen-momentopname altijd vrijgeven, ook na een fout
                 System.Threading.Interlocked.Exchange(ref _dumpBusy, 0);
+                // Scan-tijdelijken (dictionaries, JSON-buffers) meteen teruggeven en de LOH
+                // compacteren: de commit-groei van opeenvolgende scans was medeoorzaak van
+                // snapshot-fouten (Win32 1450) en onleesbare pagina's op krappe machines.
+                try
+                {
+                    System.Runtime.GCSettings.LargeObjectHeapCompactionMode =
+                        System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+                    System.GC.Collect();
+                }
+                catch { }
             }
         });
     }

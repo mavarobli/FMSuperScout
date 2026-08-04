@@ -5,6 +5,44 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-08-04
+
+Plugin: v0.1.43. Theme: one real crash fixed at the root, and a scan that adapts to any
+Windows PC — big or small saves, fast or slow machines — instead of assuming a happy path.
+
+### Fixed
+- The "Index was out of range (Parameter 'startIndex')" dump failure (issue #16). Root
+  cause: a corrupt metadata pointer near the top of the 64-bit address space made an
+  internal bounds check wrap around, so a bogus candidate produced a negative array
+  index deep in the scan. Whether it hit depended on what happened to be in FM's heap,
+  which is why it appeared "suddenly" and then failed every retry in that session. The
+  bounds math is now overflow-safe, and as a second line of defence one broken scan
+  region can no longer kill the whole dump: it is counted as unreadable and the scan
+  moves on.
+- Scanning is fast again (1.4.1 regression). The frozen-snapshot read introduced in
+  1.4.1 turned out to be the wrong default: it slowed every scan down and on
+  memory-pressed machines the snapshot itself failed (Win32 1450, reported in issue
+  #13), falling back to the exact live scan it was meant to replace. The scan now reads
+  live by default (the fast pre-1.4.1 way) and only retries once from a frozen snapshot
+  when the live pass could not read more than 10% of FM's memory. Nobody pays the
+  snapshot cost unless it demonstrably buys them a better dump.
+
+### Changed
+- The scan adapts to the machine it runs on: read buffers and module caches are
+  allocated once and reused across scans (repeated scans no longer grow FM's memory
+  footprint, a contributor to the random snapshot/read failures on tight machines), the
+  worker count drops when physical memory is low, the big module cache is skipped
+  entirely when it would not fit, and the plugin compacts its heap after every scan.
+- Field reports got teeth: every scan logs free physical/commit memory and the read
+  source (live or snapshot), diagnostics.txt records both plus per-phase timing, and
+  "Report a problem…" now auto-embeds that telemetry block in the prefilled GitHub
+  issue so reports are self-contained even without attachments. The unreadable-memory
+  error message now names the likely cause (Windows low on memory) and what to do.
+- Settings menu restructured: preferences grouped on top, then a divider, then an
+  about-row with the version and a new "Check for updates" action (manual check that
+  bypasses the 20-hour cache and reopens a dismissed update notice), and "Report a
+  problem…" at the bottom.
+
 ## [1.4.1] - 2026-08-03
 
 Plugin: v0.1.42. One fundamental change and one performance pass, both aimed at the same

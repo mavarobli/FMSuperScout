@@ -296,6 +296,18 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/diagnostics') {
+    // diagnostics.txt van de plugin, voor het voorgevulde GitHub-issue: de kopregels
+    // (leesbron, geheugen, fase-timing) maken een rapport zelfvoorzienend — gebruikers
+    // vergeten het bestand zelf vaak bij te voegen.
+    try {
+      const txt = fs.readFileSync(path.join(DATA_DIR, 'diagnostics.txt'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end(txt);
+    } catch { res.writeHead(404); res.end(); }
+    return;
+  }
+
   if (url.pathname === '/api/heartbeat') {
     lastBeat = Date.now();
     if (pendingExit) { clearTimeout(pendingExit); pendingExit = null; }   // herladen: toch openhouden

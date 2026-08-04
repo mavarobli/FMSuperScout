@@ -44,17 +44,22 @@
     <select id="sel-lang"><option value="nl">Nederlands</option><option value="en">English</option></select></div>
   <div class="set-row"><span data-i18n="curLabel">Valuta</span>
     <select id="sel-cur"><option value="£">£ GBP</option><option value="€">€ EUR</option><option value="$">$ USD</option></select></div>
-  <label class="set-row set-toggle"><span data-i18n="showHidden">Verborgen stats tonen</span>
-    <input type="checkbox" id="set-hidecapa"></label>
-  <label class="set-row set-toggle"><span data-i18n="showMeta">Meta-score tonen</span>
-    <input type="checkbox" id="set-hidemeta"></label>
   <div class="set-row"><span data-i18n="profileMode">Spelersprofiel</span>
     <select id="set-profile">
       <option value="side" data-i18n="profSide">Rechts</option>
       <option value="popup" data-i18n="profPopup">Popup</option>
     </select></div>
+  <label class="set-row set-toggle"><span data-i18n="showHidden">Verborgen stats tonen</span>
+    <input type="checkbox" id="set-hidecapa"></label>
+  <label class="set-row set-toggle"><span data-i18n="showMeta">Meta-score tonen</span>
+    <input type="checkbox" id="set-hidemeta"></label>
+  <div class="set-div"></div>
+  <div class="set-about">
+    <span id="set-version"></span>
+    <button id="btn-updcheck" class="set-link" data-i18n="updCheckBtn">Zoek updates</button>
+  </div>
+  <div class="set-note" id="upd-note"></div>
   <button id="btn-report" class="set-report" data-i18n="reportBug">Probleem melden…</button>
-  <div class="set-note" id="set-version"></div>
 </div>
 
 <div id="banner" class="hidden"></div>

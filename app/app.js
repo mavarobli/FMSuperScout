@@ -39,7 +39,7 @@ try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.r
 // $: xe.com-koers uit diezelfde periode; verifieer tegen FM's eigen USD-weergave.
 const CUR_RATE = { '£': 1, '€': 1.16, '$': 1.35 };
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -85,6 +85,9 @@ const I18N = {
     updDl: 'Update downloaden… {pct}%', updVerify: 'Download controleren…',
     updLaunch: 'Installer gestart. Volg de stappen; de app start daarna opnieuw.',
     updErr: 'Updaten mislukt. Open de downloadpagina',
+    updCheckBtn: 'Zoek updates', updChecking: 'Zoeken…',
+    updNone: 'Je bent up-to-date (v{v})', updFound: 'Update {v} beschikbaar — zie de melding bovenin',
+    updCheckErr: 'Controleren mislukt. Ben je online?',
     onlyshortlist: 'Alleen shortlist', clearfilters: 'Filters wissen', fetch: 'Nieuwe data',
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
@@ -203,6 +206,9 @@ const I18N = {
     updDl: 'Downloading update… {pct}%', updVerify: 'Verifying download…',
     updLaunch: 'Installer started. Follow the steps; the app restarts afterwards.',
     updErr: 'Update failed. Open the download page',
+    updCheckBtn: 'Check for updates', updChecking: 'Checking…',
+    updNone: "You're up to date (v{v})", updFound: 'Update {v} available — see the notice up top',
+    updCheckErr: 'Check failed. Are you online?',
     onlyshortlist: 'Shortlist only', clearfilters: 'Clear filters', fetch: 'New data',
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
@@ -2932,21 +2938,25 @@ initHelpTip();
 // ---------- update-melding ----------
 // Checkt hooguit 1x per ~20 uur de laatste GitHub-release (API staat CORS toe) en toont
 // een wegklikbaar pilletje in de topbar bij een nieuwere versie. Offline/fout = stil.
-async function checkUpdate() {
+// Met force=true (knop in Instellingen): cache en eerdere wegklik negeren, en het
+// resultaat teruggeven zodat de knop "up-to-date"/"update gevonden" kan tonen;
+// een fout bubbelt dan op naar de knop i.p.v. stil te blijven.
+async function checkUpdate(force = false) {
   try {
     let chk = {};
     try { chk = JSON.parse(localStorage.getItem('fmss_updchk') || '{}'); } catch { }
-    if (!chk.at || Date.now() - chk.at > 20 * 3600e3) {
+    if (force || !chk.at || Date.now() - chk.at > 20 * 3600e3) {
       const res = await fetch('https://api.github.com/repos/mavarobli/FMSuperScout/releases/latest');
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       chk = { at: Date.now(), tag: (await res.json()).tag_name };
       localStorage.setItem('fmss_updchk', JSON.stringify(chk));
     }
-    if (!chk.tag) return;
+    if (!chk.tag) return { newer: false, tag: null };
     const norm = v => String(v).replace(/^v/, '').split('.').map(n => parseInt(n) || 0);
     const [l, c] = [norm(chk.tag), norm(APP_VERSION)];
     const newer = l[0] !== c[0] ? l[0] > c[0] : l[1] !== c[1] ? l[1] > c[1] : (l[2] || 0) > (c[2] || 0);
-    if (!newer || localStorage.getItem('fmss_upd_dismiss') === chk.tag) return;
+    if (force) localStorage.removeItem('fmss_upd_dismiss');   // handmatige check heropent de melding bewust
+    if (!newer || localStorage.getItem('fmss_upd_dismiss') === chk.tag) return { newer, tag: chk.tag };
     const el = $('update-pill');
     el.innerHTML = `<a href="${REPO_URL}/releases/latest" target="_blank" rel="noopener">${tf('updateAvail', { v: chk.tag })}</a>
       <button title="${t('donateLater')}">${icon('x', 10)}</button>`;
@@ -2955,7 +2965,10 @@ async function checkUpdate() {
     // dan valt de pill terug op de gewone link naar de releasepagina.
     el.querySelector('a').onclick = e => { e.preventDefault(); startSelfUpdate(el); };
     el.querySelector('button').onclick = () => { localStorage.setItem('fmss_upd_dismiss', chk.tag); el.classList.add('hidden'); };
-  } catch { }
+    return { newer, tag: chk.tag };
+  } catch (e) {
+    if (force) throw e;   // knop toont de foutmelding; de stille autocheck blijft stil
+  }
 }
 
 // Zelf-update: server downloadt en verifieert de nieuwe Setup.exe en start hem; wij
@@ -2989,7 +3002,20 @@ async function startSelfUpdate(el) {
 // ---------- probleem melden ----------
 // Opent een voorgevuld GitHub-issue met de omgevingsinfo die we hebben; de gebruiker
 // hoeft alleen het verhaal en de diagnostiekbestanden toe te voegen.
-function reportBug() {
+async function reportBug() {
+  // Kop van diagnostics.txt (t/m de eerste lege regel) automatisch meesturen: leesbron
+  // (live/snapshot), geheugenstatus en fase-timing — precies de telemetrie waarmee
+  // veldproblemen te herleiden zijn, en het bestand zelf wordt vaak vergeten.
+  let diag = [];
+  try {
+    const r = await fetch('/api/diagnostics');
+    if (r.ok) {
+      const head = (await r.text()).split(/\r?\n/).slice(0, 12);
+      const cut = head.findIndex(l => !l.trim());
+      diag = ['', '### Last scan telemetry (auto-filled from diagnostics.txt)', '```',
+              ...(cut < 0 ? head : head.slice(0, cut)), '```'];
+    }
+  } catch { /* geen server of geen diagnostics: sectie gewoon weglaten */ }
   const m = state.meta || {};
   const body = [
     '### What happened?', '', '_Describe the problem here._', '',
@@ -3002,6 +3028,7 @@ function reportBug() {
       ? [`- Dump on disk: ${(lastStatus.dumpSize / 1048576).toFixed(0)} MB (${lastStatus.dumpFile || 'dump.json'})`] : []),
     ...(loadError ? [`- Load error: ${loadError.msg}`] : []),
     `- Platform: Steam / Epic / Game Pass? _(fill in)_`,
+    ...diag,
     '',
     '### Attach these files (important!)',
     'From `%LOCALAPPDATA%\\FMSuperScout\\`: `diagnostics.txt` and `status.json`.',
@@ -3466,6 +3493,22 @@ $('btn-export').onclick = exportShortlist;
 $('btn-coffee').onclick = openKofi;
 $('btn-report').onclick = reportBug;
 $('es-report').onclick = reportBug;
+// Handmatige update-check in Instellingen, naast de stille 20-uurs autocheck.
+// Resultaat verschijnt als notitie onder de knop; een gevonden update toont
+// bovendien het gewone update-pilletje in de topbar (zelfde vervolgflow).
+$('btn-updcheck').onclick = async () => {
+  const btn = $('btn-updcheck'), note = $('upd-note');
+  btn.disabled = true;
+  note.textContent = t('updChecking');
+  try {
+    const r = await checkUpdate(true);
+    note.textContent = r && r.newer ? tf('updFound', { v: r.tag }) : tf('updNone', { v: APP_VERSION });
+  } catch (e) {
+    console.error('update-check:', e);
+    note.textContent = t('updCheckErr');
+  }
+  btn.disabled = false;
+};
 checkUpdate();
 
 // Ko-fi-glow: het koffie-icoon pulseert even zacht op het moment dat de tool je net iets
@@ -3651,6 +3694,7 @@ function applyLang() {
   $('f-name').placeholder = t('searchph');
   $('btn-coffee').title = t('donateBtn');
   $('set-version').textContent = 'FMSuperScout v' + APP_VERSION;
+  $('upd-note').textContent = '';   // checkresultaat is een momentopname in de oude taal
   updateAdvBtn();
   renderDumpInfo();
   renderClubBadge();

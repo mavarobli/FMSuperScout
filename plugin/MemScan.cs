@@ -40,6 +40,33 @@ internal sealed class MemScan
     private static extern bool ReadProcessMemory(nint hProcess, ulong lpBaseAddress,
         byte[] lpBuffer, nuint nSize, out nuint lpNumberOfBytesRead);
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MEMORYSTATUSEX
+    {
+        public uint dwLength;
+        public uint dwMemoryLoad;
+        public ulong ullTotalPhys, ullAvailPhys, ullTotalPageFile, ullAvailPageFile,
+                     ullTotalVirtual, ullAvailVirtual, ullAvailExtendedVirtual;
+    }
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+    /// <summary>
+    /// Vrij fysiek geheugen, vrije commit (RAM+pagefile) en belasting (%). Stuurt de
+    /// adaptieve keuzes (workers, image-cache) en gaat mee in log + diagnostics, zodat
+    /// leesproblemen op krappe machines in het veld te herleiden zijn.
+    /// </summary>
+    public static (ulong availPhys, ulong availCommit, uint loadPct) MemoryStatus()
+    {
+        try
+        {
+            var ms = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
+            if (GlobalMemoryStatusEx(ref ms)) return (ms.ullAvailPhys, ms.ullAvailPageFile, ms.dwMemoryLoad);
+        }
+        catch { }
+        return (0, 0, 0);
+    }
+
     // Process Snapshotting API (Win 8.1+): copy-on-write kloon van de eigen adresruimte.
     [DllImport("kernel32.dll")]
     private static extern uint PssCaptureSnapshot(nint processHandle, uint captureFlags, uint threadContextFlags, out nint snapshotHandle);
@@ -61,11 +88,12 @@ internal sealed class MemScan
     private const uint PAGE_GUARD = 0x100;
     private const uint PAGE_NOACCESS = 0x01;
 
-    // Leesbron: bij voorkeur een VA-kloon (bevroren copy-on-write-momentopname van de hele
-    // adresruimte, gemaakt in ~1 ms). Alles wat FM daarna vrijgeeft of herschrijft blijft in
-    // de kloon gewoon leesbaar, dus de scan is een consistent point-in-time-beeld in plaats
-    // van een 10-30s uitgesmeerde opname van een levend proces. Lukt de snapshot niet
-    // (oudere Windows, rechten), dan valt alles terug op live lezen zoals voorheen.
+    // Leesbron: standaard het live proces (snel, geen extra geheugendruk). Op verzoek een
+    // VA-kloon: bevroren copy-on-write-momentopname van de hele adresruimte. Alles wat FM
+    // daarna vrijgeeft of herschrijft blijft in de kloon leesbaar — een consistent
+    // point-in-time-beeld. De kloon kost wél commit-geheugen en vertraagt FM (elke write
+    // wordt een pagina-kopie), dus hij is een herkansing voor als live lezen faalt, geen
+    // standaardroute.
     private nint _proc = GetCurrentProcess();
     private nint _snap, _vaClone;
     public bool Snapshotted { get; private set; }
@@ -86,13 +114,26 @@ internal sealed class MemScan
     private byte[] _gp;   // game_plugin.dll
     private byte[] _ga;   // GameAssembly.dll
 
-    public MemScan()
+    // Herbruikbare image-buffers over scans heen. Elke scan vers alloceren (±550 MB samen)
+    // liet de Large Object Heap per scan groeien/fragmenteren — de commit-charge van het
+    // FM-proces liep op en precies op krappe machines mondde dat uit in Win32 1450 bij de
+    // snapshot of onleesbare pagina's bij live lezen. Modulegroottes liggen per sessie vast,
+    // dus de arrays zijn perfect herbruikbaar.
+    private static byte[] _gpPool, _gaPool;
+
+    /// <summary>Gezet als de image-cache bewust is overgeslagen (weinig vrij geheugen) — voor de log.</summary>
+    public string ImageNote { get; private set; }
+
+    /// <summary>Duur van de snapshot-opname in ms (alleen relevant als erom gevraagd is).</summary>
+    public long SnapshotMs { get; private set; }
+
+    public MemScan(bool useSnapshot = false)
     {
-        TrySnapshot();      // zet _proc op de kloon; regio's en reads gaan dan uit de momentopname
+        if (useSnapshot) TrySnapshot();   // zet _proc op de kloon; regio's en reads gaan dan uit de momentopname
         BuildRegions();
         FindModules();      // moduleadressen zijn identiek in de kloon
-        _gp = ReadImage(GpBase, GpEnd);
-        _ga = ReadImage(GaBase, GaEnd);
+        _gp = CacheImage(ref _gpPool, GpBase, GpEnd, "game_plugin.dll");
+        _ga = CacheImage(ref _gaPool, GaBase, GaEnd, "GameAssembly.dll");
     }
 
     /// <summary>Waarom de snapshot niet lukte (leeg = wél gelukt). Gaat mee in de log en diagnostics.</summary>
@@ -100,6 +141,7 @@ internal sealed class MemScan
 
     private void TrySnapshot()
     {
+        var sw = Stopwatch.StartNew();
         try
         {
             uint rc = PssCaptureSnapshot(GetCurrentProcess(), PSS_CAPTURE_VA_CLONE, 0, out _snap);
@@ -123,8 +165,9 @@ internal sealed class MemScan
         }
         catch (System.Exception e)
         {
-            SnapshotError = "uitzondering: " + e.Message;   // fallback: live lezen, zoals vóór 0.1.42
+            SnapshotError = "uitzondering: " + e.Message;   // fallback: live lezen
         }
+        finally { SnapshotMs = sw.ElapsedMilliseconds; }
     }
 
     /// <summary>
@@ -142,11 +185,30 @@ internal sealed class MemScan
         _vaClone = 0; _snap = 0;
     }
 
-    private byte[] ReadImage(ulong start, ulong end)
+    private byte[] CacheImage(ref byte[] pool, ulong start, ulong end, string name)
     {
         if (start == 0 || end <= start) return null;
-        int len = (int)(end - start);
-        var img = new byte[len];
+        ulong len64 = end - start;
+        if (len64 > int.MaxValue) return null;
+        int len = (int)len64;
+        if (pool == null || pool.Length != len)
+        {
+            // Krap aan vrij fysiek geheugen? Cache overslaan: ImgPtr/ImgI32 vallen dan
+            // terug op losse reads — trager, maar de allocatie zelf verergert de
+            // geheugendruk niet en de scan blijft werken (elke Windows-pc).
+            var (availPhys, _, _) = MemoryStatus();
+            if (availPhys != 0 && (ulong)len * 2 > availPhys)
+            {
+                ImageNote = $"image-cache {name} ({len / (1024 * 1024)} MB) overgeslagen: maar {availPhys / (1024 * 1024)} MB fysiek vrij — scan gebruikt losse reads (trager)";
+                return null;
+            }
+            try { pool = new byte[len]; }
+            catch (System.OutOfMemoryException)
+            {
+                ImageNote = $"image-cache {name} ({len / (1024 * 1024)} MB) niet gealloceerd (OutOfMemory) — scan gebruikt losse reads (trager)";
+                return null;
+            }
+        }
         const int chunk = 8 * 1024 * 1024;
         var tmp = new byte[chunk];
         int done = 0;
@@ -154,24 +216,30 @@ internal sealed class MemScan
         {
             int want = System.Math.Min(chunk, len - done);
             if (ReadBlock(start + (ulong)done, tmp, want))
-                System.Array.Copy(tmp, 0, img, done, want);
-            // bij een gat blijft die sectie 0 — prima voor onze read-checks
+                System.Array.Copy(tmp, 0, pool, done, want);
+            else
+                System.Array.Clear(pool, done, want);   // hergebruikte buffer: gat expliciet nullen
             done += want;
         }
-        return img;
+        return pool;
     }
 
     // Snelle image-reads (buiten bereik → 0).
+    // Bounds via (addr - base) i.p.v. (addr + 8 <= end): bij een corrupte meta-pointer
+    // rond ulong.MaxValue wrapte addr+8 om, waardoor de check onterecht slaagde en de
+    // (int)-cast een negatieve index opleverde → BitConverter-crash 'startIndex', die de
+    // hele dump om zeep hielp (issue #16). addr >= base garandeert dat addr-base niet
+    // wrapt, en de vergelijking met de arraylengte kan daarna niet meer overlopen.
     private ulong ImgPtr(ulong addr)
     {
-        if (_gp != null && addr >= GpBase && addr + 8 <= GpEnd) return BitConverter.ToUInt64(_gp, (int)(addr - GpBase));
-        if (_ga != null && addr >= GaBase && addr + 8 <= GaEnd) return BitConverter.ToUInt64(_ga, (int)(addr - GaBase));
+        if (_gp != null && addr >= GpBase && addr - GpBase + 8 <= (ulong)_gp.Length) return BitConverter.ToUInt64(_gp, (int)(addr - GpBase));
+        if (_ga != null && addr >= GaBase && addr - GaBase + 8 <= (ulong)_ga.Length) return BitConverter.ToUInt64(_ga, (int)(addr - GaBase));
         return Ptr(addr); // fallback via RPM
     }
     private int ImgI32(ulong addr)
     {
-        if (_gp != null && addr >= GpBase && addr + 4 <= GpEnd) return BitConverter.ToInt32(_gp, (int)(addr - GpBase));
-        if (_ga != null && addr >= GaBase && addr + 4 <= GaEnd) return BitConverter.ToInt32(_ga, (int)(addr - GaBase));
+        if (_gp != null && addr >= GpBase && addr - GpBase + 4 <= (ulong)_gp.Length) return BitConverter.ToInt32(_gp, (int)(addr - GpBase));
+        if (_ga != null && addr >= GaBase && addr - GaBase + 4 <= (ulong)_ga.Length) return BitConverter.ToInt32(_ga, (int)(addr - GaBase));
         return I32(addr);
     }
 

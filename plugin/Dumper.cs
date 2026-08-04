@@ -35,11 +35,17 @@ internal static class Dumper
 
     private const int ChunkSize = 32 * 1024 * 1024; // 32 MB leesblokken
 
+    // Herbruikbare leesbuffers over scans heen (max 8 workers × 32 MB). Per scan vers
+    // alloceren liet de LOH groeien — zie de toelichting bij MemScan._gpPool.
+    private static readonly byte[][] BufPool = new byte[8][];
+
+    // Leesbron van de laatste scan ("live" / "snapshot…") — gaat mee in diagnostics.
+    internal static string ScanMode = "live";
+
     // Thread-lokale verzameling voor de parallelle scan: elke worker vult zijn eigen
     // buffer + collecties zonder locks; aan het eind mergen we ze samen.
     private sealed class ScanLocal
     {
-        public readonly byte[] Buf = new byte[ChunkSize];
         public readonly Dictionary<uint, Person> Players = new();
         public readonly Dictionary<uint, Person> Staff = new();
         public readonly Dictionary<int, int> OffsetHist = new();
@@ -98,7 +104,23 @@ internal static class Dumper
     // JSON: negatief (onbekend) → null, anders getal.
     private static void Money(JsonWriter j, string key, long v) { if (v < 0) j.Null4(key); else j.Prop(key, v); }
 
+    private enum DumpResult { Done, RetryWithSnapshot }
+
+    // Scanstrategie: eerst live (snel, geen extra geheugendruk — zoals t/m 1.4.0). Alleen
+    // als de live scan >10% van de regio's niet kon lezen volgt automatisch één herkansing
+    // met een bevroren geheugen-momentopname (VA-kloon). Zo betaalt niemand de snapshot-
+    // kosten (commit-geheugen, tragere game tijdens de scan) tenzij het aantoonbaar nodig is.
     public static void DumpAll()
+    {
+        if (DumpCore(useSnapshot: false) == DumpResult.RetryWithSnapshot)
+        {
+            ReleaseScan();
+            Plugin.Log.LogInfo("Herkansing: scan opnieuw vanuit een bevroren geheugen-momentopname (VA-kloon)…");
+            DumpCore(useSnapshot: true);
+        }
+    }
+
+    private static DumpResult DumpCore(bool useSnapshot)
     {
         var sw = Stopwatch.StartNew();
         Plugin.Log.LogInfo("FMSuperScout: geheugen scannen…");
@@ -118,20 +140,34 @@ internal static class Dumper
         long tPrev = 0;
         void Phase(string name) { long now = sw.ElapsedMilliseconds; PhaseLog.Add($"{name}: {now - tPrev} ms"); tPrev = now; }
 
-        var mem = new MemScan();
+        // Geheugenstatus vóór de scan: stuurt de adaptieve keuzes hieronder en maakt
+        // veldrapporten ("faalt willekeurig") herleidbaar tot wel/geen geheugendruk.
+        var (availPhys, availCommit, memLoad) = MemScan.MemoryStatus();
+        const ulong MB = 1024 * 1024;
+        Plugin.Log.LogInfo($"Geheugen: {availPhys / MB:N0} MB fysiek vrij · {availCommit / MB:N0} MB commit vrij · belasting {memLoad}%");
+
+        var mem = new MemScan(useSnapshot);
         // Bijgehouden zodat TryStartDump's finally de VA-kloon op élk pad vrijgeeft
         // (ook bij een exception mid-scan) — zolang de kloon leeft, kost elke door FM
         // gewijzigde pagina een copy-on-write-kopie.
         CurrentScan = mem;
-        Plugin.Log.LogInfo(mem.Snapshotted
-            ? "Scan leest uit een bevroren geheugen-momentopname (VA-kloon)."
-            : $"Geen snapshot beschikbaar ({mem.SnapshotError ?? "onbekend"}) — scan leest live geheugen (zoals vóór 0.1.42).");
+        if (useSnapshot)
+        {
+            PhaseLog.Add($"snapshot maken: {mem.SnapshotMs} ms");
+            Plugin.Log.LogInfo(mem.Snapshotted
+                ? $"Scan leest uit een bevroren geheugen-momentopname (VA-kloon, opname {mem.SnapshotMs} ms)."
+                : $"Snapshot niet beschikbaar ({mem.SnapshotError ?? "onbekend"}) — herkansing leest opnieuw live geheugen.");
+        }
+        ScanMode = !useSnapshot ? "live"
+            : mem.Snapshotted ? "snapshot (VA-kloon), herkansing"
+            : $"live, herkansing (snapshot mislukt: {mem.SnapshotError ?? "onbekend"})";
+        if (mem.ImageNote != null) Plugin.Log.LogWarning(mem.ImageNote);
         Phase("MemScan-ctor (image-reads)");
         if (mem.GaBase == 0)
         {
             Plugin.Log.LogError("GameAssembly.dll niet gevonden — kan niet dumpen.");
             WriteError("GameAssembly.dll niet gevonden. Is FM26 goed geladen?");
-            return;
+            return DumpResult.Done;
         }
         Plugin.Log.LogInfo($"Scanregio's: {mem.ScanRegions.Count}, GameAssembly {mem.GaBase:X}-{mem.GaEnd:X}, " +
                            $"game_plugin {mem.GpBase:X}-{mem.GpEnd:X}");
@@ -144,7 +180,7 @@ internal static class Dumper
             // bestaande dump met rust laten.
             Plugin.Log.LogError("game_plugin.dll niet geladen — dump afgebroken, bestaande dump.json blijft staan.");
             WriteError("FM26 is still starting up (game database not loaded yet). Load your save, then try again.");
-            return;
+            return DumpResult.Done;
         }
 
         var players = new Dictionary<uint, Person>();
@@ -171,6 +207,13 @@ internal static class Dumper
         // waar mega-saves toch al tegen OOM aanhikken. Boven ~8 workers is ReadProcessMemory
         // bovendien de flessenhals, niet de CPU.
         int maxDop = System.Math.Clamp(Environment.ProcessorCount - 1, 1, 8);
+        // Weinig fysiek geheugen vrij? Minder workers: minder buffers en minder paging-druk
+        // tegelijk. Trager, maar het faalt niet — belangrijker op een doorsnee-pc.
+        if (availPhys != 0 && availPhys < 2048 * MB && maxDop > 2)
+        {
+            maxDop = 2;
+            Plugin.Log.LogInfo($"Weinig geheugen vrij ({availPhys / MB:N0} MB) — scan beperkt tot 2 workers.");
+        }
 
         // N workers, elk een round-robin-deel van de regio's (regio's variëren sterk in
         // grootte → interleaven balanceert de last). Task.Run i.p.v. Parallel.ForEach:
@@ -179,17 +222,24 @@ internal static class Dumper
         // Task-lambda omzeilt dat volledig.
         var locals = new ScanLocal[maxDop];
         var tasks = new System.Threading.Tasks.Task[maxDop];
+        // Vangnet-tellers: één regio met onverwachte inhoud (zoals de corrupte meta-pointer
+        // van issue #16) mag nooit meer de complete dump laten sneuvelen. Zo'n regio telt
+        // voortaan als onleesbaar en de scan gaat door; na afloop loggen we wat er miste.
+        long regionErrors = 0;
+        string firstRegionError = null;
         for (int t = 0; t < maxDop; t++)
         {
             int worker = t;
             var L = locals[worker] = new ScanLocal();
             tasks[worker] = System.Threading.Tasks.Task.Run(() =>
             {
-                var buf = L.Buf;
+                var buf = BufPool[worker] ??= new byte[ChunkSize];
                 for (int ri = worker; ri < regions.Count; ri += maxDop)
                 {
                     var (start, size) = regions[ri];
                     ulong scanned = 0;
+                    try
+                    {
                     while (scanned < size)
                     {
                         int want = (int)System.Math.Min((ulong)ChunkSize, size - scanned);
@@ -286,10 +336,21 @@ internal static class Dumper
                             finally { Monitor.Exit(progLock); }
                         }
                     }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        long rest = (long)(size - scanned);
+                        Interlocked.Add(ref doneBytes, rest);
+                        Interlocked.Add(ref unreadBytes, rest);
+                        Interlocked.Increment(ref regionErrors);
+                        Interlocked.CompareExchange(ref firstRegionError, ex.Message, null);
+                    }
                 }
             });
         }
         System.Threading.Tasks.Task.WaitAll(tasks);
+        if (regionErrors > 0)
+            Plugin.Log.LogWarning($"{regionErrors} scanregio('s) overgeslagen na interne fout (eerste: {firstRegionError}) — rest van de scan is doorgegaan.");
 
         // Merge alle worker-resultaten in de gedeelde verzamelingen (single-threaded, geen lock nodig).
         foreach (var L in locals)
@@ -304,6 +365,19 @@ internal static class Dumper
             candidates += L.Candidates; vtGp += L.VtGp; women += L.Women;
         }
         Phase("hoofdscan (parallel, geheugen doorlopen)");
+        // Onleesbaar-fractie altijd meten en loggen — de belangrijkste indicator bij
+        // veldrapporten, óók als de scan verder gewoon slaagt.
+        double unreadFrac = totalBytes > 0 ? (double)Interlocked.Read(ref unreadBytes) / totalBytes : 0;
+        if (unreadFrac > 0)
+            Plugin.Log.LogInfo($"Onleesbaar tijdens scan: {unreadFrac:P1} van {totalBytes / MB:N0} MB.");
+        // Live poging miste te veel? Direct herkansen met een bevroren momentopname, vóórdat
+        // we tijd steken in koppeling en wegschrijven. De snapshot leest ook pagina's die FM
+        // ondertussen vrijgeeft/herschrijft, dus dit vangt scans tijdens simulatie/laden af.
+        if (!useSnapshot && unreadFrac > 0.10)
+        {
+            Plugin.Log.LogWarning($"{(int)System.Math.Round(unreadFrac * 100)}% van de scanregio's was live onleesbaar — herkansing met snapshot volgt.");
+            return DumpResult.RetryWithSnapshot;
+        }
         Plugin.Log.LogInfo($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten · {women:N0} vrouwen overgeslagen");
         Dumper.AllOffHist = allOffHist;
         Dumper.VtGp = vtGp;
@@ -495,13 +569,13 @@ internal static class Dumper
             WriteDiag(mem, players, staff, offsetHist, candidates, sw.ElapsedMilliseconds);
             Plugin.Log.LogError("0 spelers en 0 staf gevonden — dump niet weggeschreven, bestaande dump.json blijft staan.");
             WriteError("The scan found no players. Is your save fully loaded? If it is, FMSuperScout may need an update for this FM version.");
-            return;
+            return DumpResult.Done;
         }
-        // Tweede vangnet: was een flink deel van het geheugen onleesbaar (save aan het
-        // laden/ontladen, geheugendruk), dan is dit resultaat vrijwel zeker uitgedund. Het
-        // haalt de 0-spelers-check hierboven niet, maar mag een bestaande, goede dump ook
-        // niet vervangen. Zonder bestaande dump: wél schrijven (iets > niets), met logregel.
-        double unreadFrac = totalBytes > 0 ? (double)Interlocked.Read(ref unreadBytes) / totalBytes : 0;
+        // Tweede vangnet: was ook ná de herkansing een flink deel onleesbaar, dan is dit
+        // resultaat vrijwel zeker uitgedund en mag het een bestaande, goede dump niet
+        // vervangen. Zonder bestaande dump: wél schrijven (iets > niets), met logregel.
+        // De melding benoemt geheugendruk expliciet: dit pad wordt in de praktijk bereikt
+        // op machines waar Windows krap zit (snapshot faalt daar ook, bv. Win32 1450).
         if (unreadFrac > 0.10)
         {
             int pct = (int)System.Math.Round(unreadFrac * 100);
@@ -510,8 +584,10 @@ internal static class Dumper
             {
                 WriteDiag(mem, players, staff, offsetHist, candidates, sw.ElapsedMilliseconds);
                 Plugin.Log.LogError("Dump niet weggeschreven — bestaande dump.json blijft staan. Probeer opnieuw met volledig geladen save.");
-                WriteError($"The scan could not read {pct}% of FM's memory (was the game still loading?). Your existing data was kept, try again in a moment.");
-                return;
+                WriteError($"The scan could not read {pct}% of FM's memory, even after a retry with a frozen snapshot. " +
+                           "Windows is probably low on memory: close other apps, make sure the page file is not capped, or reboot. " +
+                           "Your existing data was kept.");
+                return DumpResult.Done;
             }
         }
         WriteStatus("scanning", players.Count, staff.Count, null, 0.90);
@@ -523,6 +599,7 @@ internal static class Dumper
         Plugin.Log.LogInfo($"Klaar in {sw.ElapsedMilliseconds} ms. Bestand in {OutDir}. " +
                            "Open de FMSuperScout web-app en klik Verversen.");
         WriteStatus("done", players.Count, staff.Count);   // web-app-banner leest dit
+        return DumpResult.Done;
     }
 
     // ---------- speler ----------
@@ -994,7 +1071,10 @@ internal static class Dumper
             string path = Path.Combine(OutDir, "diagnostics.txt");
             using var w = new StreamWriter(path, false);
             w.WriteLine($"FMSuperScout diagnostics — {DateTime.Now}");
-            w.WriteLine($"Scanregio's: {m.ScanRegions.Count}  ·  snapshot (VA-kloon): {(m.Snapshotted ? "ja" : $"nee, live gelezen ({m.SnapshotError ?? "onbekend"})")}");
+            var (dAvailPhys, dAvailCommit, dLoad) = MemScan.MemoryStatus();
+            w.WriteLine($"Scanregio's: {m.ScanRegions.Count}  ·  leesbron: {ScanMode}");
+            w.WriteLine($"Geheugen (na scan): {dAvailPhys / (1024 * 1024):N0} MB fysiek vrij · {dAvailCommit / (1024 * 1024):N0} MB commit vrij · belasting {dLoad}%");
+            if (m.ImageNote != null) w.WriteLine($"Let op: {m.ImageNote}");
             w.WriteLine($"GameAssembly.dll: {m.GaBase:X}-{m.GaEnd:X}");
             w.WriteLine($"game_plugin.dll:  {m.GpBase:X}-{m.GpEnd:X}");
             w.WriteLine($"Kandidaten: {candidates:N0}  (vtable in game_plugin: {VtGp:N0})");
