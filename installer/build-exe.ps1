@@ -74,6 +74,12 @@ $exe = Join-Path $dist 'FMSuperScout-Setup.exe'
 # SHA-256 voor de release notes (verificatie door downloaders; we releasen ongesigneerd).
 $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
 Set-Content -Path "$exe.sha256" -Value "$hash  FMSuperScout-Setup.exe" -NoNewline
+
+# version.json: mini-asset voor de update-check van de app. De publieke download-teller
+# ervan telt de dagelijkse checks en is zo een anonieme maat voor actieve installaties.
+# Bij elke release mee-uploaden naast de Setup.exe en .sha256.
+$ver = (Select-String -Path (Join-Path $PSScriptRoot 'FMSuperScout.iss') -Pattern 'MyAppVersion "([^"]+)"').Matches[0].Groups[1].Value
+Set-Content -Path (Join-Path $dist 'version.json') -Value "{`"tag`":`"v$ver`"}" -NoNewline -Encoding ascii
 Write-Host ''
 Write-Host "Klaar: $exe ($([math]::Round((Get-Item $exe).Length/1MB,1)) MB)" -ForegroundColor Green
 Write-Host "SHA-256: $hash"

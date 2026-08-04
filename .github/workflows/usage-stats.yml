@@ -1,0 +1,35 @@
+# Dagelijkse snapshot van alle release-download-tellers naar stats/downloads.csv.
+# De tellers zelf zijn cumulatieve momentopnames; deze log maakt er een tijdreeks van:
+# downloads per dag rond een release, en (via het version.json-asset vanaf 1.5) het
+# aantal update-checks per dag als anonieme maat voor actieve installaties.
+name: usage-stats
+on:
+  schedule:
+    - cron: '17 5 * * *'   # dagelijks 05:17 UTC
+  workflow_dispatch: {}     # ook handmatig te starten via de Actions-tab
+permissions:
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tellers ophalen en aan de log toevoegen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p stats
+          f=stats/downloads.csv
+          [ -f "$f" ] || echo 'date,release,asset,downloads' > "$f"
+          d=$(date -u +%F)
+          # Idempotent: draait hij twee keer op een dag, dan geen dubbele rijen.
+          grep -q "^$d," "$f" && { echo "vandaag al gelogd"; exit 0; }
+          curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" |
+          jq -r --arg d "$d" '.[] | .tag_name as $t | .assets[] | [$d, $t, .name, (.download_count|tostring)] | @csv' >> "$f"
+      - name: Committen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add stats/downloads.csv
+          git diff --cached --quiet || { git commit -m "stats: dagelijkse download-tellers"; git push; }

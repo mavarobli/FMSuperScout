@@ -296,6 +296,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/version-check') {
+    // Update-check via het version.json-asset van de laatste release, server-side (de
+    // asset-CDN staat geen browser-CORS toe). Functioneel gelijk aan de API-call, maar
+    // asset-downloads hebben een publieke download-teller: checks per dag zijn zo
+    // anoniem af te lezen als maat voor actieve installaties. Geen asset (oudere
+    // release) of netwerkfout? 404, en de app valt terug op de gewone API-call.
+    (async () => {
+      try {
+        const buf = await readAll(await httpsGet('https://github.com/mavarobli/FMSuperScout/releases/latest/download/version.json'));
+        const tag = String(JSON.parse(buf.toString('utf8')).tag || '');
+        if (!/^v\d/.test(tag)) throw new Error('geen tag in version.json');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ tag }));
+      } catch { res.writeHead(404); res.end(); }
+    })();
+    return;
+  }
+
   if (url.pathname === '/api/diagnostics') {
     // diagnostics.txt van de plugin, voor het voorgevulde GitHub-issue: de kopregels
     // (leesbron, geheugen, fase-timing) maken een rapport zelfvoorzienend — gebruikers

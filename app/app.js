@@ -3274,9 +3274,16 @@ async function checkUpdate(force = false) {
     let chk = {};
     try { chk = JSON.parse(localStorage.getItem('fmss_updchk') || '{}'); } catch { }
     if (force || !chk.at || Date.now() - chk.at > 20 * 3600e3) {
-      const res = await fetch('https://api.github.com/repos/mavarobli/FMSuperScout/releases/latest');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      chk = { at: Date.now(), tag: (await res.json()).tag_name };
+      // Eerst via de lokale server naar het version.json-asset (download-teller = anonieme
+      // maat voor actieve installaties); lukt dat niet, dan de gewone GitHub-API.
+      let tag = null;
+      try { const r = await fetch('/api/version-check'); if (r.ok) tag = (await r.json()).tag; } catch { }
+      if (!tag) {
+        const res = await fetch('https://api.github.com/repos/mavarobli/FMSuperScout/releases/latest');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        tag = (await res.json()).tag_name;
+      }
+      chk = { at: Date.now(), tag };
       localStorage.setItem('fmss_updchk', JSON.stringify(chk));
     }
     if (!chk.tag) return { newer: false, tag: null };
