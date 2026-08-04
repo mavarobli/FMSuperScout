@@ -610,6 +610,7 @@ internal static class Dumper
         (e.BirthYear, e.BirthDoy) = DecodeFmDate(m.U32(person + Fields.PERO_DOB));
         e.Age = AgeFrom(e.BirthYear, e.BirthDoy);
         e.Nat = ReadNation(m, person);
+        e.NatId = ReadNationId(m, person);
         e.Height = m.U16(pl + Fields.PLAO_HEIGHT);
         if (e.Height is < 140 or > 220) e.Height = 0;
 
@@ -685,6 +686,7 @@ internal static class Dumper
         (e.BirthYear, e.BirthDoy) = DecodeFmDate(m.U32(person + Fields.PERO_DOB));
         e.Age = AgeFrom(e.BirthYear, e.BirthDoy);
         e.Nat = ReadNation(m, person);
+        e.NatId = ReadNationId(m, person);
 
         foreach (var (key, off) in Fields.StaffAttrs)
             e.StaffAttrs[key] = Attr(m, st + (ulong)Fields.NPLO_ATTRS + (ulong)off);
@@ -730,6 +732,18 @@ internal static class Dumper
         string s = m.IndirectString(nat + Fields.NATION_SHORT_NAME)
                  ?? m.IndirectString(nat + Fields.NATION_NAME);
         return s == null ? new List<string>() : new List<string> { s };
+    }
+
+    // Taalonafhankelijk land-ID: de DB-UID in de objectheader van het nation-object
+    // (zelfde OBJ_DUNI-plek als bij persons). Groundwork voor issue #15 — landnamen
+    // komen in de gametaal binnen; met dit ID kan de app straks zelf vertalen en de
+    // EU-lijst taalvrij maken. De app negeert het veld voorlopig.
+    private static uint ReadNationId(MemScan m, ulong person)
+    {
+        ulong nat = m.Ptr(person + Fields.PERO_NATION);
+        if (nat == 0) return 0;
+        uint id = m.U32(nat + (ulong)Fields.OBJ_DUNI);
+        return id == 0xFFFFFFFF ? 0 : id;
     }
 
     // Huidige club via de brondata-keten (authoritatief, uit gedecompileerde CE-tabel):
@@ -1012,6 +1026,7 @@ internal static class Dumper
         j.Prop("age", p.Age);
         if (p.BirthYear > 0) { j.Prop("dob", $"{p.BirthYear:D4}"); j.Prop("birthYear", p.BirthYear); j.Prop("birthDoy", p.BirthDoy); }
         j.Key("nat"); j.BeginArr(); foreach (var n in p.Nat) j.Val(n); j.EndArr();
+        if (p.NatId != 0) j.Prop("natId", p.NatId);
         j.Prop("club", p.Club);
         // Moederclub alleen emitten als die afwijkt van de huidige club (= huurrelatie); scheelt ruis.
         if (isPlayer && p.OwnerClub != null && p.OwnerClub != p.Club) j.Prop("ownerClub", p.OwnerClub);
@@ -1168,6 +1183,7 @@ internal sealed class Person
     public int BirthYear;
     public int BirthDoy;
     public List<string> Nat = new();
+    public uint NatId;          // DB-UID van het (eerste) land — taalonafhankelijk (issue #15)
     public string Club;
     public string OwnerClub;    // moederclub (volledig contract); ≠ Club bij huur
     public string Div;

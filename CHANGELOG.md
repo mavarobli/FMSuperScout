@@ -6,6 +6,23 @@ new release is built, so the Unreleased section below is what the next release s
 ## [Unreleased]
 
 ### Added
+- French and German as app languages, next to Dutch and English. Full translations of the
+  UI, help texts, attribute names (following common FM terminology; corrections from
+  native speakers welcome), role names, player card and squad analysis. Number and date
+  formatting follows the chosen language. A key-parity test guards that every language
+  stays complete.
+- Groundwork for language-independent nation handling (issue #15): the plugin now dumps a
+  stable nation ID (`natId`) next to the name. The app does not use it yet; a later
+  release maps IDs to names and makes the EU check language-free.
+
+### Changed
+- Help tooltips now appear after a short delay (450 ms) instead of instantly, so moving
+  the mouse across the table no longer flashes "click = copy name" on every row. Moving
+  directly from one tooltip target to the next still shows instantly.
+- Help texts rewritten: shorter and more concrete (meta, PA meta, interest, growth,
+  availability).
+- With a non-Dutch app language, nation names from a Dutch-language dump now display in
+  English instead of Dutch.
 - Goalkeeper meta score. Keepers now get a meta score with their own weighting, taken from
   harvestgreen22's FM24 keeper attribute retest on FM-Arena (Reflexes and Agility count
   heaviest). Same Meta column, profile line, comparison and player card as outfield players.

@@ -68,7 +68,7 @@ const I18N = {
     c_growth: 'Groei', grNew: 'nieuw', development: 'Ontwikkeling', histPeriod: 'Periode',
     hp_last: 'Sinds vorige dump', hp_m6: 'Afgelopen 6 maanden', hp_y1: 'Afgelopen jaar',
     hp_season: 'Dit seizoen', hp_all: 'Sinds we meten', growthRange: 'Groei', onlyNew: 'Alleen nieuwe spelers',
-    growthHint: 'Hoeveel CA erbij is gekomen sinds de gekozen peildatum, uit je eigen opgeslagen momentopnames. Groen is groei, rood verlies.\n\n"nieuw" betekent dat hij er op de peildatum nog niet was. Spelers met een te dun beginrecord (CA onder 40) blijven leeg: die zouden een onzinnige sprong laten zien.\n\nElke keer dat je F9 drukt komt er een meetpunt bij, dus hoe langer je de tool gebruikt hoe verder je terug kunt kijken.',
+    growthHint: 'CA-verandering sinds de gekozen peildatum, gemeten uit je eigen dumps. Groen = groei, rood = verlies, "nieuw" = bestond toen nog niet.\n\nElke F9 voegt een meetpunt toe: hoe langer je de tool gebruikt, hoe verder je terugkijkt.',
     onlyNewHint: 'Spelers die er op de peildatum nog niet waren. Meestal jeugdspelers uit een intake, soms iemand die vanuit een niet-geladen competitie jouw database in komt.',
     intakeTitle: 'Jeugdintake: {n} nieuwe spelers wereldwijd', intakeBest: 'Beste vooruitzicht: {p}',
     intakeShow: 'Toon de intake',
@@ -96,7 +96,7 @@ const I18N = {
     c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.', c_div: 'Divisie',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
     int_big: 'Groot', int_ok: 'Redelijk', int_small: 'Klein', int_no: 'Nee', interestTitle: 'Interesse-inschatting',
-    interestHint: 'Zou deze speler een overstap naar jouw club zien zitten? Dus zijn kant van het verhaal, niet de interesse van clubs in hem.\n\nGeschat uit het reputatieverschil (jouw club tegen de zijne en tegen zijn eigen status), of je zijn salaris kunt dragen, zijn ambitie en loyaliteit, leeftijd, en of hij beschikbaar is. FIFA-artikel 19 telt mee voor niet-EU-spelers onder de 18.\n\nHet is een schatting, geen FM-getal: FM rekent dit pas uit tijdens een onderhandeling en kijkt dan ook naar jouw concrete bod. Een speler die hier "Klein" scoort kan bij een goed aanbod alsnog ja zeggen.',
+    interestHint: 'Wil deze speler naar jouw club? Geschat uit reputatieverschil, salaris, ambitie, loyaliteit, leeftijd en beschikbaarheid. FIFA-artikel 19 telt mee voor niet-EU-spelers onder de 18.\n\nSchatting, geen FM-getal: FM rekent pas tijdens de onderhandeling en weegt dan ook jouw bod. "Klein" kan bij een sterk bod alsnog ja worden.',
     minorNote: 'Te jong voor een transfer.', minorIntlNote: 'Als niet-EU-minderjarige pas vanaf 18 haalbaar (FIFA-regel voor internationale transfers).',
     ambition: 'Ambitie', loyalty: 'Loyaliteit', professionalism: 'Professionaliteit', adaptability: 'Aanpassing',
     pressure: 'Druk', sportsmanship: 'Sportiviteit', temperament: 'Temperament', controversy: 'Controverse', determination: 'Vastberadenheid',
@@ -161,8 +161,8 @@ const I18N = {
     presetSaveTitle: 'Filters opslaan', presetDelTitle: 'Filter verwijderen',
     saveBtn: 'Opslaan', deleteBtn: 'Verwijderen', cancelBtn: 'Annuleren',
     c_meta: 'Meta', metaLabel: 'Meta-score', c_metapa: 'PA-meta',
-    metaHint: 'Meta-score (1-20): gewogen gemiddelde van de attributen die volgens FM-Arena\'s match-engine-tests wedstrijden winnen. Snelheid en Versnelling tellen veruit het zwaarst, daarna Sprongkracht en Dribbelen.\n\n15+ elite, 13-15 sterk, 11-13 degelijk.\n\nTwee spelers met gelijke CA? Die met de hoogste Meta presteert meestal beter op het veld. Positie en rol tellen niet mee. Keepers krijgen een eigen weging uit FM-Arena\'s keeperstest (FM24-hertest): Reflexen en Behendigheid tellen daar het zwaarst.',
-    metaPaHint: 'PA-meta (1-20): dezelfde meta-weging, maar toegepast op de attributen die deze speler naar verwachting op zijn potentieel (PA) heeft. De projectie volgt het gemeten groeiprofiel van zijn positiegroep; fysieke groei dooft uit na 23 jaar.\n\nUitontwikkelde spelers scoren gelijk aan Meta. Sorteer hierop om de meta-toppers van morgen te vinden.',
+    metaHint: 'Gewogen gemiddelde (1-20) van de attributen die volgens FM-Arena\'s match-engine-tests wedstrijden winnen; Snelheid en Versnelling tellen veruit het zwaarst. Keepers: eigen weging uit de keeperstest (Reflexen, Behendigheid).\n\n15+ elite, 13-15 sterk, 11-13 degelijk. Bij gelijke CA presteert de hoogste Meta meestal beter.',
+    metaPaHint: 'Dezelfde meta-weging, toegepast op de attributen die hij op zijn potentieel (PA) naar verwachting haalt. Projectie volgt het groeiprofiel van zijn positiegroep; fysieke groei stopt na 23.\n\nUitontwikkeld = gelijk aan Meta. Sorteer hierop voor de meta-toppers van morgen.',
     verWarn: 'FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x. Data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
     verWarnOldDump: 'Deze data komt van een oudere FMSuperScout-plugin. Alles werkt, maar haal verse data op (F9 in FM26 met je save geladen) voor het beste resultaat.',
   },
@@ -190,7 +190,7 @@ const I18N = {
     c_growth: 'Growth', grNew: 'new', development: 'Development', histPeriod: 'Period',
     hp_last: 'Since last dump', hp_m6: 'Last 6 months', hp_y1: 'Last year',
     hp_season: 'This season', hp_all: 'Since tracking began', growthRange: 'Growth', onlyNew: 'Only new players',
-    growthHint: 'How much CA he has gained since the chosen reference date, from your own stored snapshots. Green is growth, red is loss.\n\n"new" means he did not exist yet at that date. Players with too thin a starting record (CA under 40) stay empty: they would show a nonsense jump.\n\nEvery time you press F9 another data point is added, so the longer you use the tool the further back you can look.',
+    growthHint: 'CA change since the chosen reference date, measured from your own dumps. Green = growth, red = decline, "new" = did not exist yet.\n\nEvery F9 adds a data point: the longer you use the tool, the further back you can look.',
     onlyNewHint: 'Players who did not exist at the reference date. Usually youth intake players, sometimes someone arriving in your database from a league you had not loaded.',
     intakeTitle: 'Youth intake: {n} new players worldwide', intakeBest: 'Best prospect: {p}',
     intakeShow: 'Show the intake',
@@ -218,7 +218,7 @@ const I18N = {
     c_clubrep: 'Club rep', c_worldrep: 'World rep', c_div: 'Division',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
     int_big: 'High', int_ok: 'Fair', int_small: 'Low', int_no: 'No', interestTitle: 'Interest estimate',
-    interestHint: 'Would this player fancy a move to your club? His side of it, not other clubs\' interest in him.\n\nEstimated from the reputation gap (your club against his, and against his own standing), whether you can carry his wages, his ambition and loyalty, age, and whether he is available. FIFA article 19 applies to non-EU players under 18.\n\nThis is an estimate, not an FM number: FM works it out during a negotiation and weighs your actual offer too. A player sitting at "Low" here can still say yes to a strong bid.',
+    interestHint: 'Would this player join your club? Estimated from the reputation gap, wages, ambition, loyalty, age and availability. FIFA article 19 applies to non-EU players under 18.\n\nAn estimate, not an FM number: FM decides during the actual negotiation and weighs your offer. A "Low" can still say yes to a strong bid.',
     minorNote: 'Too young for a transfer.', minorIntlNote: 'As a non-EU minor, only feasible from age 18 (FIFA rule on international transfers).',
     ambition: 'Ambition', loyalty: 'Loyalty', professionalism: 'Professionalism', adaptability: 'Adaptability',
     pressure: 'Pressure', sportsmanship: 'Sportsmanship', temperament: 'Temperament', controversy: 'Controversy', determination: 'Determination',
@@ -283,15 +283,262 @@ const I18N = {
     presetSaveTitle: 'Save filters', presetDelTitle: 'Delete filter',
     saveBtn: 'Save', deleteBtn: 'Delete', cancelBtn: 'Cancel',
     c_meta: 'Meta', metaLabel: 'Meta score', c_metapa: 'PA meta',
-    metaHint: 'Meta score (1-20): a weighted average of the attributes that win matches according to FM-Arena\'s match-engine tests. Pace and Acceleration count heaviest by far, then Jumping Reach and Dribbling.\n\n15+ elite, 13-15 strong, 11-13 decent.\n\nTwo players with equal CA? The one with the higher Meta score usually performs better on the pitch. Position and role are ignored. Goalkeepers get their own weighting from FM-Arena\'s keeper test (FM24 retest): Reflexes and Agility count heaviest there.',
-    metaPaHint: 'PA meta (1-20): the same meta weighting, applied to the attributes this player is expected to have at his potential (PA). The projection follows the measured growth profile of his position group; physical growth fades after 23.\n\nFully developed players score the same as Meta. Sort on this to find tomorrow\'s meta stars.',
+    metaHint: 'Weighted average (1-20) of the attributes that win matches according to FM-Arena\'s match-engine tests; Pace and Acceleration count heaviest by far. Goalkeepers: own weighting from the keeper test (Reflexes, Agility).\n\n15+ elite, 13-15 strong, 11-13 decent. At equal CA the higher Meta usually performs better.',
+    metaPaHint: 'The same meta weighting, applied to the attributes he is expected to reach at his potential (PA). The projection follows his position group\'s growth profile; physical growth stops after 23.\n\nFully developed = same as Meta. Sort on this for tomorrow\'s meta stars.',
     verWarn: 'FM version {v} detected; memory reading is calibrated for {s}.x. Data may be unreliable until FMSuperScout is updated.',
     verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM26 with your save loaded) for the best results.',
+  },
+  fr: {
+    players: 'Joueurs', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Nom ou club…',
+    settings: 'Paramètres', langLabel: 'Langue', curLabel: 'Devise',
+    showHidden: 'Afficher les stats cachées', showMeta: 'Afficher le score méta',
+    profileMode: 'Profil du joueur', profSide: 'À droite', profPopup: 'Popup',
+    devTitle: 'Progression',
+    cardBtnTip: 'Enregistrer la carte du joueur (PNG)', cardSaved: 'Carte enregistrée dans Téléchargements',
+    donateBtn: 'Soutenir FMSuperScout',
+    seasonTitle: 'C\'était la saison {s}',
+    seasonStatProfiles: '{n} profils consultés', seasonStatLoads: '{n} chargements de la base',
+    seasonStatCards: '{n} cartes partagées', seasonStatShort: '{n} sur la shortlist',
+    seasonAsk: 'FMSuperScout a bossé toute la saison gratuitement. Un café, c\'est son salaire annuel.',
+    alreadyDonated: 'Déjà donné ?', neverAsk: 'Ne plus demander',
+    supporterThanks: 'Merci ! Vous n\'en entendrez plus parler.',
+    donateCta: '☕ Offrir un café', donateLater: 'Plus tard',
+    position: 'Poste', clear: 'effacer', staffrole: 'Rôle du staff', quality: 'Qualité et âge',
+    age: 'Âge', financial: 'Finances', maxvalue: 'Valeur max.', maxfee: 'Prix demandé max.', maxwage: 'Salaire max. /sem',
+    esSetupTitle: 'Lancez d\'abord Football Manager 26 une fois',
+    esSetupBody: 'Le premier lancement après l\'installation prend 1 à 3 minutes de plus et affiche une console noire. C\'est normal : la couche de mods génère ses fichiers une seule fois. Laissez la fenêtre ouverte, même si FM semble figé.',
+    esSetupHint: 'Ensuite chargez votre sauvegarde et appuyez sur F9. Les lancements suivants seront normaux.',
+    devDeltaHint: 'Évolution sur la période affichée : dernière mesure moins la première. Vert = progrès, rouge = recul.',
+    c_growth: 'Progrès', grNew: 'nouveau', development: 'Progression', histPeriod: 'Période',
+    hp_last: 'Depuis le dernier dump', hp_m6: '6 derniers mois', hp_y1: 'Dernière année',
+    hp_season: 'Cette saison', hp_all: 'Depuis le début', growthRange: 'Progrès', onlyNew: 'Nouveaux joueurs uniquement',
+    growthHint: 'Évolution de la CA depuis la date de référence, mesurée dans vos propres dumps. Vert = progrès, rouge = recul, "nouveau" = n\'existait pas encore.\n\nChaque F9 ajoute un point de mesure : plus vous utilisez l\'outil, plus vous remontez loin.',
+    onlyNewHint: 'Joueurs absents à la date de référence. En général des jeunes issus d\'une intake, parfois un joueur arrivé d\'un championnat non chargé.',
+    intakeTitle: 'Intake : {n} nouveaux joueurs dans le monde', intakeBest: 'Meilleur espoir : {p}',
+    intakeShow: 'Voir l\'intake',
+    physical: 'Physique', heightCm: 'Taille (cm)', wonderkidOnly: 'Wonderkids uniquement',
+    wonderkidHint: '21 ans max, PA de 150 ou plus et au moins 25 points de marge (PA moins CA). Même seuil que le liseré doré de la carte.',
+    origin: 'Origine', originComp: 'Origine et championnat', nat: 'Nationalité', euonly: 'UE/EEE uniquement', availability: 'Disponibilité',
+    interestmin: 'Intérêt ≥', all: 'Tous', attainable: 'Disponible', listed: 'Transférable',
+    tstatus: 'Statut de transfert', tsSale: 'À vendre', tsLoan: 'À prêter', tsAny: 'À vendre ou à prêter',
+    attainHint: 'Peut-il quitter son club ? Listé, proposé, libre ou en fin de contrat sous 12 mois (et pas "pas à vendre"). Ne dit rien sur son envie de VOUS rejoindre : ça, c\'est l\'Intérêt.',
+    exp6: '< 6 mois', exp12: '< 1 an', free: 'Libre', myclub: 'Mon club', contractF: 'Contrat',
+    advBtn: 'Filtre d\'attributs', advTitle: 'Filtrer par attributs', advSearch: 'Choisissez ou tapez un attribut…',
+    advAdd: '+ attribut', advClear: 'Effacer', advDone: 'OK', advMin: 'min', advMax: 'max', advColAttr: 'Attribut',
+    reportBug: 'Signaler un problème…', esReportHint: 'F9 pressé mais pas de données ?', updateAvail: 'Mise à jour {v} disponible',
+    updDl: 'Téléchargement… {pct}%', updVerify: 'Vérification du téléchargement…',
+    updLaunch: 'Installateur lancé. Suivez les étapes ; l\'app redémarre ensuite.',
+    updErr: 'Échec de la mise à jour. Ouvrir la page de téléchargement',
+    updCheckBtn: 'Rechercher des mises à jour', updChecking: 'Recherche…',
+    updNone: 'Vous êtes à jour (v{v})', updFound: 'Mise à jour {v} disponible, voir la notification en haut',
+    updCheckErr: 'Vérification impossible. Êtes-vous en ligne ?',
+    onlyshortlist: 'Shortlist uniquement', clearfilters: 'Effacer les filtres', fetch: 'Nouvelles données',
+    nodata: 'Aucune donnée chargée', exportcsv: 'Exporter la shortlist (CSV)',
+    results: 'résultats', c_name: 'Nom', c_age: 'Âge', c_pos: 'Poste', c_club: 'Club', c_nat: 'Nat',
+    c_value: 'Valeur', c_fee: 'Prix demandé', c_wage: 'Salaire /sem', c_expires: 'Contrat jusqu\'au', c_interest: 'Intérêt',
+    c_status: 'Statut', c_role: 'Rôle', foot: 'Pied', footR: 'Droit', footL: 'Gauche', footB: 'Les deux', height: 'Taille', repLabel: 'Réputation',
+    c_clubrep: 'Rép. club', c_worldrep: 'Rép. mondiale', c_div: 'Division',
+    estval: 'Valeur est.', wageLabel: 'Salaire', contractLabel: 'Contrat jusqu\'au', free_l: 'libre',
+    int_big: 'Fort', int_ok: 'Correct', int_small: 'Faible', int_no: 'Non', interestTitle: 'Estimation d\'intérêt',
+    interestHint: 'Ce joueur rejoindrait-il votre club ? Estimé à partir de l\'écart de réputation, du salaire, de l\'ambition, de la loyauté, de l\'âge et de la disponibilité. L\'article 19 de la FIFA s\'applique aux non-UE de moins de 18 ans.\n\nUne estimation, pas un chiffre FM : FM tranche pendant la négociation et pèse votre offre. Un "Faible" peut dire oui à une belle offre.',
+    minorNote: 'Trop jeune pour un transfert.', minorIntlNote: 'Mineur non-UE : possible seulement à partir de 18 ans (règle FIFA sur les transferts internationaux).',
+    ambition: 'Ambition', loyalty: 'Loyauté', professionalism: 'Professionnalisme', adaptability: 'Adaptabilité',
+    pressure: 'Pression', sportsmanship: 'Fair-play', temperament: 'Tempérament', controversy: 'Controverse', determination: 'Détermination',
+    personaTitle: 'Personnalité',
+    hiddenTitle: 'Caractéristiques cachées', a_Consistency: 'Régularité', a_ImportantMatches: 'Grands matchs',
+    a_InjuryProneness: 'Fragilité', a_Versatility: 'Polyvalence', a_Dirtiness: 'Antijeu',
+    showPot: 'Voir le potentiel estimé', potNote: 'valeurs estimées au potentiel (PA)',
+    loanOut: 'prêté à {c}', loanIn: 'prêté par {c}', ownerLabel: 'Club propriétaire',
+    clubless: 'sans club', clubUnknown: 'club inconnu', copied: 'Copié',
+    copyNameTip: 'Clic = copier le nom', slEmpty: 'Shortlist vide',
+    copyBtnTip: 'Copier le nom', clubNotRead: 'Club non résolu (rép {r})',
+    reqSent: 'Lecture des données…',
+    dumping: 'Lecture des données…', dumpReady: 'Nouvelles données prêtes, cliquez pour charger',
+    dumpLoaded: 'Nouvelles données chargées',
+    dumpError: 'Échec de la lecture', fmNotRunning: 'Lancez d\'abord Football Manager 26 et chargez votre sauvegarde.',
+    dumpIncomplete: 'Le dump est incomplet (FM26 était sans doute encore occupé). Réessayez dans un instant.',
+    reqNoPickup: 'FM26 ne reçoit pas la demande. Sauvegarde chargée ? Essayez F9 dans le jeu, ou relancez FM26.',
+    reqNoPickupMore: 'Ça revient sans cesse ? Lisez le correctif',
+    scanStalled: 'Le scan semble arrêté (FM26 fermé ou planté ?). Relancez FM26 et réessayez.',
+    serverGone: 'Pas de connexion au serveur local. Fermez cette fenêtre et relancez FMSuperScout.',
+    tag_free: 'libre', tag_listed: 'transférable', tag_loan: 'à prêter', tag_rel: 'libéré', tag_nfs: 'pas à vendre',
+    colHint: 'Glissez pour déplacer · clic droit pour les colonnes', colsTitle: 'Colonnes affichées', colsReset: 'Rétablir par défaut',
+    g_technical: 'Technique', g_setpieces: 'Coups de pied arrêtés', g_mental: 'Mental', g_physical: 'Physique', g_goalkeeping: 'Gardien',
+    staffAttrs: 'Attributs du staff',
+    clearAll: 'tout effacer', chipSearch: 'Rechercher',
+    loading: 'Chargement…',
+    parsing: 'Traitement…',
+    esErrTitle: 'Impossible de charger le dump',
+    esErrBig: 'Un dump existe sur le disque, mais l\'app n\'a pas pu le lire. Cela arrive surtout avec une très grosse sauvegarde (beaucoup de championnats chargés). Signalez-le avec le bouton ci-dessous.',
+    esErrSize: 'Dump sur disque : {mb} Mo',
+    esErrReload: 'Réessayer',
+    esErrCrash: 'Le chargement précédent a échoué, probablement par manque de mémoire. Astuce : fermez FM26 (le dump est déjà sur le disque) puis cliquez sur Réessayer.',
+    step1: 'Lancez <b>FM26</b> et chargez votre sauvegarde',
+    step2: 'Appuyez sur <kbd>F9</kbd> dans le jeu, ou cliquez ici sur <b>Nouvelles données</b>',
+    step3: 'Les données se chargent dès que le dump est prêt',
+    playersWord: 'joueurs', staffWord: 'staff', clickClubFilter: 'Clic = filtrer sur votre club', repWord: 'réputation',
+    roleFit: 'Rôle tactique', roleColHdr: 'Rôle', roleAny: 'Aucun rôle choisi', bestRoles: 'Meilleurs rôles',
+    compare: 'Comparer', comparing: 'Comparaison', addCompare: 'Comparer', compareFull: '3 joueurs max.',
+    cmpTitle: 'Comparaison de joueurs', cmpValue: 'Valeur', cmpTopRole: 'Meilleur rôle',
+    cmpWinsBadge: '{n}× meilleur attribut', avgLabel: 'Moyenne',
+    mt_all: 'Tout', mt_first: 'Équipe première', mt_res: 'Réserve', mt_youth: 'Jeunes',
+    cmpDeltaHint: 'Écart : joueur 1 moins joueur 2 (vert = avantage joueur 1)',
+    analysis: 'Analyse', anTitle: 'Analyse des besoins de l\'effectif', anNoClub: 'Aucun club à vous trouvé dans les données.',
+    anPlayers: 'joueurs', anAvgAge: 'âge moyen', anAvgCa: 'CA moyenne', anTopCa: 'meilleure CA',
+    anOk: 'Au niveau', anThin: 'Effectif mince', anShort: 'Manque', anAging: 'Vieillissant', anNoSucc: 'Pas de relève',
+    anScout: 'Scouter des joueurs', anYoungTalent: 'plus jeune talent', anNone: 'aucun',
+    anBiggestNeed: 'Plus grand besoin', anSquadSize: 'Effectif',
+    anRecAging: 'Vieillissant ; cherchez un successeur de moins de {age} ans avec plus de {pa} de PA.',
+    anRecShort: 'Trop peu de joueurs ; recrutez au moins {n} de plus ({pa}+ PA).',
+    anRecThin: 'Couverture mince ; un renfort de {pa}+ PA étoffera la rotation.',
+    anRecSucc: 'Aucun jeune au niveau ; cherchez un U{age} avec plus de {pa} de PA.',
+    anRecAgingNp: 'Vieillissant ; cherchez un successeur plus jeune.',
+    anRecShortNp: 'Trop peu de joueurs ; recrutez-en {n} de plus.',
+    anRecThinNp: 'Couverture mince ; un renfort étoffera la rotation.',
+    anRecSuccNp: 'Aucun jeune au niveau ; cherchez un grand talent U{age}.',
+    competition: 'Championnat', divLabel: 'Division', divSearch: 'Tapez un championnat…',
+    gameDateMemory: 'Date en jeu (lue en mémoire)', gameDateDerived: 'Date en jeu estimée (année sûre, jour approché)',
+    presetsTitle: 'Filtres enregistrés', presetSave: 'Enregistrer les filtres actuels', presetNamePrompt: 'Nom de cette recherche',
+    presetSaved: 'Filtre enregistré', presetNone: 'Aucun filtre enregistré.', presetPick: 'Choisir un filtre…',
+    presetDelConfirm: 'Supprimer "{name}" ?',
+    presetEmptyFilters: 'Aucun filtre actif à enregistrer',
+    presetSaveTitle: 'Enregistrer les filtres', presetDelTitle: 'Supprimer le filtre',
+    saveBtn: 'Enregistrer', deleteBtn: 'Supprimer', cancelBtn: 'Annuler',
+    c_meta: 'Méta', metaLabel: 'Score méta', c_metapa: 'Méta PA',
+    metaHint: 'Moyenne pondérée (1-20) des attributs qui gagnent des matchs selon les tests du moteur de FM-Arena ; Vitesse et Accélération pèsent de loin le plus lourd. Gardiens : pondération propre issue du test des gardiens (Réflexes, Agilité).\n\n15+ élite, 13-15 fort, 11-13 correct. À CA égale, le Méta le plus haut performe en général mieux.',
+    metaPaHint: 'La même pondération méta, appliquée aux attributs qu\'il devrait atteindre à son potentiel (PA). La projection suit le profil de progression de son groupe de postes ; le physique cesse de progresser après 23 ans.\n\nJoueur abouti = identique au Méta. Triez dessus pour trouver les stars méta de demain.',
+    verWarn: 'Version FM {v} détectée ; la lecture est calibrée pour {s}.x. Données possiblement peu fiables avant une mise à jour de FMSuperScout.',
+    verWarnOldDump: 'Ces données viennent d\'un plugin FMSuperScout plus ancien. Tout fonctionne, mais rechargez des données fraîches (F9 dans FM26, sauvegarde chargée) pour un meilleur résultat.',
+  },
+  de: {
+    players: 'Spieler', staff: 'Mitarbeiter', shortlist: 'Shortlist', searchph: 'Name oder Verein…',
+    settings: 'Einstellungen', langLabel: 'Sprache', curLabel: 'Währung',
+    showHidden: 'Versteckte Werte anzeigen', showMeta: 'Meta-Score anzeigen',
+    profileMode: 'Spielerprofil', profSide: 'Rechts', profPopup: 'Popup',
+    devTitle: 'Entwicklung',
+    cardBtnTip: 'Spielerkarte speichern (PNG)', cardSaved: 'Karte in Downloads gespeichert',
+    donateBtn: 'FMSuperScout unterstützen',
+    seasonTitle: 'Das war Saison {s}',
+    seasonStatProfiles: '{n} Profile angesehen', seasonStatLoads: '{n}× Datenbank geladen',
+    seasonStatCards: '{n} Spielerkarten geteilt', seasonStatShort: '{n} auf der Shortlist',
+    seasonAsk: 'FMSuperScout hat die ganze Saison gratis mitgearbeitet. Ein Kaffee ist sein komplettes Jahresgehalt.',
+    alreadyDonated: 'Schon gespendet?', neverAsk: 'Nicht mehr fragen',
+    supporterThanks: 'Danke! Du hörst nichts mehr davon.',
+    donateCta: '☕ Kaffee spendieren', donateLater: 'Später',
+    position: 'Position', clear: 'leeren', staffrole: 'Mitarbeiterrolle', quality: 'Qualität & Alter',
+    age: 'Alter', financial: 'Finanzen', maxvalue: 'Max. Wert', maxfee: 'Max. Forderung', maxwage: 'Max. Gehalt /Wo',
+    esSetupTitle: 'Starte Football Manager 26 zuerst einmal',
+    esSetupBody: 'Der erste Start nach der Installation dauert 1 bis 3 Minuten länger und zeigt ein schwarzes Konsolenfenster. Das ist normal: Die Mod-Ebene erzeugt einmalig ihre Dateien. Fenster offen lassen, auch wenn FM zu hängen scheint.',
+    esSetupHint: 'Danach Spielstand laden und F9 drücken. Die nächsten Starts laufen wieder normal.',
+    devDeltaHint: 'Veränderung im angezeigten Zeitraum: letzte Messung minus erste. Grün = Fortschritt, Rot = Rückschritt.',
+    c_growth: 'Wachstum', grNew: 'neu', development: 'Entwicklung', histPeriod: 'Zeitraum',
+    hp_last: 'Seit letztem Dump', hp_m6: 'Letzte 6 Monate', hp_y1: 'Letztes Jahr',
+    hp_season: 'Diese Saison', hp_all: 'Seit Beginn', growthRange: 'Wachstum', onlyNew: 'Nur neue Spieler',
+    growthHint: 'CA-Veränderung seit dem gewählten Stichtag, gemessen aus deinen eigenen Dumps. Grün = Wachstum, Rot = Verlust, "neu" = existierte damals noch nicht.\n\nJedes F9 fügt einen Messpunkt hinzu: Je länger du das Tool nutzt, desto weiter blickst du zurück.',
+    onlyNewHint: 'Spieler, die es am Stichtag noch nicht gab. Meist Jugendspieler aus einer Intake, manchmal jemand aus einer nicht geladenen Liga.',
+    intakeTitle: 'Jugend-Intake: {n} neue Spieler weltweit', intakeBest: 'Bestes Talent: {p}',
+    intakeShow: 'Intake anzeigen',
+    physical: 'Physis', heightCm: 'Größe (cm)', wonderkidOnly: 'Nur Wonderkids',
+    wonderkidHint: 'Höchstens 21 Jahre, PA 150 oder mehr und mindestens 25 Punkte Luft (PA minus CA). Gleiche Schwelle wie der Goldrand auf der Spielerkarte.',
+    origin: 'Herkunft', originComp: 'Herkunft & Liga', nat: 'Nationalität', euonly: 'Nur EU/EWR', availability: 'Verfügbarkeit',
+    interestmin: 'Interesse ≥', all: 'Alle', attainable: 'Verfügbar', listed: 'Auf Transferliste',
+    tstatus: 'Transferstatus', tsSale: 'Zu verkaufen', tsLoan: 'Zu verleihen', tsAny: 'Verkauf oder Leihe',
+    attainHint: 'Kann er weg? Auf der Transferliste, angeboten, vereinslos oder Vertrag läuft binnen 12 Monaten aus (und nicht "unverkäuflich"). Sagt nichts darüber, ob er zu DIR will: das ist Interesse.',
+    exp6: '< 6 Mon.', exp12: '< 1 Jahr', free: 'Vereinslos', myclub: 'Mein Verein', contractF: 'Vertrag',
+    advBtn: 'Attributfilter', advTitle: 'Nach Attributen filtern', advSearch: 'Attribut wählen oder tippen…',
+    advAdd: '+ Attribut', advClear: 'Leeren', advDone: 'Fertig', advMin: 'min', advMax: 'max', advColAttr: 'Attribut',
+    reportBug: 'Problem melden…', esReportHint: 'F9 gedrückt, aber keine Daten?', updateAvail: 'Update {v} verfügbar',
+    updDl: 'Update wird geladen… {pct}%', updVerify: 'Download wird geprüft…',
+    updLaunch: 'Installer gestartet. Folge den Schritten; die App startet danach neu.',
+    updErr: 'Update fehlgeschlagen. Downloadseite öffnen',
+    updCheckBtn: 'Nach Updates suchen', updChecking: 'Suche…',
+    updNone: 'Du bist aktuell (v{v})', updFound: 'Update {v} verfügbar, siehe Hinweis oben',
+    updCheckErr: 'Prüfung fehlgeschlagen. Bist du online?',
+    onlyshortlist: 'Nur Shortlist', clearfilters: 'Filter leeren', fetch: 'Neue Daten',
+    nodata: 'Noch keine Daten geladen', exportcsv: 'Shortlist exportieren (CSV)',
+    results: 'Treffer', c_name: 'Name', c_age: 'Alter', c_pos: 'Position', c_club: 'Verein', c_nat: 'Nat',
+    c_value: 'Wert', c_fee: 'Forderung', c_wage: 'Gehalt /Wo', c_expires: 'Vertrag bis', c_interest: 'Interesse',
+    c_status: 'Status', c_role: 'Rolle', foot: 'Fuß', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Größe', repLabel: 'Reputation',
+    c_clubrep: 'Vereinsrep.', c_worldrep: 'Weltrep.', c_div: 'Liga',
+    estval: 'Gesch. Wert', wageLabel: 'Gehalt', contractLabel: 'Vertrag bis', free_l: 'ablösefrei',
+    int_big: 'Hoch', int_ok: 'Ordentlich', int_small: 'Gering', int_no: 'Nein', interestTitle: 'Interesse-Einschätzung',
+    interestHint: 'Würde dieser Spieler zu deinem Verein wechseln? Geschätzt aus Reputationsunterschied, Gehalt, Ambition, Loyalität, Alter und Verfügbarkeit. FIFA-Artikel 19 gilt für Nicht-EU-Spieler unter 18.\n\nEine Schätzung, keine FM-Zahl: FM entscheidet erst in der Verhandlung und wägt dein Angebot mit. Ein "Gering" kann bei einem starken Angebot trotzdem Ja sagen.',
+    minorNote: 'Zu jung für einen Transfer.', minorIntlNote: 'Als Nicht-EU-Minderjähriger erst ab 18 machbar (FIFA-Regel für internationale Transfers).',
+    ambition: 'Ambition', loyalty: 'Loyalität', professionalism: 'Professionalität', adaptability: 'Anpassung',
+    pressure: 'Druck', sportsmanship: 'Fairness', temperament: 'Temperament', controversy: 'Kontroverse', determination: 'Entschlossenheit',
+    personaTitle: 'Persönlichkeit',
+    hiddenTitle: 'Versteckte Merkmale', a_Consistency: 'Konstanz', a_ImportantMatches: 'Wichtige Spiele',
+    a_InjuryProneness: 'Verletzungsanfälligkeit', a_Versatility: 'Vielseitigkeit', a_Dirtiness: 'Unfairness',
+    showPot: 'Geschätztes Potenzial anzeigen', potNote: 'geschätzte Werte beim Potenzial (PA)',
+    loanOut: 'verliehen an {c}', loanIn: 'ausgeliehen von {c}', ownerLabel: 'Stammverein',
+    clubless: 'vereinslos', clubUnknown: 'unbekannter Verein', copied: 'Kopiert',
+    copyNameTip: 'Klick = Name kopieren', slEmpty: 'Shortlist leer',
+    copyBtnTip: 'Name kopieren', clubNotRead: 'Verein nicht ausgelesen (Rep {r})',
+    reqSent: 'Spielerdaten werden gelesen…',
+    dumping: 'Spielerdaten werden gelesen…', dumpReady: 'Neue Daten bereit, zum Laden klicken',
+    dumpLoaded: 'Neue Daten geladen',
+    dumpError: 'Auslesen fehlgeschlagen', fmNotRunning: 'Starte zuerst Football Manager 26 und lade deinen Spielstand.',
+    dumpIncomplete: 'Der Dump ist unvollständig (FM26 war vermutlich noch beschäftigt). Versuche es gleich noch einmal.',
+    reqNoPickup: 'FM26 nimmt die Anfrage nicht an. Spielstand geladen? Versuche F9 im Spiel oder starte FM26 neu.',
+    reqNoPickupMore: 'Kommt das immer wieder? Lies den Fix',
+    scanStalled: 'Der Scan scheint gestoppt (FM26 beendet oder abgestürzt?). Starte FM26 neu und versuche es erneut.',
+    serverGone: 'Keine Verbindung zum lokalen Server. Schließe dieses Fenster und starte FMSuperScout neu.',
+    tag_free: 'vereinslos', tag_listed: 'Transferliste', tag_loan: 'zu verleihen', tag_rel: 'freigestellt', tag_nfs: 'unverkäuflich',
+    colHint: 'Ziehen zum Verschieben · Rechtsklick für Spalten', colsTitle: 'Spalten anzeigen', colsReset: 'Standard wiederherstellen',
+    g_technical: 'Technik', g_setpieces: 'Standards', g_mental: 'Mental', g_physical: 'Physis', g_goalkeeping: 'Torwart',
+    staffAttrs: 'Mitarbeiter-Attribute',
+    clearAll: 'alles leeren', chipSearch: 'Suchen',
+    loading: 'Daten werden geladen…',
+    parsing: 'Daten werden verarbeitet…',
+    esErrTitle: 'Der Dump konnte nicht geladen werden',
+    esErrBig: 'Auf der Festplatte liegt ein Dump, aber die App konnte ihn nicht lesen. Das passiert vor allem bei sehr großen Spielständen (viele Ligen gleichzeitig geladen). Melde es mit dem Button unten.',
+    esErrSize: 'Dump auf Festplatte: {mb} MB',
+    esErrReload: 'Erneut versuchen',
+    esErrCrash: 'Der letzte Ladeversuch ist hängen geblieben, vermutlich wegen zu wenig freiem Speicher. Tipp: Schließe FM26 (der Dump liegt schon auf der Festplatte) und klicke dann auf Erneut versuchen.',
+    step1: 'Starte <b>FM26</b> und lade deinen Spielstand',
+    step2: 'Drücke im Spiel <kbd>F9</kbd> oder klicke hier auf <b>Neue Daten</b>',
+    step3: 'Die Daten laden automatisch, sobald der Dump fertig ist',
+    playersWord: 'Spieler', staffWord: 'Mitarbeiter', clickClubFilter: 'Klick = nach deinem Verein filtern', repWord: 'Reputation',
+    roleFit: 'Taktische Rolle', roleColHdr: 'Rolle', roleAny: 'Keine Rolle gewählt', bestRoles: 'Beste Rollen',
+    compare: 'Vergleichen', comparing: 'Vergleich', addCompare: 'Vergleichen', compareFull: 'Max. 3 Spieler',
+    cmpTitle: 'Spielervergleich', cmpValue: 'Wert', cmpTopRole: 'Beste Rolle',
+    cmpWinsBadge: '{n}× bestes Attribut', avgLabel: 'Durchschnitt',
+    mt_all: 'Alle', mt_first: '1. Mannschaft', mt_res: 'Reserve', mt_youth: 'Jugend',
+    cmpDeltaHint: 'Differenz: Spieler 1 minus Spieler 2 (grün = Vorteil Spieler 1)',
+    analysis: 'Analyse', anTitle: 'Kaderbedarfsanalyse', anNoClub: 'Kein eigener Verein in den Daten gefunden.',
+    anPlayers: 'Spieler', anAvgAge: 'Ø Alter', anAvgCa: 'Ø CA', anTopCa: 'beste CA',
+    anOk: 'Gut besetzt', anThin: 'Dünn besetzt', anShort: 'Unterbesetzt', anAging: 'Überaltert', anNoSucc: 'Keine Nachfolge',
+    anScout: 'Spieler scouten', anYoungTalent: 'jüngstes Talent', anNone: 'keins',
+    anBiggestNeed: 'Größter Bedarf', anSquadSize: 'Kader',
+    anRecAging: 'Überaltert; suche einen Nachfolger unter {age} mit PA über {pa}.',
+    anRecShort: 'Zu wenige Spieler; verpflichte mindestens {n} weitere ({pa}+ PA).',
+    anRecThin: 'Dünne Absicherung; ein Zugang mit {pa}+ PA stärkt die Tiefe.',
+    anRecSucc: 'Kein junges Talent auf Niveau; suche einen U{age} mit PA über {pa}.',
+    anRecAgingNp: 'Überaltert; suche einen jüngeren Nachfolger.',
+    anRecShortNp: 'Zu wenige Spieler; verpflichte {n} weitere.',
+    anRecThinNp: 'Dünne Absicherung; ein Zugang stärkt die Tiefe.',
+    anRecSuccNp: 'Kein junges Talent auf Niveau; suche ein großes U{age}-Talent.',
+    competition: 'Liga', divLabel: 'Liga', divSearch: 'Liga eintippen…',
+    gameDateMemory: 'Datum im Spiel (aus dem Speicher)', gameDateDerived: 'Geschätztes Spieldatum (Jahr sicher, Tag angenähert)',
+    presetsTitle: 'Gespeicherte Filter', presetSave: 'Aktuelle Filter speichern', presetNamePrompt: 'Name für diese Suche',
+    presetSaved: 'Filter gespeichert', presetNone: 'Noch keine gespeicherten Filter.', presetPick: 'Gespeicherten Filter wählen…',
+    presetDelConfirm: '"{name}" wirklich löschen?',
+    presetEmptyFilters: 'Keine aktiven Filter zum Speichern',
+    presetSaveTitle: 'Filter speichern', presetDelTitle: 'Filter löschen',
+    saveBtn: 'Speichern', deleteBtn: 'Löschen', cancelBtn: 'Abbrechen',
+    c_meta: 'Meta', metaLabel: 'Meta-Score', c_metapa: 'PA-Meta',
+    metaHint: 'Gewichteter Durchschnitt (1-20) der Attribute, die laut FM-Arenas Match-Engine-Tests Spiele gewinnen; Schnelligkeit und Antritt zählen mit Abstand am meisten. Torhüter: eigene Gewichtung aus dem Torwart-Test (Reflexe, Beweglichkeit).\n\n15+ Elite, 13-15 stark, 11-13 solide. Bei gleicher CA spielt der höhere Meta meist besser.',
+    metaPaHint: 'Dieselbe Meta-Gewichtung, angewandt auf die Attribute, die er an seinem Potenzial (PA) voraussichtlich erreicht. Die Projektion folgt dem Wachstumsprofil seiner Positionsgruppe; Physis wächst nach 23 nicht mehr.\n\nAusentwickelt = gleich Meta. Sortiere danach für die Meta-Stars von morgen.',
+    verWarn: 'FM-Version {v} erkannt; das Auslesen ist auf {s}.x geeicht. Daten bis zu einem FMSuperScout-Update möglicherweise unzuverlässig.',
+    verWarnOldDump: 'Diese Daten stammen von einem älteren FMSuperScout-Plugin. Alles funktioniert, aber hole frische Daten (F9 in FM26 mit geladenem Spielstand) für das beste Ergebnis.',
   },
 };
 // Onbekende taalcode (oude versie in localStorage, gesynct profiel) mag de app niet
 // slopen vóór er ook maar iets gerenderd is → altijd via een geldige tabel.
-const t = k => ((I18N[state.lang] || I18N.en)[k] ?? I18N.nl[k] ?? k);
+const t = k => ((I18N[state.lang] || I18N.en)[k] ?? I18N.en[k] ?? I18N.nl[k] ?? k);
+// Locale voor getallen/datums per app-taal (toLocaleString/-DateString).
+const LOCALES = { nl: 'nl-NL', en: 'en-GB', fr: 'fr-FR', de: 'de-DE' };
+const uiLocale = () => LOCALES[state.lang] || 'en-GB';
 
 // ================= SVG-iconen =================
 // Eén stijl (stroke, currentColor) die aansluit bij de bestaande UI-iconen; geen emoji.
@@ -353,6 +600,19 @@ const ATTR_LABEL = {
     Aggression: 'Aggression', Anticipation: 'Anticipation', Bravery: 'Bravery', Composure: 'Composure', Concentration: 'Concentration', Decisions: 'Decisions', Determination: 'Determination', Flair: 'Flair', Leadership: 'Leadership', OffTheBall: 'Off the Ball', Positioning: 'Positioning', Teamwork: 'Teamwork', Vision: 'Vision', WorkRate: 'Work Rate',
     Acceleration: 'Acceleration', Agility: 'Agility', Balance: 'Balance', JumpingReach: 'Jumping Reach', NaturalFitness: 'Natural Fitness', Pace: 'Pace', Stamina: 'Stamina', Strength: 'Strength',
     AerialReach: 'Aerial Reach', CommandOfArea: 'Command of Area', Communication: 'Communication', Eccentricity: 'Eccentricity', Handling: 'Handling', Kicking: 'Kicking', OneOnOnes: 'One on Ones', Punching: 'Punching', Reflexes: 'Reflexes', RushingOut: 'Rushing Out', Throwing: 'Throwing',
+  },
+  // FR/DE volgen de gangbare FM-termen; correcties van native spelers zijn welkom via een issue/PR.
+  fr: {
+    Corners: 'Corners', Crossing: 'Centres', Dribbling: 'Dribble', Finishing: 'Finition', FirstTouch: 'Contrôle', FreeKicks: 'Coups francs', Heading: 'Jeu de tête', LongShots: 'Tirs de loin', LongThrows: 'Touches longues', Marking: 'Marquage', Passing: 'Passes', PenaltyTaking: 'Penaltys', Tackling: 'Tacles', Technique: 'Technique',
+    Aggression: 'Agressivité', Anticipation: 'Anticipation', Bravery: 'Courage', Composure: 'Sang-froid', Concentration: 'Concentration', Decisions: 'Décisions', Determination: 'Détermination', Flair: 'Flair', Leadership: 'Leadership', OffTheBall: 'Déplacements', Positioning: 'Placement', Teamwork: 'Collectif', Vision: 'Vision du jeu', WorkRate: 'Volume de jeu',
+    Acceleration: 'Accélération', Agility: 'Agilité', Balance: 'Équilibre', JumpingReach: 'Détente', NaturalFitness: 'Condition naturelle', Pace: 'Vitesse', Stamina: 'Endurance', Strength: 'Force',
+    AerialReach: 'Jeu aérien', CommandOfArea: 'Autorité dans la surface', Communication: 'Communication', Eccentricity: 'Excentricité', Handling: 'Prise de balle', Kicking: 'Dégagements', OneOnOnes: 'Un contre un', Punching: 'Sorties aux poings', Reflexes: 'Réflexes', RushingOut: 'Sorties', Throwing: 'Relances à la main',
+  },
+  de: {
+    Corners: 'Ecken', Crossing: 'Flanken', Dribbling: 'Dribbling', Finishing: 'Abschluss', FirstTouch: 'Ballannahme', FreeKicks: 'Freistöße', Heading: 'Kopfball', LongShots: 'Weitschüsse', LongThrows: 'Weite Einwürfe', Marking: 'Manndeckung', Passing: 'Passspiel', PenaltyTaking: 'Elfmeter', Tackling: 'Tackling', Technique: 'Technik',
+    Aggression: 'Aggressivität', Anticipation: 'Antizipation', Bravery: 'Mut', Composure: 'Gelassenheit', Concentration: 'Konzentration', Decisions: 'Entscheidungen', Determination: 'Entschlossenheit', Flair: 'Flair', Leadership: 'Führungsqualität', OffTheBall: 'Freilaufen', Positioning: 'Stellungsspiel', Teamwork: 'Teamarbeit', Vision: 'Übersicht', WorkRate: 'Einsatzfreude',
+    Acceleration: 'Antritt', Agility: 'Beweglichkeit', Balance: 'Balance', JumpingReach: 'Sprungkraft', NaturalFitness: 'Natürliche Fitness', Pace: 'Schnelligkeit', Stamina: 'Ausdauer', Strength: 'Kraft',
+    AerialReach: 'Luftbeherrschung', CommandOfArea: 'Strafraumbeherrschung', Communication: 'Kommunikation', Eccentricity: 'Exzentrik', Handling: 'Fangsicherheit', Kicking: 'Abschlag', OneOnOnes: 'Eins gegen eins', Punching: 'Fausten', Reflexes: 'Reflexe', RushingOut: 'Herauslaufen', Throwing: 'Abwurf',
   },
 };
 const attrName = k => ((ATTR_LABEL[state.lang] || ATTR_LABEL.en)[k] ?? k);
@@ -551,7 +811,7 @@ function renderIntakeBar() {
   if (!info) { bar.classList.add('hidden'); return; }
   const best = info.best
     ? `<span class="ib-best">${tf('intakeBest', { p: `${escHtml(info.best.name)}, ${getAge(info.best)}, ${escHtml(info.best.club || '?')}` })} · PA ${info.best.pa}</span>` : '';
-  bar.innerHTML = `${icon('ball', 14)}<span class="ib-txt">${escHtml(tf('intakeTitle', { n: info.n.toLocaleString(state.lang === 'en' ? 'en-GB' : 'nl-NL') }))}</span>${best}
+  bar.innerHTML = `${icon('ball', 14)}<span class="ib-txt">${escHtml(tf('intakeTitle', { n: info.n.toLocaleString(uiLocale()) }))}</span>${best}
     <button class="ib-go">${t('intakeShow')}</button>
     <button class="ib-x" title="${t('donateLater')}">${icon('x', 12)}</button>`;
   bar.classList.remove('hidden');
@@ -614,7 +874,10 @@ const NATION_EN = {
   'Nieuw-Zeeland': 'New Zealand', 'Saoedi-Arabië': 'Saudi Arabia', 'Iran': 'Iran', 'Irak': 'Iraq',
   'Verenigde Arabische Emiraten': 'United Arab Emirates', 'Qatar': 'Qatar', 'Indonesië': 'Indonesia',
 };
-const natLabel = n => state.lang === 'en' ? (NATION_EN[n] || n) : n;
+// Landnamen staan in de dump in de gametaal. Bij een niet-NL app-taal tonen we de Engelse
+// naam als we de (NL-)dumpnaam kennen; anders de dumpnaam zelf. Draait FM al in de app-taal,
+// dan is de dumpnaam vanzelf goed. Taalonafhankelijk land-ID staat in de backlog (issue #15).
+const natLabel = n => state.lang !== 'nl' ? (NATION_EN[n] || n) : n;
 const natsLabel = p => (p.nat || []).map(natLabel).join(', ');
 
 // Kolommen die onder de "verborgen stats"-toggle vallen: CA/PA zelf, plus meta-score en
@@ -632,7 +895,7 @@ function fmtMoney(v) {
   const val = v * CUR_RATE[sym];
   if (val === 0) return sym + '0';
   const abs = Math.abs(val);
-  if (abs >= 1e9) return sym + (val / 1e9).toFixed(2) + (state.lang === 'en' ? 'B' : ' mld');
+  if (abs >= 1e9) return sym + (val / 1e9).toFixed(2) + ({ nl: ' mld', en: 'B', fr: ' Md', de: ' Mrd.' }[state.lang] || 'B');
   if (abs >= 1e6) return sym + (val / 1e6).toFixed(1) + 'M';
   if (abs >= 1e3) return sym + Math.round(val / 1e3) + 'K';
   return sym + Math.round(val);
@@ -1129,8 +1392,10 @@ const ROLES = [
 const ROLE_LABEL = {
   nl: { gk: 'Keeper', sk: 'Meevoetballende keeper', cd: 'Centrale verdediger', bpd: 'Opbouwende verdediger', fb: 'Vleugelverdediger', wb: 'Wingback', dm: 'Verdedigende middenvelder', dlp: 'Verdiepte spelmaker', bwm: 'Baljagende middenvelder', cm: 'Centrale middenvelder', b2b: 'Box-to-box middenvelder', ap: 'Aanvallende spelmaker', wing: 'Buitenspeler', if: 'Schaduwspits', am: 'Hangende spits', af: 'Diepliggende spits', poacher: 'Afmaker', tm: 'Targetman', cf: 'Complete spits' },
   en: { gk: 'Goalkeeper', sk: 'Sweeper Keeper', cd: 'Central Defender', bpd: 'Ball Playing Defender', fb: 'Full Back', wb: 'Wing Back', dm: 'Defensive Midfielder', dlp: 'Deep Lying Playmaker', bwm: 'Ball Winning Midfielder', cm: 'Central Midfielder', b2b: 'Box to Box Midfielder', ap: 'Advanced Playmaker', wing: 'Winger', if: 'Inside Forward', am: 'Attacking Midfielder', af: 'Advanced Forward', poacher: 'Poacher', tm: 'Target Man', cf: 'Complete Forward' },
+  fr: { gk: 'Gardien', sk: 'Gardien libéro', cd: 'Défenseur central', bpd: 'Défenseur relanceur', fb: 'Arrière latéral', wb: 'Piston', dm: 'Milieu défensif', dlp: 'Meneur reculé', bwm: 'Récupérateur', cm: 'Milieu central', b2b: 'Milieu box-to-box', ap: 'Meneur avancé', wing: 'Ailier', if: 'Attaquant intérieur', am: 'Milieu offensif', af: 'Attaquant avancé', poacher: 'Renard des surfaces', tm: 'Pivot', cf: 'Attaquant complet' },
+  de: { gk: 'Torwart', sk: 'Mitspielender Torwart', cd: 'Innenverteidiger', bpd: 'Ballspielender Innenverteidiger', fb: 'Außenverteidiger', wb: 'Flügelverteidiger', dm: 'Defensiver Mittelfeldspieler', dlp: 'Tiefer Spielmacher', bwm: 'Balleroberer', cm: 'Zentraler Mittelfeldspieler', b2b: 'Box-to-Box-Spieler', ap: 'Offensiver Spielmacher', wing: 'Flügelspieler', if: 'Inverser Flügelstürmer', am: 'Offensiver Mittelfeldspieler', af: 'Vorgezogene Spitze', poacher: 'Knipser', tm: 'Zielspieler', cf: 'Komplette Spitze' },
 };
-const roleName = id => (ROLE_LABEL[state.lang]?.[id] ?? ROLE_LABEL.nl[id] ?? id);
+const roleName = id => (ROLE_LABEL[state.lang]?.[id] ?? ROLE_LABEL.en[id] ?? id);
 const ROLE_BY_ID = Object.fromEntries(ROLES.map(r => [r.id, r]));
 // Rolscore op de 1-20 schaal; key-attributen tellen dubbel. Vereist attributen (spelers).
 function roleScore(p, role) {
@@ -1547,7 +1812,7 @@ function renderDumpInfo() {
     else {
       const derived = state.meta.gameDateSource !== 'memory';
       const d = new Date(ds);
-      const txt = isNaN(d) ? ds : d.toLocaleDateString(state.lang === 'en' ? 'en-GB' : 'nl-NL',
+      const txt = isNaN(d) ? ds : d.toLocaleDateString(uiLocale(),
         { day: 'numeric', month: 'short', year: 'numeric' });
       gd.innerHTML = icon('calendar', 12) + ' ' + escHtml((derived ? '~ ' : '') + txt);
       gd.title = derived ? t('gameDateDerived') : t('gameDateMemory');
@@ -1692,9 +1957,13 @@ function buildRoleSelect() {
     ['GK', ['gk', 'sk']], ['DEF', ['cd', 'bpd', 'fb', 'wb']],
     ['MID', ['dm', 'dlp', 'bwm', 'cm', 'b2b', 'ap']], ['AANV', ['wing', 'if', 'am', 'af', 'poacher', 'tm', 'cf']],
   ];
-  const heads = { GK: 'Keeper', DEF: 'Verdediging', MID: 'Middenveld', AANV: 'Aanval' };
-  const headsEn = { GK: 'Goalkeeper', DEF: 'Defence', MID: 'Midfield', AANV: 'Attack' };
-  const H = state.lang === 'en' ? headsEn : heads;
+  const headsBy = {
+    nl: { GK: 'Keeper', DEF: 'Verdediging', MID: 'Middenveld', AANV: 'Aanval' },
+    en: { GK: 'Goalkeeper', DEF: 'Defence', MID: 'Midfield', AANV: 'Attack' },
+    fr: { GK: 'Gardien', DEF: 'Défense', MID: 'Milieu', AANV: 'Attaque' },
+    de: { GK: 'Torwart', DEF: 'Abwehr', MID: 'Mittelfeld', AANV: 'Angriff' },
+  };
+  const H = headsBy[state.lang] || headsBy.en;
   let html = `<option value="">${t('roleAny')}</option>`;
   for (const [g, ids] of groups) {
     html += `<optgroup label="${H[g]}">` + ids.map(id => `<option value="${id}">${roleName(id)}</option>`).join('') + '</optgroup>';
@@ -2724,6 +2993,16 @@ const CARDL = {
     wk: '★ WONDERKID', repW: 'Worldwide', repC: 'Continental', repN: 'National', repL: 'Local',
     injL: 'Low', injM: 'Medium', injH: 'High',
     sListed: 'TRANSFER LISTED', sLoan: 'FOR LOAN', sRel: 'RELEASED', sNfs: 'NOT FOR SALE', sFree: 'FREE AGENT' },
+  fr: { meta: 'MÉTA', cur: 'ACTUEL', pot: 'POTENTIEL', roles: 'MEILLEURS RÔLES', value: 'VALEUR',
+    ask: 'PRIX DEMANDÉ', wage: 'SALAIRE', contract: 'CONTRAT', rep: 'Réputation', inj: 'Blessures',
+    wk: '★ WONDERKID', repW: 'Mondiale', repC: 'Continentale', repN: 'Nationale', repL: 'Locale',
+    injL: 'Faible', injM: 'Moyenne', injH: 'Élevée',
+    sListed: 'TRANSFÉRABLE', sLoan: 'À PRÊTER', sRel: 'LIBÉRÉ', sNfs: 'PAS À VENDRE', sFree: 'LIBRE' },
+  de: { meta: 'META', cur: 'AKTUELL', pot: 'POTENZIAL', roles: 'BESTE ROLLEN', value: 'WERT',
+    ask: 'FORDERUNG', wage: 'GEHALT', contract: 'VERTRAG', rep: 'Reputation', inj: 'Verletzungen',
+    wk: '★ WONDERKID', repW: 'Weltweit', repC: 'Kontinental', repN: 'National', repL: 'Lokal',
+    injL: 'Gering', injM: 'Mittel', injH: 'Hoch',
+    sListed: 'AUF TRANSFERLISTE', sLoan: 'ZU VERLEIHEN', sRel: 'FREIGESTELLT', sNfs: 'UNVERKÄUFLICH', sFree: 'VEREINSLOS' },
 };
 // Kaartkolommen zoals FM ze zelf indeelt: standaardsituaties horen bij Technisch (de app
 // splitst ze in het profiel, de kaart voegt ze weer samen → 14 rijen, net als Mentaal).
@@ -2742,7 +3021,7 @@ function cardGroups(p, isGk) {
 
 // Bouwt het kaartmodel uit een echte speler (alle afgeleide waardes en labels).
 function buildCardModel(p) {
-  const L = CARDL[state.lang] || CARDL.nl;
+  const L = CARDL[state.lang] || CARDL.en;
   const isGk = (p.posArr || []).includes('GK');
   const meta = metaScore(p);
   const ca = p.ca || 0, pa = p.pa || 0;
@@ -2950,22 +3229,35 @@ function initHelpTip() {
   const tip = document.createElement('div');
   tip.id = 'help-tip'; tip.className = 'hidden';
   document.body.appendChild(tip);
-  let cur = null;
-  const hide = () => { cur = null; tip.classList.add('hidden'); };
+  let cur = null, timer = 0, warmUntil = 0;
+  const hide = () => { cur = null; clearTimeout(timer); tip.classList.add('hidden'); };
   document.addEventListener('mouseover', e => {
     const el = e.target.closest('[data-help],[data-tip]');
     if (el === cur) return;
-    if (!el) { hide(); return; }
+    clearTimeout(timer);
+    const wasVisible = !tip.classList.contains('hidden');
+    if (!el) {
+      // Net een tip verlaten: korte "warme" periode waarin de volgende meteen toont,
+      // zoals OS-menu's. Daarbuiten geldt de vertraging weer.
+      if (wasVisible) warmUntil = Date.now() + 400;
+      hide(); return;
+    }
     cur = el;
-    tip.textContent = el.dataset.tip ?? t(el.dataset.help);
-    tip.classList.remove('hidden');
-    const r = el.getBoundingClientRect();
-    tip.style.left = '0px'; tip.style.top = '0px';               // eerst meten op (0,0)
-    const tw = tip.offsetWidth, th = tip.offsetHeight;
-    let xPos = Math.max(8, Math.min(window.innerWidth - tw - 8, r.left + r.width / 2 - tw / 2));
-    let yPos = r.bottom + 8;
-    if (yPos + th > window.innerHeight - 8) yPos = r.top - th - 8;
-    tip.style.left = xPos + 'px'; tip.style.top = yPos + 'px';
+    const show = () => {
+      tip.textContent = el.dataset.tip ?? t(el.dataset.help);
+      tip.classList.remove('hidden');
+      const r = el.getBoundingClientRect();
+      tip.style.left = '0px'; tip.style.top = '0px';               // eerst meten op (0,0)
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      let xPos = Math.max(8, Math.min(window.innerWidth - tw - 8, r.left + r.width / 2 - tw / 2));
+      let yPos = r.bottom + 8;
+      if (yPos + th > window.innerHeight - 8) yPos = r.top - th - 8;
+      tip.style.left = xPos + 'px'; tip.style.top = yPos + 'px';
+    };
+    // Vertraging voorkomt flikkerende tips terwijl je met de muis over de tabel beweegt
+    // (elke naamcel heeft er een). Direct doorschuiven van tip naar tip blijft instant.
+    if (wasVisible || Date.now() < warmUntil) show();
+    else timer = setTimeout(show, 450);
   });
   document.addEventListener('scroll', hide, true);
 }
@@ -3114,7 +3406,7 @@ function maybeSeasonReport() {
   try { localStorage.setItem('fmss_season_base', JSON.stringify(cur)); } catch { }
   const n = k => Math.max(0, cur[k] - (+base[k] || 0));
   const stats = [];
-  if (n('uses') > 0) stats.push(tf('seasonStatProfiles', { n: n('uses').toLocaleString(state.lang === 'en' ? 'en-GB' : 'nl-NL') }));
+  if (n('uses') > 0) stats.push(tf('seasonStatProfiles', { n: n('uses').toLocaleString(uiLocale()) }));
   if (n('loads') > 0) stats.push(tf('seasonStatLoads', { n: n('loads') }));
   if (n('cards') > 0) stats.push(tf('seasonStatCards', { n: n('cards') }));
   if (state.shortlist.size > 0) stats.push(tf('seasonStatShort', { n: state.shortlist.size }));
@@ -3352,14 +3644,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('compar
 // ---------- squad-behoefteanalyse ----------
 // Positiegroepen met een streefaantal (basis + degelijke cover) en de bijhorende pitch-codes.
 const SQUAD_GROUPS = [
-  { id: 'gk', label: { nl: 'Keeper', en: 'Goalkeeper' }, pos: ['GK'], target: 2 },
-  { id: 'cb', label: { nl: 'Centrale verdediger', en: 'Central defender' }, pos: ['DC'], target: 4 },
-  { id: 'fb', label: { nl: 'Vleugelverdediger', en: 'Full back' }, pos: ['DL', 'DR', 'WBL', 'WBR'], target: 4 },
-  { id: 'dm', label: { nl: 'Verdedigende mid', en: 'Defensive mid' }, pos: ['DM'], target: 2 },
-  { id: 'cm', label: { nl: 'Centrale middenvelder', en: 'Central midfielder' }, pos: ['MC'], target: 3 },
-  { id: 'wing', label: { nl: 'Buitenspeler', en: 'Winger' }, pos: ['ML', 'MR', 'AML', 'AMR'], target: 4 },
-  { id: 'am', label: { nl: 'Aanvallende mid', en: 'Attacking mid' }, pos: ['AMC'], target: 2 },
-  { id: 'st', label: { nl: 'Spits', en: 'Striker' }, pos: ['ST'], target: 3 },
+  { id: 'gk', label: { nl: 'Keeper', en: 'Goalkeeper', fr: 'Gardien', de: 'Torwart' }, pos: ['GK'], target: 2 },
+  { id: 'cb', label: { nl: 'Centrale verdediger', en: 'Central defender', fr: 'Défenseur central', de: 'Innenverteidiger' }, pos: ['DC'], target: 4 },
+  { id: 'fb', label: { nl: 'Vleugelverdediger', en: 'Full back', fr: 'Arrière latéral', de: 'Außenverteidiger' }, pos: ['DL', 'DR', 'WBL', 'WBR'], target: 4 },
+  { id: 'dm', label: { nl: 'Verdedigende mid', en: 'Defensive mid', fr: 'Milieu défensif', de: 'Defensives MF' }, pos: ['DM'], target: 2 },
+  { id: 'cm', label: { nl: 'Centrale middenvelder', en: 'Central midfielder', fr: 'Milieu central', de: 'Zentrales MF' }, pos: ['MC'], target: 3 },
+  { id: 'wing', label: { nl: 'Buitenspeler', en: 'Winger', fr: 'Ailier', de: 'Flügelspieler' }, pos: ['ML', 'MR', 'AML', 'AMR'], target: 4 },
+  { id: 'am', label: { nl: 'Aanvallende mid', en: 'Attacking mid', fr: 'Milieu offensif', de: 'Offensives MF' }, pos: ['AMC'], target: 2 },
+  { id: 'st', label: { nl: 'Spits', en: 'Striker', fr: 'Attaquant', de: 'Stürmer' }, pos: ['ST'], target: 3 },
 ];
 const avg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
 function analyseSquad() {
@@ -3418,7 +3710,7 @@ function renderAnalysis() {
     <div class="an-sum-item"><span class="an-sum-n">${squad.length}</span><span class="an-sum-l">${t('anSquadSize')}</span></div>
     ${caTile}
     <div class="an-sum-item"><span class="an-sum-n">${avg(squad.map(p => getAge(p)).filter(Boolean)).toFixed(1)}</span><span class="an-sum-l">${t('anAvgAge')}</span></div>
-    <div class="an-sum-item need"><span class="an-sum-l">${t('anBiggestNeed')}</span><span class="an-sum-need">${topNeed ? topNeed.g.label[state.lang] || topNeed.g.label.nl : '–'}</span></div>
+    <div class="an-sum-item need"><span class="an-sum-l">${t('anBiggestNeed')}</span><span class="an-sum-need">${topNeed ? topNeed.g.label[state.lang] || topNeed.g.label.en : '–'}</span></div>
   </div>`;
 
   const cards = groups.map(x => {
@@ -3433,7 +3725,7 @@ function renderAnalysis() {
     const depthDots = dots + (x.count > x.g.target ? `<span class="dot-extra">+${x.count - x.g.target}</span>` : '');
     const yt = x.youngTalents[0];
     return `<div class="an-card ${st}">
-      <div class="an-card-top"><span class="an-pos">${x.g.label[state.lang] || x.g.label.nl}</span>${badge}</div>
+      <div class="an-card-top"><span class="an-pos">${x.g.label[state.lang] || x.g.label.en}</span>${badge}</div>
       <div class="an-depth" data-tip="${x.count}/${x.g.target}">${depthDots}</div>
       <div class="an-stats">
         <span><b>${x.count}</b> ${t('anPlayers')}</span>

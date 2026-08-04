@@ -84,8 +84,9 @@ Wonderkids get a gold card. Built for showing off that one insane regen.
 - **Asking price and transfer interest**: estimates from contract, transfer status, age,
   reputation gap and wages, including the FIFA under-18 rule.
 - **Shortlist** (★) with its own tab and CSV export.
-- **Settings**: NL/EN, GBP/EUR/USD, and one toggle to hide CA/PA and all hidden stats for people
-  who consider reading them cheating (the meta score has its own toggle).
+- **Settings**: four languages (English, Dutch, French, German), GBP/EUR/USD, and one toggle to
+  hide CA/PA and all hidden stats for people who consider reading them cheating (the meta score
+  has its own toggle).
 - **One-click update**: the app checks for a new release about once a day and shows a dismissible
   notice, and the settings menu has a manual "Check for updates" action. One click downloads the
   installer, verifies its SHA-256 against the release and starts it. Nothing installs without

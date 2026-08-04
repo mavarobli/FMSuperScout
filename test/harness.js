@@ -51,6 +51,7 @@ function loadApp() {
     'estValue', 'feeMultiplier', 'feeEstimate', 'interestEstimate', 'roleScore', 'projectAttrs',
     'parseMoney', 'monthsUntil', 'getAge', 'gameNow', 'isEu', 'isFree', 'wSat', 'bestRoles',
     'rolesForPos', 'physGrowthFactor', 'mentalGrowthFactor', 'state', 'ROLE_BY_ID', 'ROLES',
+    'I18N', 'ATTR_LABEL', 'ROLE_LABEL', 'CARDL', 'metaScore', 'metaPaScore',
   ];
   const body = src + '\n;return {' + exposed.map(n => `${n}: typeof ${n} !== 'undefined' ? ${n} : undefined`).join(',') + '};';
   const factory = new Function(
