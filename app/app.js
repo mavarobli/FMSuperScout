@@ -637,6 +637,48 @@ const ATTR_LABEL = {
   },
 };
 const attrName = k => ((ATTR_LABEL[state.lang] || ATTR_LABEL.en)[k] ?? k);
+
+// Localized labels for staff attributes exported by the plugin (plugin/Fields.cs StaffAttrs).
+const STAFF_ATTR_LABEL = {
+  nl: {
+    Aanvallen: 'Aanvallen', Verdedigen: 'Verdedigen', Fitheid: 'Fitheid', Balbezit: 'Balbezit',
+    Technisch: 'Technisch', Tactisch: 'Tactisch', Standaardsituaties: 'Standaardsituaties',
+    Vastberadenheid: 'Vastberadenheid', 'Man-management': 'Man-management', Motiveren: 'Motiveren',
+    Oordeel_vermogen: 'Oordeel vermogen', Oordeel_potentie: 'Oordeel potentie', Oordeel_staf: 'Oordeel staf',
+    Onderhandelen: 'Onderhandelen', Tactische_kennis: 'Tactische kennis', Fysiotherapie: 'Fysiotherapie',
+    Sportwetenschap: 'Sportwetenschap', Data_analyse: 'Data-analyse', Jeugd: 'Jeugd',
+    KV_distributie: 'GK Distributie', KV_vangen: 'GK Balbeheersing', KV_reflexen: 'GK Reflexen',
+  },
+  en: {
+    Aanvallen: 'Attacking', Verdedigen: 'Defending', Fitheid: 'Fitness', Balbezit: 'Possession',
+    Technisch: 'Technical', Tactisch: 'Tactical', Standaardsituaties: 'Set Pieces',
+    Vastberadenheid: 'Determination', 'Man-management': 'Man Management', Motiveren: 'Motivating',
+    Oordeel_vermogen: 'Judging Player Ability', Oordeel_potentie: 'Judging Player Potential', Oordeel_staf: 'Judging Staff Ability',
+    Onderhandelen: 'Negotiating', Tactische_kennis: 'Tactical Knowledge', Fysiotherapie: 'Physiotherapy',
+    Sportwetenschap: 'Sports Science', Data_analyse: 'Data Analysis', Jeugd: 'Working With Youngsters',
+    KV_distributie: 'GK Distribution', KV_vangen: 'GK Handling', KV_reflexen: 'GK Shot Stopping',
+  },
+  fr: {
+    Aanvallen: 'Attaque', Verdedigen: 'Défense', Fitheid: 'Physique', Balbezit: 'Possession',
+    Technisch: 'Technique', Tactisch: 'Tactique', Standaardsituaties: 'Coups de pied arrêtés',
+    Vastberadenheid: 'Détermination', 'Man-management': 'Gestion des hommes', Motiveren: 'Motivation',
+    Oordeel_vermogen: 'Évaluation du niveau', Oordeel_potentie: 'Évaluation du potentiel', Oordeel_staf: 'Évaluation du staff',
+    Onderhandelen: 'Négociation', Tactische_kennis: 'Connaissances tactiques', Fysiotherapie: 'Kinésithérapie',
+    Sportwetenschap: 'Science du sport', Data_analyse: 'Analyse de données', Jeugd: 'Travail avec les jeunes',
+    KV_distributie: 'GBD Distribution', KV_vangen: 'GBD Prise de balle', KV_reflexen: 'GBD Réflexes',
+  },
+  de: {
+    Aanvallen: 'Angriffsspiel', Verdedigen: 'Abwehrspiel', Fitheid: 'Fitness', Balbezit: 'Ballbesitz',
+    Technisch: 'Technik', Tactisch: 'Taktik', Standaardsituaties: 'Standardsituationen',
+    Vastberadenheid: 'Entschlossenheit', 'Man-management': 'Menschenführung', Motiveren: 'Motivation',
+    Oordeel_vermogen: 'Spielerfähigkeit bewerten', Oordeel_potentie: 'Spielerpotenzial bewerten', Oordeel_staf: 'Mitarbeiterfähigkeit bewerten',
+    Onderhandelen: 'Verhandeln', Tactische_kennis: 'Taktikkenntnisse', Fysiotherapie: 'Physiotherapy',
+    Sportwetenschap: 'Sportwissenschaft', Data_analyse: 'Datenanalyse', Jeugd: 'Arbeit mit Jugendlichen',
+    KV_distributie: 'TW-Passspiel', KV_vangen: 'TW-Fangsicherheit', KV_reflexen: 'TW-Schussabwehr',
+  },
+};
+const staffAttrName = k => ((STAFF_ATTR_LABEL[state.lang] || STAFF_ATTR_LABEL.en)[k] ?? k.replace(/_/g, ' '));
+
 // FM sorteert attributen binnen een groep alfabetisch in de taal van de game; wij dus ook,
 // op de vertaalde naam. Gebruikt door profiel, vergelijking en het attribuutfilter.
 const sortByLabel = keys => [...keys].sort((a, b) => attrName(a).localeCompare(attrName(b), state.lang));
@@ -2924,7 +2966,7 @@ function showDetail(p) {
   } else if (p.staffAttrs) {
     html += `<div class="attr-cols"><div class="attr-col"><h3>${t('staffAttrs')}</h3>` +
       Object.entries(p.staffAttrs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v], idx) =>
-        `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${k.replace(/_/g, ' ')}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div></div>';
+        `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${staffAttrName(k)}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div></div>';
   }
   $('detail-body').innerHTML = html;
   document.querySelector('.detail-star').onclick = () => toggleShortlist(p.id);
