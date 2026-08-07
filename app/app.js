@@ -23,6 +23,7 @@ const state = {
   colCfg: jread('fmss_cols', {}),  // per modus: {order:[], hidden:[]}
   colW: jread('fmss_colw', {}),    // per modus: {kolomkey: breedte px}
   advF: jread('fmss_adv', []),     // attribuutfilter-regels [{k,min,max}]
+  advStaffF: jread('fmss_adv_staff', []), // staf attribuutfilter-regels [{k,min,max}]
   hist: null,        // {dates, refIdx, map: Map<uid,[caRef,paRef,firstIdx]>} uit /api/history/deltas
   histPeriod: localStorage.getItem('fmss_histperiod') || 'y1',
 };
@@ -120,7 +121,7 @@ const I18N = {
     serverGone: 'Geen verbinding met de lokale server. Sluit dit venster en start FMSuperScout opnieuw.',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_loan: 'te huur', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
-    g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
+    g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen', g_coaching: 'Coaching', g_knowledge: 'Kennis & Scouting', g_gkCoaching: 'Keeper-coaching',
     staffAttrs: 'Staf-attributen',
     clearAll: 'alles wissen', chipSearch: 'Zoek',
     loading: 'Data laden…',
@@ -247,7 +248,7 @@ const I18N = {
     serverGone: 'Lost connection to the local server. Close this window and start FMSuperScout again.',
     tag_free: 'free', tag_listed: 'listed', tag_loan: 'for loan', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
-    g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
+    g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping', g_coaching: 'Coaching', g_knowledge: 'Knowledge & Scouting', g_gkCoaching: 'Goalkeeper Coaching',
     staffAttrs: 'Staff attributes',
     clearAll: 'clear all', chipSearch: 'Search',
     loading: 'Loading data…',
@@ -374,7 +375,7 @@ const I18N = {
     serverGone: 'Pas de connexion au serveur local. Fermez cette fenêtre et relancez FMSuperScout.',
     tag_free: 'libre', tag_listed: 'transférable', tag_loan: 'à prêter', tag_rel: 'libéré', tag_nfs: 'pas à vendre',
     colHint: 'Glissez pour déplacer · clic droit pour les colonnes', colsTitle: 'Colonnes affichées', colsReset: 'Rétablir par défaut',
-    g_technical: 'Technique', g_setpieces: 'Coups de pied arrêtés', g_mental: 'Mental', g_physical: 'Physique', g_goalkeeping: 'Gardien',
+    g_technical: 'Technique', g_setpieces: 'Coups de pied arrêtés', g_mental: 'Mental', g_physical: 'Physique', g_goalkeeping: 'Gardien', g_coaching: 'Entraînement', g_knowledge: 'Connaissances et recrutement', g_gkCoaching: 'Entraînement des gardiens',
     staffAttrs: 'Attributs du staff',
     clearAll: 'tout effacer', chipSearch: 'Rechercher',
     loading: 'Chargement…',
@@ -501,7 +502,7 @@ const I18N = {
     serverGone: 'Keine Verbindung zum lokalen Server. Schließe dieses Fenster und starte FMSuperScout neu.',
     tag_free: 'vereinslos', tag_listed: 'Transferliste', tag_loan: 'zu verleihen', tag_rel: 'freigestellt', tag_nfs: 'unverkäuflich',
     colHint: 'Ziehen zum Verschieben · Rechtsklick für Spalten', colsTitle: 'Spalten anzeigen', colsReset: 'Standard wiederherstellen',
-    g_technical: 'Technik', g_setpieces: 'Standards', g_mental: 'Mental', g_physical: 'Physis', g_goalkeeping: 'Torwart',
+    g_technical: 'Technik', g_setpieces: 'Standards', g_mental: 'Mental', g_physical: 'Physis', g_goalkeeping: 'Torwart', g_coaching: 'Coaching', g_knowledge: 'Wissen & Scouting', g_gkCoaching: 'Torwart-Coaching',
     staffAttrs: 'Mitarbeiter-Attribute',
     clearAll: 'alles leeren', chipSearch: 'Suchen',
     loading: 'Daten werden geladen…',
@@ -678,6 +679,13 @@ const STAFF_ATTR_LABEL = {
   },
 };
 const staffAttrName = k => ((STAFF_ATTR_LABEL[state.lang] || STAFF_ATTR_LABEL.en)[k] ?? k.replace(/_/g, ' '));
+const isStaffAttrKey = k => typeof k === 'string' && k in STAFF_ATTR_LABEL.en;
+const STAFF_ATTR_GROUPS = [
+  ['g_coaching', ['Aanvallen', 'Verdedigen', 'Fitheid', 'Balbezit', 'Technisch', 'Tactisch', 'Standaardsituaties']],
+  ['g_mental', ['Vastberadenheid', 'Man-management', 'Motiveren']],
+  ['g_knowledge', ['Oordeel_vermogen', 'Oordeel_potentie', 'Oordeel_staf', 'Onderhandelen', 'Tactische_kennis', 'Fysiotherapie', 'Sportwetenschap', 'Data_analyse', 'Jeugd']],
+  ['g_gkCoaching', ['KV_distributie', 'KV_vangen', 'KV_reflexen']],
+];
 
 // FM sorteert attributen binnen een groep alfabetisch in de taal van de game; wij dus ook,
 // op de vertaalde naam. Gebruikt door profiel, vergelijking en het attribuutfilter.
@@ -1317,11 +1325,16 @@ function isAttainable(p) {
 const ADV_HIDDEN_KEYS = ['Consistency', 'ImportantMatches', 'Versatility', 'InjuryProneness', 'Dirtiness'];
 const ADV_PERS_KEYS = ['ambition', 'professionalism', 'loyalty', 'pressure', 'temperament', 'sportsmanship', 'adaptability', 'controversy'];
 const advIsHidden = k => ADV_HIDDEN_KEYS.includes(k) || ADV_PERS_KEYS.includes(k);
-const advLabel = k => ADV_PERS_KEYS.includes(k) ? t(k) : ADV_HIDDEN_KEYS.includes(k) ? t('a_' + k) : attrName(k);
-const advValue = (p, k) => ADV_PERS_KEYS.includes(k) ? (p[k] || null) : (p.attrs ? p.attrs[k] : null);
-const activeAdvRules = () => state.advF.filter(r => r.k && (r.min || r.max) && !(state.hideCapa && advIsHidden(r.k)));
+const advLabel = k => isStaffAttrKey(k) ? staffAttrName(k) : ADV_PERS_KEYS.includes(k) ? t(k) : ADV_HIDDEN_KEYS.includes(k) ? t('a_' + k) : attrName(k);
+const advValue = (p, k) => p.staffAttrs ? (p.staffAttrs[k] ?? null) : ADV_PERS_KEYS.includes(k) ? (p[k] || null) : (p.attrs ? p.attrs[k] : null);
+const getCurAdvRules = () => state.mode === 'staff' ? (state.advStaffF ||= []) : state.advF;
+const activeAdvRules = () => getCurAdvRules().filter(r => r.k && (r.min || r.max) && !(state.hideCapa && advIsHidden(r.k)));
 const advChipTxt = r => `${advLabel(r.k)} ${r.min && r.max ? r.min + '–' + r.max : r.min ? '≥ ' + r.min : '≤ ' + r.max}`;
-function saveAdv() { localStorage.setItem('fmss_adv', JSON.stringify(state.advF)); updateAdvBtn(); }
+function saveAdv() {
+  localStorage.setItem('fmss_adv', JSON.stringify(state.advF));
+  localStorage.setItem('fmss_adv_staff', JSON.stringify(state.advStaffF || []));
+  updateAdvBtn();
+}
 // Alleen een teller op de knop; de regels zelf staan al in de chips boven de tabel
 // en in de popup, een derde lijst in de zijbalk was dubbelop.
 function updateAdvBtn() {
@@ -1332,16 +1345,26 @@ function updateAdvBtn() {
 }
 function advDialog() {
   const m = $('adv-modal');
-  // Doorzoekbare attributencatalogus: veld-, keeper- (alleen GK-specifiek, gedeelde
-  // staan al onder Technisch), verborgen en persoonlijkheidsattributen.
-  const gkOnly = ATTR_GROUPS_GK[0][1].filter(k => !ATTR_GROUPS_OUTFIELD.some(([, ks]) => ks.includes(k)));
+  const isStaff = state.mode === 'staff';
+  const getRules = () => isStaff ? (state.advStaffF ||= []) : state.advF;
+  let curRules = getRules();
+
+  // Doorzoekbare attributencatalogus: speler-, staf-, verborgen en persoonlijkheidsattributen.
   const catalog = [];
-  for (const [g, keys] of [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', gkOnly]])
-    for (const k of sortByLabel(keys)) catalog.push({ k, label: attrName(k), group: t(g) });
-  if (!state.hideCapa) {
-    const byT = (a, b) => a.localeCompare(b, state.lang);
-    for (const k of [...ADV_HIDDEN_KEYS].sort((a, b) => byT(t('a_' + a), t('a_' + b)))) catalog.push({ k, label: t('a_' + k), group: t('hiddenTitle') });
-    for (const k of [...ADV_PERS_KEYS].sort((a, b) => byT(t(a), t(b)))) catalog.push({ k, label: t(k), group: t('personaTitle') });
+  if (isStaff) {
+    for (const [g, keys] of STAFF_ATTR_GROUPS) {
+      const sortedKeys = [...keys].sort((a, b) => staffAttrName(a).localeCompare(staffAttrName(b), state.lang));
+      for (const k of sortedKeys) catalog.push({ k, label: staffAttrName(k), group: t(g) });
+    }
+  } else {
+    const gkOnly = ATTR_GROUPS_GK[0][1].filter(k => !ATTR_GROUPS_OUTFIELD.some(([, ks]) => ks.includes(k)));
+    for (const [g, keys] of [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', gkOnly]])
+      for (const k of sortByLabel(keys)) catalog.push({ k, label: attrName(k), group: t(g) });
+    if (!state.hideCapa) {
+      const byT = (a, b) => a.localeCompare(b, state.lang);
+      for (const k of [...ADV_HIDDEN_KEYS].sort((a, b) => byT(t('a_' + a), t('a_' + b)))) catalog.push({ k, label: t('a_' + k), group: t('hiddenTitle') });
+      for (const k of [...ADV_PERS_KEYS].sort((a, b) => byT(t(a), t(b)))) catalog.push({ k, label: t(k), group: t('personaTitle') });
+    }
   }
   // Escape sluit eerst een open attributen-dropdown, daarna pas de popup zelf.
   const esc = e => {
@@ -1351,16 +1374,18 @@ function advDialog() {
     if (dd) dd.classList.add('hidden'); else close();
   };
   const close = () => {
-    state.advF = state.advF.filter(r => r.k);   // lege (nog niet gekozen) rijen opruimen
+    if (isStaff) state.advStaffF = state.advStaffF.filter(r => r.k);
+    else state.advF = state.advF.filter(r => r.k);
     saveAdv();
     m.classList.add('hidden');
     document.removeEventListener('keydown', esc, true);
   };
   const render = () => {
+    curRules = getRules();
     m.innerHTML = `<div class="pm-card adv-card">
       <div class="pm-title">${t('advTitle')}</div>
       <div class="adv-head"><span class="ah-attr">${t('advColAttr')}</span><span class="ah-mm">${t('advMin')}</span><span class="ah-mm">${t('advMax')}</span><span class="ah-sp"></span></div>
-      <div id="adv-rows">` + state.advF.map((r, i) => `
+      <div id="adv-rows">` + curRules.map((r, i) => `
         <div class="adv-row" data-i="${i}">
           <div class="adv-kwrap">
             <input type="text" class="adv-kin" value="${r.k ? escHtml(advLabel(r.k)) : ''}" placeholder="${t('advSearch')}" autocomplete="off">
@@ -1377,12 +1402,12 @@ function advDialog() {
       </div>
     </div>`;
     m.querySelectorAll('.adv-row').forEach(row => {
-      const r = state.advF[+row.dataset.i];
+      const r = curRules[+row.dataset.i];
       const kin = row.querySelector('.adv-kin'), dd = row.querySelector('.adv-dd');
       // Combobox: klikken opent de volledige (gegroepeerde) lijst, typen filtert hem.
       const buildDd = termRaw => {
         const term = (termRaw || '').trim().toLowerCase();
-        const used = new Set(state.advF.filter(x => x !== r && x.k).map(x => x.k));
+        const used = new Set(curRules.filter(x => x !== r && x.k).map(x => x.k));
         const hits = catalog.filter(c => !used.has(c.k) && (!term || c.label.toLowerCase().includes(term)));
         if (term) hits.sort((a, b) => a.label.toLowerCase().indexOf(term) - b.label.toLowerCase().indexOf(term));
         let html = '', lastG = null;
@@ -1409,24 +1434,24 @@ function advDialog() {
       };
       row.querySelector('.adv-min').oninput = e => { r.min = +e.target.value || 0; saveAdv(); applyFilters(); };
       row.querySelector('.adv-max').oninput = e => { r.max = +e.target.value || 0; saveAdv(); applyFilters(); };
-      row.querySelector('.adv-x').onclick = () => { state.advF.splice(+row.dataset.i, 1); saveAdv(); applyFilters(); render(); };
+      row.querySelector('.adv-x').onclick = () => { curRules.splice(+row.dataset.i, 1); saveAdv(); applyFilters(); render(); };
     });
     m.querySelector('.adv-add').onclick = () => {
-      state.advF.push({ k: '', min: 0, max: 0 });
+      curRules.push({ k: '', min: 0, max: 0 });
       render();
       const kins = m.querySelectorAll('.adv-kin');
       const last = kins[kins.length - 1];
       last.focus(); last.onfocus();   // dropdown meteen open, ook als het focus-event niet vuurt
     };
-    m.querySelector('.pm-cancel').onclick = () => { state.advF = []; saveAdv(); applyFilters(); render(); };
+    m.querySelector('.pm-cancel').onclick = () => { curRules.length = 0; saveAdv(); applyFilters(); render(); };
     m.querySelector('.pm-ok').onclick = close;
   };
   document.addEventListener('keydown', esc, true);
   m.onclick = e => { if (e.target === m) close(); };
-  if (!state.advF.length) state.advF.push({ k: '', min: 0, max: 0 });
+  if (!curRules.length) curRules.push({ k: '', min: 0, max: 0 });
   render();
   m.classList.remove('hidden');   // eerst zichtbaar, anders pakt focus() niet
-  const firstEmpty = [...m.querySelectorAll('.adv-row')].find(row => !state.advF[+row.dataset.i].k);
+  const firstEmpty = [...m.querySelectorAll('.adv-row')].find(row => !curRules[+row.dataset.i].k);
   if (firstEmpty) { const k = firstEmpty.querySelector('.adv-kin'); k.focus(); k.onfocus(); }
 }
 
@@ -2134,7 +2159,7 @@ function applyFilters() {
   const minInterest = +$('f-interest').value || 0;
   const tstatus = $('f-tstatus').value, contractF = $('f-contract').value;
   const onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
-  const advRules = state.mode === 'staff' ? [] : activeAdvRules();   // staf heeft geen veld-attributen
+  const advRules = activeAdvRules();
   const staffRole = $('f-staffrole').value;
   const gsel = $('f-gender').value;   // '' = beide, 'm' = mannen, 'v' = vrouwen
   const divVal = $('f-div').value.trim().toLowerCase();   // zoekbalk: substring, hoofdletterongevoelig
@@ -2277,8 +2302,11 @@ function buildChips() {
   if (+$('f-interest').value > 0) add(`${t('interestmin')} ${$('f-interest').selectedOptions[0].textContent}`, () => { $('f-interest').value = '0'; });
   if ($('f-tstatus').value) add(`${t('tstatus')}: ${$('f-tstatus').selectedOptions[0].textContent}`, () => { $('f-tstatus').value = ''; });
   if ($('f-contract').value) add(`${t('contractF')}: ${$('f-contract').selectedOptions[0].textContent}`, () => { $('f-contract').value = ''; });
-  if (state.mode !== 'staff')
-    for (const r of activeAdvRules()) add(advChipTxt(r), () => { state.advF = state.advF.filter(x => x !== r); saveAdv(); });
+  for (const r of activeAdvRules()) add(advChipTxt(r), () => {
+    if (state.mode === 'staff') state.advStaffF = state.advStaffF.filter(x => x !== r);
+    else state.advF = state.advF.filter(x => x !== r);
+    saveAdv();
+  });
   if ($('f-myclub').checked) add(t('myclub'), uncheck('f-myclub'));
   if ($('f-shortlist').checked && state.mode !== 'shortlist') add(t('onlyshortlist'), uncheck('f-shortlist'));
   return chips;
@@ -2310,13 +2338,15 @@ function snapshotFilters() {
   for (const id of PRESET_SELECT_IDS) { const v = $(id).value; if (v && v !== '0') s.select[id] = v; }
   const adv = state.advF.filter(r => r.k && (r.min || r.max));
   if (adv.length) s.adv = adv.map(r => ({ ...r }));
+  const advStaff = (state.advStaffF || []).filter(r => r.k && (r.min || r.max));
+  if (advStaff.length) s.advStaff = advStaff.map(r => ({ ...r }));
   return s;
 }
 // f-hist-period heeft altijd een waarde (standaard 'y1') en telt dus niet als "actief
 // filter" — anders was de lege-preset-waarschuwing onbereikbaar en sleepte elke preset
 // stilletjes een groeiperiode mee die de gebruiker nooit aanraakte.
 const presetIsEmpty = s => !s.pos.length && !Object.keys(s.text).length && !Object.keys(s.check).length
-  && !Object.keys(s.select).some(k => k !== 'f-hist-period') && !(s.adv || []).length;
+  && !Object.keys(s.select).some(k => k !== 'f-hist-period') && !(s.adv || []).length && !(s.advStaff || []).length;
 function applyPreset(s) {
   $('btn-clear').onclick();                       // schone lei
   $('f-role').value = '';                         // rol hoort bij de preset, niet bij de vorige zoektocht
@@ -2331,6 +2361,7 @@ function applyPreset(s) {
   // Idem vóór de transferstatus-select (v1.2): transferlijst-checkbox → "te koop".
   if (oc['f-listed']) $('f-tstatus').value = 'sale';
   state.advF = (s.adv || []).map(r => ({ ...r }));
+  state.advStaffF = (s.advStaff || []).map(r => ({ ...r }));
   saveAdv();
   const codes = new Set(s.pos || []);
   activePos.clear();
@@ -3937,7 +3968,7 @@ $('btn-clear').onclick = () => {
   document.querySelectorAll('#filters input[type=checkbox]').forEach(i => i.checked = false);
   $('f-staffrole').value = ''; $('f-gender').value = ''; $('f-interest').value = '0'; $('f-contract').value = ''; $('f-tstatus').value = '';
   $('f-foot').value = '';
-  state.advF = []; saveAdv();
+  state.advF = []; state.advStaffF = []; saveAdv();
   activePos.clear();
   document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on'));
   state.myTeam = 'all'; renderMyTeamChips();   // subteamchip (Eerste/Jeugd) hoort ook bij "wissen"
