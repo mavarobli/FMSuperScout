@@ -2248,14 +2248,15 @@ function updateSecDots() {
   const on = {
     position: activePos.size > 0,
     role: !!$('f-role').value,
+    staffrole: !!$('f-staffrole').value,
     quality: ['f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-metapa-min', 'f-metapa-max'].some(id => val(id))
       || activeAdvRules().length > 0 || (!state.hideCapa && $('f-wonderkid').checked),
     development: histReady() && !state.hideCapa
       && (['f-growth-min', 'f-growth-max'].some(id => val(id)) || $('f-new').checked),
     physical: ['f-height-min', 'f-height-max'].some(id => val(id)) || !!$('f-foot').value,
-    financial: ['f-price', 'f-fee', 'f-wage'].some(id => val(id)),
+    financial: state.mode === 'staff' ? !!val('f-wage') : ['f-price', 'f-fee', 'f-wage'].some(id => val(id)),
     origin: !!(val('f-nat') || $('f-eu').checked || val('f-div')),
-    availability: +$('f-interest').value > 0 || !!$('f-tstatus').value || !!$('f-contract').value || $('f-myclub').checked || $('f-shortlist').checked,
+    availability: (state.mode !== 'staff' && (+$('f-interest').value > 0 || !!$('f-tstatus').value)) || !!$('f-contract').value || $('f-myclub').checked || $('f-shortlist').checked,
   };
   document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
     const k = sec.dataset.sec;
@@ -4226,15 +4227,20 @@ function setMode(mode) {
   $('tab-staff').classList.toggle('active', mode === 'staff');
   $('tab-shortlist').classList.toggle('active', mode === 'shortlist');
   $('tab-analysis').classList.toggle('active', isAn);
-  $('fg-pitch').style.display = mode === 'staff' || isAn ? 'none' : '';
-  $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
+  const isStaff = mode === 'staff';
+  $('fg-pitch').style.display = isStaff || isAn ? 'none' : '';
+  $('fg-staffrole').style.display = isStaff ? '' : 'none';
   buildGenderFilter();   // spelers- en staflijst kunnen apart gemengd zijn
-  $('fg-role').style.display = mode === 'staff' || isAn ? 'none' : '';
-  $('f-meta-row').style.display = mode === 'staff' ? 'none' : '';   // meta-score bestaat niet voor staf
-  $('f-metapa-row').style.display = mode === 'staff' ? 'none' : '';
-  // Staf heeft geen lengte, voet of PA-groei in de dump; die filters horen daar niet.
-  $('fg-physical').style.display = mode === 'staff' ? 'none' : '';
-  $('f-wonderkid-row').style.display = mode === 'staff' ? 'none' : '';
+  $('fg-role').style.display = isStaff || isAn ? 'none' : '';
+  $('f-meta-row').style.display = isStaff ? 'none' : '';   // meta-score bestaat niet voor staf
+  $('f-metapa-row').style.display = isStaff ? 'none' : '';
+  // Staf heeft geen lengte, voet, PA-groei of speler-transferopties; die filters horen daar niet.
+  $('fg-physical').style.display = isStaff ? 'none' : '';
+  $('f-wonderkid-row').style.display = isStaff ? 'none' : '';
+  $('f-price-row').style.display = isStaff ? 'none' : '';
+  $('f-fee-row').style.display = isStaff ? 'none' : '';
+  $('f-interest-row').style.display = isStaff ? 'none' : '';
+  $('f-tstatus-row').style.display = isStaff ? 'none' : '';
   renderDevSection();   // historie wordt alleen voor spelers bijgehouden
   renderIntakeBar();
   // Kolom bestaat niet in deze modus: anders sorteert de tabel stilzwijgend op een
