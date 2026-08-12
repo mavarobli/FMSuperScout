@@ -25,7 +25,10 @@ const state = {
   advF: jread('fmss_adv', []),     // attribuutfilter-regels [{k,min,max}]
   hist: null,        // {dates, refIdx, map: Map<uid,[caRef,paRef,firstIdx]>} uit /api/history/deltas
   histPeriod: localStorage.getItem('fmss_histperiod') || 'y1',
+  bestXiFormation: '4-3-3',
 };
+
+const mercatoDismissed = new Set();
 // Beschadigde browseropslag (één ongeldige JSON-waarde) mag de app nooit vóór het
 // foutscherm laten crashen: kapotte sleutel → standaardwaarde, opslag opgeruimd.
 function jread(key, fallback) {
@@ -3741,6 +3744,624 @@ function closeCompare() { $('compare-modal').classList.add('hidden'); }
 $('compare-modal').addEventListener('click', e => { if (e.target.id === 'compare-modal') closeCompare(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('compare-modal').classList.contains('hidden')) closeCompare(); });
 
+// ================= MODULE MEILLEUR XI, TACTIQUE & MERCATO =================
+const XI_FORMATIONS = {
+  '4-3-3': [
+    {role: 'af', line: 'fw', side: 'C', t: 15, l: 50},
+    {role: 'wing', line: 'am', side: 'L', t: 25, l: 15},
+    {role: 'wing', line: 'am', side: 'R', t: 25, l: 85},
+    {role: 'cm', line: 'cm', side: 'CL', t: 45, l: 30},
+    {role: 'cm', line: 'cm', side: 'CR', t: 45, l: 70},
+    {role: 'dm', line: 'dm', side: 'C', t: 60, l: 50},
+    {role: 'fb', line: 'df', side: 'L', t: 75, l: 15},
+    {role: 'cd', line: 'df', side: 'CL', t: 75, l: 35},
+    {role: 'cd', line: 'df', side: 'CR', t: 75, l: 65},
+    {role: 'fb', line: 'df', side: 'R', t: 75, l: 85},
+    {role: 'gk', line: 'gk', side: 'C', t: 90, l: 50}
+  ],
+  '4-2-3-1': [
+    {role: 'af', line: 'fw', side: 'C', t: 15, l: 50},
+    {role: 'wing', line: 'am', side: 'L', t: 30, l: 15},
+    {role: 'am', line: 'am', side: 'C', t: 30, l: 50},
+    {role: 'wing', line: 'am', side: 'R', t: 30, l: 85},
+    {role: 'dm', line: 'dm', side: 'CL', t: 55, l: 35},
+    {role: 'dm', line: 'dm', side: 'CR', t: 55, l: 65},
+    {role: 'fb', line: 'df', side: 'L', t: 75, l: 15},
+    {role: 'cd', line: 'df', side: 'CL', t: 75, l: 35},
+    {role: 'cd', line: 'df', side: 'CR', t: 75, l: 65},
+    {role: 'fb', line: 'df', side: 'R', t: 75, l: 85},
+    {role: 'gk', line: 'gk', side: 'C', t: 90, l: 50}
+  ],
+  '4-4-2': [
+    {role: 'af', line: 'fw', side: 'CL', t: 15, l: 35},
+    {role: 'af', line: 'fw', side: 'CR', t: 15, l: 65},
+    {role: 'wing', line: 'cm', side: 'L', t: 45, l: 15},
+    {role: 'cm', line: 'cm', side: 'CL', t: 45, l: 35},
+    {role: 'cm', line: 'cm', side: 'CR', t: 45, l: 65},
+    {role: 'wing', line: 'cm', side: 'R', t: 45, l: 85},
+    {role: 'fb', line: 'df', side: 'L', t: 75, l: 15},
+    {role: 'cd', line: 'df', side: 'CL', t: 75, l: 35},
+    {role: 'cd', line: 'df', side: 'CR', t: 75, l: 65},
+    {role: 'fb', line: 'df', side: 'R', t: 75, l: 85},
+    {role: 'gk', line: 'gk', side: 'C', t: 90, l: 50}
+  ],
+  '5-3-2': [
+    {role: 'af', line: 'fw', side: 'CL', t: 15, l: 35},
+    {role: 'af', line: 'fw', side: 'CR', t: 15, l: 65},
+    {role: 'cm', line: 'cm', side: 'CL', t: 45, l: 30},
+    {role: 'cm', line: 'cm', side: 'C', t: 45, l: 50},
+    {role: 'cm', line: 'cm', side: 'CR', t: 45, l: 70},
+    {role: 'wb', line: 'df', side: 'L', t: 65, l: 15},
+    {role: 'cd', line: 'df', side: 'CL', t: 75, l: 35},
+    {role: 'cd', line: 'df', side: 'C', t: 75, l: 50},
+    {role: 'cd', line: 'df', side: 'CR', t: 75, l: 65},
+    {role: 'wb', line: 'df', side: 'R', t: 65, l: 85},
+    {role: 'gk', line: 'gk', side: 'C', t: 90, l: 50}
+  ],
+  '4-2-4': [
+    {role: 'af', line: 'fw', side: 'CL', t: 15, l: 35},
+    {role: 'af', line: 'fw', side: 'CR', t: 15, l: 65},
+    {role: 'wing', line: 'am', side: 'L', t: 30, l: 15},
+    {role: 'wing', line: 'am', side: 'R', t: 30, l: 85},
+    {role: 'cm', line: 'cm', side: 'CL', t: 50, l: 35},
+    {role: 'cm', line: 'cm', side: 'CR', t: 50, l: 65},
+    {role: 'fb', line: 'df', side: 'L', t: 75, l: 15},
+    {role: 'cd', line: 'df', side: 'CL', t: 75, l: 35},
+    {role: 'cd', line: 'df', side: 'CR', t: 75, l: 65},
+    {role: 'fb', line: 'df', side: 'R', t: 75, l: 85},
+    {role: 'gk', line: 'gk', side: 'C', t: 90, l: 50}
+  ],
+  '5-4-1': [
+    {role: 'af', line: 'fw', side: 'C', t: 15, l: 50},
+    {role: 'wing', line: 'cm', side: 'L', t: 45, l: 15},
+    {role: 'cm', line: 'cm', side: 'CL', t: 45, l: 35},
+    {role: 'cm', line: 'cm', side: 'CR', t: 45, l: 65},
+    {role: 'wing', line: 'cm', side: 'R', t: 45, l: 85},
+    {role: 'wb', line: 'df', side: 'L', t: 65, l: 15},
+    {role: 'cd', line: 'df', side: 'CL', t: 75, l: 35},
+    {role: 'cd', line: 'df', side: 'C', t: 75, l: 50},
+    {role: 'cd', line: 'df', side: 'CR', t: 75, l: 65},
+    {role: 'wb', line: 'df', side: 'R', t: 65, l: 85},
+    {role: 'gk', line: 'gk', side: 'C', t: 90, l: 50}
+  ],
+  '4-1-4-1': [
+    {role: 'af', line: 'fw', side: 'C', t: 15, l: 50},
+    {role: 'wing', line: 'cm', side: 'L', t: 40, l: 15},
+    {role: 'cm', line: 'cm', side: 'CL', t: 40, l: 35},
+    {role: 'cm', line: 'cm', side: 'CR', t: 40, l: 65},
+    {role: 'wing', line: 'cm', side: 'R', t: 40, l: 85},
+    {role: 'dm', line: 'dm', side: 'C', t: 55, l: 50},
+    {role: 'fb', line: 'df', side: 'L', t: 75, l: 15},
+    {role: 'cd', line: 'df', side: 'CL', t: 75, l: 35},
+    {role: 'cd', line: 'df', side: 'CR', t: 75, l: 65},
+    {role: 'fb', line: 'df', side: 'R', t: 75, l: 85},
+    {role: 'gk', line: 'gk', side: 'C', t: 90, l: 50}
+  ],
+  '3-4-3': [
+    {role: 'af', line: 'fw', side: 'C', t: 15, l: 50},
+    {role: 'wing', line: 'am', side: 'L', t: 25, l: 20},
+    {role: 'wing', line: 'am', side: 'R', t: 25, l: 80},
+    {role: 'cm', line: 'cm', side: 'CL', t: 45, l: 35},
+    {role: 'cm', line: 'cm', side: 'CR', t: 45, l: 65},
+    {role: 'wb', line: 'dm', side: 'L', t: 55, l: 15},
+    {role: 'wb', line: 'dm', side: 'R', t: 55, l: 85},
+    {role: 'cd', line: 'df', side: 'CL', t: 75, l: 30},
+    {role: 'cd', line: 'df', side: 'C', t: 75, l: 50},
+    {role: 'cd', line: 'df', side: 'CR', t: 75, l: 70},
+    {role: 'gk', line: 'gk', side: 'C', t: 90, l: 50}
+  ]
+};
+
+function canPlaySlot(p, slot) {
+  const pos = p.posArr || [];
+  if (!pos.length) return false;
+  const role = slot.role;
+  const side = slot.side;
+
+  if (role === 'gk') return pos.includes('GK');
+  if (role === 'cd' || role === 'bpd') return pos.includes('DC');
+  if (role === 'fb' || role === 'wb') {
+    if (side === 'L' || side === 'CL') return pos.includes('DL') || pos.includes('WBL');
+    if (side === 'R' || side === 'CR') return pos.includes('DR') || pos.includes('WBR');
+    return pos.includes('DL') || pos.includes('DR') || pos.includes('WBL') || pos.includes('WBR');
+  }
+  if (role === 'dm' || role === 'dlp' || role === 'bwm') return pos.includes('DM');
+  if (role === 'cm' || role === 'b2b' || role === 'ap') return pos.includes('MC');
+  if (role === 'wing' || role === 'if') {
+    if (side === 'L' || side === 'CL') return pos.includes('AML') || pos.includes('ML');
+    if (side === 'R' || side === 'CR') return pos.includes('AMR') || pos.includes('MR');
+    return pos.includes('AML') || pos.includes('AMR') || pos.includes('ML') || pos.includes('MR');
+  }
+  if (role === 'am') return pos.includes('AMC');
+  if (role === 'af' || role === 'poacher' || role === 'tm' || role === 'cf') return pos.includes('ST');
+  return false;
+}
+
+function findOptimalLineup(squad, formation) {
+  const candidatesForSlot = formation.map(f => {
+    let list = squad.map(p => {
+      let score = metaScore(p);
+      const fitsSlot = canPlaySlot(p, f);
+      return { player: p, score: fitsSlot && score != null ? score : -1 };
+    }).filter(c => c.score > 0);
+    list.sort((a, b) => b.score - a.score);
+    return list.slice(0, 15);
+  });
+
+  let bestSum = -1, bestLineup = null;
+  let maxRemaining = new Array(12).fill(0);
+  for (let i = 10; i >= 0; i--) {
+    maxRemaining[i] = maxRemaining[i + 1] + (candidatesForSlot[i][0] ? candidatesForSlot[i][0].score : 0);
+  }
+
+  let assignedIds = new Set(), currentLineup = new Array(11), iterations = 0;
+
+  function dfs(slotIdx, currentSum) {
+    if (iterations++ > 300000) return;
+    if (currentSum + maxRemaining[slotIdx] <= bestSum) return;
+    if (slotIdx === 11) { bestSum = currentSum; bestLineup = [...currentLineup]; return; }
+
+    let found = false;
+    for (let cand of candidatesForSlot[slotIdx]) {
+      if (!assignedIds.has(cand.player.id)) {
+        found = true;
+        assignedIds.add(cand.player.id);
+        currentLineup[slotIdx] = {
+          player: cand.player, score: cand.score, role: formation[slotIdx].role,
+          t: formation[slotIdx].t, l: formation[slotIdx].l
+        };
+        dfs(slotIdx + 1, currentSum + cand.score);
+        assignedIds.delete(cand.player.id);
+      }
+    }
+    if (!found) {
+      currentLineup[slotIdx] = { player: null, score: 0, role: formation[slotIdx].role, t: formation[slotIdx].t, l: formation[slotIdx].l };
+      dfs(slotIdx + 1, currentSum);
+    }
+  }
+
+  dfs(0, 0);
+  return bestLineup ? { lineup: bestLineup, score: bestSum } : null;
+}
+
+function autoDetectBestFormation(squad) {
+  let bestFormationKey = null, bestResult = null, highestAvgScore = -1;
+  const formationKeys = Object.keys(XI_FORMATIONS).filter(k => k !== 'custom' && k !== 'custom_active');
+
+  formationKeys.forEach(fKey => {
+    const formation = XI_FORMATIONS[fKey];
+    const res = findOptimalLineup(squad, formation);
+    if (res && res.score > 0) {
+      const avg = res.score / 11;
+      if (avg > highestAvgScore) {
+        highestAvgScore = avg;
+        bestFormationKey = fKey;
+        bestResult = res;
+      }
+    }
+  });
+  return { key: bestFormationKey, result: bestResult };
+}
+
+function triggerBestFormationAuto() {
+  const myClub = (state.meta.myClub || '').toLowerCase();
+  if (!myClub) { showToast("Aucun club sélectionné", "warning"); return; }
+  const squad = state.players.filter(p => (p.club || '').toLowerCase() === myClub);
+  const best = autoDetectBestFormation(squad);
+  if (best && best.key) {
+    state.bestXiFormation = best.key;
+    renderBestXI();
+    showToast(`Compo optimale : ${best.key} (${(best.result.score / 11).toFixed(1)} moy.)`, "check");
+  } else {
+    showToast("Impossible de trouver une formation", "warning");
+  }
+}
+window.triggerBestFormationAuto = triggerBestFormationAuto;
+
+function renderBestXI() {
+  const box = $('bestxi');
+  if (!box) return;
+
+  if (state.bestXiFormation === 'custom') { renderInteractiveMap(); return; }
+
+  const myClub = (state.meta.myClub || '').toLowerCase();
+  let html = `<div class="an-head" style="display:flex; justify-content:space-between; align-items:center; padding: 15px 20px; flex-wrap: wrap; gap: 10px;">
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <h2 style="margin:0;">Meilleur XI & Banc (Doublures)</h2>
+        <button onclick="openMercatoModal()" style="padding: 5px 12px; background: #059669; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">📊 Rapport Mercato</button>
+        <button onclick="triggerBestFormationAuto()" style="padding: 5px 12px; background: #d97706; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">⚡ Trouver la meilleure compo</button>
+        <button onclick="state.bestXiFormation = 'custom'; renderBestXI();" style="padding: 5px 12px; background: #7c3aed; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">✏️ Modifier la tactique</button>
+    </div>
+    <select id="xi-formation" onchange="handleFormationChange()" style="padding: 5px 10px; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 5px; font-weight: bold; cursor: pointer;">
+        ${Object.keys(XI_FORMATIONS).filter(f => f !== 'custom_active').map(f => `<option value="${f}" ${state.bestXiFormation === f ? 'selected' : ''}>${f}</option>`).join('')}
+        <option value="custom" ${state.bestXiFormation === 'custom' || state.bestXiFormation === 'custom_active' ? 'selected' : ''}>⚙️ Tactique Personnalisée (Interactive)</option>
+    </select>
+  </div>`;
+
+  if (!myClub) {
+    box.innerHTML = html + `<div class="an-empty" style="text-align:center; padding: 20px;">Aucun club détecté. Sélectionnez une équipe via les filtres (Mijn club).</div>`;
+    return;
+  }
+
+  const squad = state.players.filter(p => (p.club || '').toLowerCase() === myClub);
+  const formation = state.bestXiFormation === 'custom_active' ? XI_FORMATIONS['custom_active'] : XI_FORMATIONS[state.bestXiFormation];
+  if (!formation) return;
+
+  const result = findOptimalLineup(squad, formation);
+  let benchResult = null;
+  if (result && result.lineup) {
+    const titularIds = new Set(result.lineup.map(slot => slot.player ? slot.player.id : null).filter(Boolean));
+    const remainingSquad = squad.filter(p => !titularIds.has(p.id));
+    benchResult = findOptimalLineup(remainingSquad, formation);
+  }
+
+  let layoutHtml = `<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; align-items: flex-start; padding: 20px;">`;
+  let pitchHtml = `<div id="xi-pitch-container" style="position:relative; width:100%; max-width:600px; height:720px; background-color:#12301c; border-radius:12px; border:2px solid #2a3441; overflow:hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); flex-shrink: 0;">
+      <div style="position:absolute; top:50%; left:0; right:0; height:2px; background:#2a4a34;"></div>
+      <div style="position:absolute; top:50%; left:50%; width:140px; height:140px; border:2px solid #2a4a34; border-radius:50%; transform:translate(-50%, -50%);"></div>
+      <div style="position:absolute; top:0; left:30%; width:40%; height:16%; border:2px solid #2a4a34; border-top:none;"></div>
+      <div style="position:absolute; bottom:0; left:30%; width:40%; height:16%; border:2px solid #2a4a34; border-bottom:none;"></div>`;
+
+  if (result && result.lineup) {
+    result.lineup.forEach(slot => {
+      let score = slot.score > 0 ? slot.score.toFixed(1) : '–';
+      let name = slot.player ? slot.player.name : 'Aucun joueur';
+      let cls = slot.score > 0 ? roleClass(slot.score) : '';
+      pitchHtml += `<div style="position:absolute; top:${slot.t}%; left:${slot.l}%; transform:translate(-50%, -50%); text-align:center; color:white; z-index:10; cursor:pointer;" ${slot.player ? `onclick="showDetail(state.players.find(p=>p.id===${slot.player.id}))"` : ''}>
+         <div class="v ${cls}" style="width:38px; height:38px; line-height:38px; border-radius:50%; margin:0 auto; font-weight:bold; background:#1e293b; border:2px solid rgba(255,255,255,0.2); font-size:13px;">${score}</div>
+         <div style="font-size:11px; font-weight:bold; background:rgba(15,23,42,0.95); padding:3px 6px; border-radius:4px; margin-top:4px; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</div>
+         <div style="font-size:9px; color:#cbd5e1; margin-top:1px; font-weight:bold;">${roleName(slot.role)}</div>
+      </div>`;
+    });
+  }
+  pitchHtml += `</div>`;
+
+  let benchHtml = `<div style="width: 100%; max-width: 320px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; display: flex; flex-direction: column; height: 720px; overflow: hidden; flex-shrink: 0;">
+    <div style="padding: 12px 15px; background: #0f172a; border-bottom: 1px solid #334155; font-weight: bold; color: #fbbf24; font-size: 13px;">
+        <span>🪑 Mon Banc (Doublures)</span>
+    </div>
+    <div style="padding: 12px; overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">`;
+
+  if (benchResult && benchResult.lineup) {
+    let sortedBench = [...benchResult.lineup];
+    sortedBench.sort((a, b) => (Math.abs(a.t - b.t) > 3) ? a.t - b.t : a.l - b.l);
+
+    sortedBench.forEach(slot => {
+      let rName = roleName(slot.role).toUpperCase();
+      let sideText = slot.l < 30 ? ' (Gauche)' : slot.l > 70 ? ' (Droit)' : '';
+      let formatRoleLabel = rName + sideText;
+      let playerName = slot.player ? slot.player.name : 'Poste vacant';
+      let scoreVal = slot.score > 0 ? slot.score.toFixed(1) : '–';
+      let cls = slot.score > 0 ? roleClass(slot.score) : '';
+
+      benchHtml += `<div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; ${!slot.player ? 'opacity: 0.5;' : ''}">
+          <div>
+              <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">${formatRoleLabel}</div>
+              <div style="font-size: 12px; font-weight: bold; color: #fff; margin-top: 1px; cursor: pointer; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" ${slot.player ? `onclick="showDetail(state.players.find(p=>p.id===${slot.player.id}))"` : ''}>${playerName}</div>
+          </div>
+          <div class="v ${cls}" style="width: 28px; height: 28px; line-height: 28px; text-align: center; border-radius: 50%; font-weight: bold; font-size: 11px; background: #1e293b; border: 1px solid rgba(255,255,255,0.2);">${scoreVal}</div>
+      </div>`;
+    });
+  }
+  benchHtml += `</div></div>`;
+  layoutHtml += pitchHtml + benchHtml + `</div>`;
+
+  let scoreFooter = result && result.score ? `<div style="text-align:center; color:#94a3b8; font-size:15px; margin-top:10px; font-weight:bold;">Score moyen Meta du XI : <strong style="color:#34d399; font-size:17px;">${(result.score / 11).toFixed(2)}</strong></div>` : '';
+  box.innerHTML = html + layoutHtml + scoreFooter;
+}
+
+let customSelectedSlots = [];
+const INTERACTIVE_MAP = [
+    { id: 'fw_C', role: 'af', line: 'fw', side: 'C', label: 'BT' },
+    { id: 'fw_CL', role: 'af', line: 'fw', side: 'CL', label: 'BT (G)' },
+    { id: 'fw_CR', role: 'af', line: 'fw', side: 'CR', label: 'BT (D)' },
+    { id: 'am_L', role: 'wing', line: 'am', side: 'L', label: 'MO (G)' },
+    { id: 'am_CL', role: 'am', line: 'am', side: 'CL', label: 'MO (CG)' },
+    { id: 'am_C', role: 'am', line: 'am', side: 'C', label: 'MO (C)' },
+    { id: 'am_CR', role: 'am', line: 'am', side: 'CR', label: 'MO (CD)' },
+    { id: 'am_R', role: 'wing', line: 'am', side: 'R', label: 'MO (D)' },
+    { id: 'cm_L', role: 'wing', line: 'cm', side: 'L', label: 'M (G)' },
+    { id: 'cm_CL', role: 'cm', line: 'cm', side: 'CL', label: 'MC (G)' },
+    { id: 'cm_C', role: 'cm', line: 'cm', side: 'C', label: 'MC (C)' },
+    { id: 'cm_CR', role: 'cm', line: 'cm', side: 'CR', label: 'MC (D)' },
+    { id: 'cm_R', role: 'wing', line: 'cm', side: 'R', label: 'M (D)' },
+    { id: 'dm_L', role: 'wb', line: 'dm', side: 'L', label: 'WB (G)' },
+    { id: 'dm_CL', role: 'dm', line: 'dm', side: 'CL', label: 'MD (G)' },
+    { id: 'dm_C', role: 'dm', line: 'dm', side: 'C', label: 'MD' },
+    { id: 'dm_CR', role: 'dm', line: 'dm', side: 'CR', label: 'MD (D)' },
+    { id: 'dm_R', role: 'wb', line: 'dm', side: 'R', label: 'WB (D)' },
+    { id: 'df_L', role: 'fb', line: 'df', side: 'L', label: 'DL' },
+    { id: 'df_CL', role: 'cd', line: 'df', side: 'CL', label: 'DC (G)' },
+    { id: 'df_C', role: 'cd', line: 'df', side: 'C', label: 'DC (C)' },
+    { id: 'df_CR', role: 'cd', line: 'df', side: 'CR', label: 'DC (D)' },
+    { id: 'df_R', role: 'fb', line: 'df', side: 'R', label: 'DR' },
+    { id: 'gk_C', role: 'gk', line: 'gk', side: 'C', label: 'GB' }
+];
+
+function handleFormationChange() {
+  const select = document.getElementById('xi-formation');
+  if (!select) return;
+  if (select.value === 'custom') {
+    state.bestXiFormation = 'custom';
+    if (customSelectedSlots.length === 0) {
+      customSelectedSlots = JSON.parse(JSON.stringify(XI_FORMATIONS['4-3-3']));
+    }
+    renderInteractiveMap();
+  } else {
+    state.bestXiFormation = select.value;
+    renderBestXI();
+  }
+}
+
+function renderInteractiveMap() {
+  const box = $('bestxi');
+  if (!box) return;
+  const lineHeights = { 'fw': 12, 'am': 28, 'cm': 44, 'dm': 60, 'df': 76, 'gk': 91 };
+  const sideWidths = { 'L': 12, 'CL': 31, 'C': 50, 'CR': 69, 'R': 88 };
+  const isReady = customSelectedSlots.length === 11;
+
+  let html = `<div class="an-head" style="display:flex; justify-content:space-between; align-items:center; padding: 15px 20px;">
+      <h2>Tactique Personnalisée (${customSelectedSlots.length}/11 postes)</h2>
+      <div style="display: flex; gap: 10px;">
+          <select id="xi-formation" onchange="handleFormationChange()" style="padding: 5px 10px; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 5px; font-weight: bold; cursor: pointer;">
+              ${Object.keys(XI_FORMATIONS).map(f => `<option value="${f}">${f}</option>`).join('')}
+              <option value="custom" selected>⚙️ Tactique Personnalisée (Interactive)</option>
+          </select>
+          <button onclick="confirmCustomTactics()" ${!isReady ? 'disabled' : ''} style="padding: 6px 14px; background: ${isReady ? '#8b5cf6' : '#334155'}; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: ${isReady ? 'pointer' : 'not-allowed'}; font-size: 12px;">Confirmer la compo</button>
+      </div>
+  </div>`;
+
+  let pitchHtml = `<div style="position:relative; width:100%; max-width:700px; height:780px; background-color:#12301c; margin:20px auto; border-radius:12px; border:2px solid #2a3441; overflow:hidden;">`;
+  INTERACTIVE_MAP.forEach(slot => {
+      const topPct = lineHeights[slot.line];
+      const leftPct = sideWidths[slot.side] || 50;
+      const isActivated = customSelectedSlots.some(s => s.line === slot.line && s.side === slot.side && s.role === slot.role);
+      const btnStyle = isActivated ? "background: #8b5cf6; color: #fff; border: 2px solid #c4b5fd;" : "background: rgba(15,23,42,0.6); color: #94a3b8; border: 2px dashed #475569;";
+      pitchHtml += `<button onclick="toggleCustomSlot('${slot.line}', '${slot.side}', '${slot.role}')" style="position:absolute; top:${topPct}%; left:${leftPct}%; transform:translate(-50%, -50%); width:52px; height:42px; border-radius:8px; font-weight:bold; font-size:9px; cursor:pointer; z-index:20; ${btnStyle}">${slot.label}</button>`;
+  });
+  pitchHtml += `</div>`;
+  box.innerHTML = html + pitchHtml;
+}
+
+function toggleCustomSlot(line, side, role) {
+  const index = customSelectedSlots.findIndex(s => s.line === line && s.side === side);
+  if (index !== -1) { customSelectedSlots.splice(index, 1); } 
+  else {
+    if (customSelectedSlots.length >= 11) { alert("Maximum 11 titulaires atteints."); return; }
+    customSelectedSlots.push({ role, line, side, t: line === 'fw' ? 15 : line === 'am' ? 30 : line === 'cm' ? 45 : line === 'dm' ? 60 : line === 'df' ? 75 : 90, l: side === 'L' ? 15 : side === 'CL' ? 33 : side === 'C' ? 50 : side === 'CR' ? 67 : 85 });
+  }
+  renderInteractiveMap();
+}
+
+function confirmCustomTactics() {
+  if (customSelectedSlots.length !== 11) return;
+  XI_FORMATIONS['custom_active'] = customSelectedSlots;
+  state.bestXiFormation = 'custom_active';
+  renderBestXI();
+}
+
+function openMercatoModal() {
+  const modal = $('mercatoModal'), content = $('mercatoModalContent');
+  if (!modal || !content) return;
+  const myClub = (state.meta.myClub || '').toLowerCase();
+  if (!myClub || !state.players.length) {
+    content.innerHTML = `<div style="text-align: center; color: #94a3b8; padding: 40px;">Aucun club détecté ou base vide.</div>`;
+    modal.classList.remove('hidden'); modal.style.display = 'flex'; return;
+  }
+
+  const squad = state.players.filter(p => (p.club || '').toLowerCase() === myClub);
+  const formationKey = state.bestXiFormation || '4-3-3';
+  const formation = XI_FORMATIONS[formationKey];
+  if (!formation) return;
+
+  const optimalLineup = findOptimalLineup(squad, formation);
+  if (!optimalLineup || !optimalLineup.lineup) return;
+
+  const minInterest = parseInt(document.getElementById('mercato-filter-interest')?.value) || 0;
+  const maxPrice = parseMoney(document.getElementById('mercato-filter-price')?.value);
+  const onlyAttainable = document.getElementById('mercato-filter-attainable')?.checked || false;
+  const minQp = parseFloat(document.getElementById('mercato-filter-qp')?.value) || 0;
+
+  let suggestions = [];
+  formation.forEach((slot, idx) => {
+    let currentSlot = optimalLineup.lineup[idx];
+    let currentScore = currentSlot && currentSlot.player ? metaScore(currentSlot.player) || 0 : 0;
+    let currentName = currentSlot && currentSlot.player ? currentSlot.player.name : "Aucun";
+    let targets = [];
+
+    state.players.forEach(dbPlayer => {
+      if ((dbPlayer.club || '').toLowerCase() === myClub || mercatoDismissed.has(dbPlayer.id)) return;
+      if (!canPlaySlot(dbPlayer, slot)) return;
+      let dbScore = metaScore(dbPlayer);
+      if (dbScore == null) return;
+      let improvement = dbScore - currentScore;
+      if (improvement <= 0.2) return;
+
+      const iObj = interestEstimate(dbPlayer);
+      if (minInterest > 0 && (iObj ? iObj.score : 0) < minInterest) return;
+
+      const estFee = feeEstimate(dbPlayer).v ?? estValue(dbPlayer).v ?? Infinity;
+      if (maxPrice != null && estFee > maxPrice) return;
+      if (onlyAttainable && !isAttainable(dbPlayer)) return;
+
+      const feeMillions = estFee === 0 ? 0 : (estFee / 1e6);
+      const qpRatio = feeMillions > 0 ? (dbScore / feeMillions) : (feeMillions === 0 ? Infinity : 0);
+      if (minQp > 0 && qpRatio < minQp) return;
+
+      targets.push({ player: dbPlayer, dbScore, improvement });
+    });
+
+    targets.sort((a, b) => b.improvement - a.improvement);
+    if (targets.length > 0) {
+      suggestions.push({ role: `${slot.role.toUpperCase()} (${slot.side})`, currentName, currentScore, targets: targets.slice(0, 3) });
+    }
+  });
+
+  let html = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h3 style="color: #fff; margin: 0;">🎯 Rapport Mercato & Cibles Prioritaires</h3>
+      ${mercatoDismissed.size > 0 ? `<button onclick="resetMercatoDismissed()" style="background: #334155; color: #cbd5e1; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer;">🔄 Réinitialiser les cibles rejetées (${mercatoDismissed.size})</button>` : ''}
+  </div>`;
+
+  if (suggestions.length === 0) {
+    html += `<div style="text-align: center; color: #94a3b8; padding: 40px;">Aucune cible ne correspond à vos filtres.</div>`;
+  } else {
+    html += suggestions.map(group => `
+      <div style="background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 10px;">
+          <span style="color: #34d399; font-weight: bold;">Poste : ${group.role}</span>
+          <span style="font-size: 12px; color: #94a3b8;">Titulaire : <b style="color: #fff;">${group.currentName}</b> (${group.currentScore.toFixed(1)})</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px;">
+          ${group.targets.map(t => {
+            const p = t.player, iObj = interestEstimate(p), feeObj = feeEstimate(p);
+            const feeVal = feeObj.v ?? estValue(p).v ?? 0;
+            const qpVal = (feeVal / 1e6) > 0 ? (t.dbScore / (feeVal / 1e6)).toFixed(2) : 'Max';
+            return `<div style="position: relative; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px;">
+              <button onclick="dismissMercatoTarget(${p.id})" style="position: absolute; top: 8px; right: 8px; background: none; border: none; color: #94a3b8; cursor: pointer;">✕</button>
+              <div style="font-weight: bold; color: #fff; cursor: pointer;" onclick="showDetail(state.players.find(x=>x.id===${p.id}))">${p.name}</div>
+              <div style="font-size: 12px; color: #94a3b8;">${p.club || 'Libre'} • ${getAge(p) || '?'} ans</div>
+              <div style="font-size: 11px; color: #cbd5e1; margin-top: 6px;">
+                <div>Prix : <b style="color: #fff;">${fmtMoney(feeVal)}</b> | Q/P : <b style="color: #34d399;">${qpVal}</b></div>
+                <div>Intérêt : <b style="color: #38bdf8;">${iObj ? iObj.score : '?'}/100</b></div>
+              </div>
+              <div style="margin-top: 10px; display: flex; justify-content: space-between; font-size: 12px;">
+                <span>Meta : <b>${t.dbScore.toFixed(1)}</b></span>
+                <span style="color: #34d399; font-weight: bold;">+${t.improvement.toFixed(1)} pts</span>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`).join('');
+  }
+  content.innerHTML = html;
+  modal.classList.remove('hidden'); modal.style.display = 'flex';
+}
+
+function closeMercatoModal() {
+  const modal = $('mercatoModal');
+  if (modal) { modal.classList.add('hidden'); modal.style.display = 'none'; }
+}
+
+function dismissMercatoTarget(playerId) {
+  mercatoDismissed.add(playerId);
+  openMercatoModal();
+}
+
+function resetMercatoDismissed() {
+  mercatoDismissed.clear();
+  openMercatoModal();
+  showToast("Cibles réinitialisées avec succès", "check");
+}
+
+let clubsSearchTerm = '';
+function analyzeClubsAndDivisions() {
+  const clubMap = new Map(), divMap = new Map();
+  state.players.forEach(p => {
+    if (p.teamType != null && p.teamType !== 0) return;
+    const clubName = p.club || 'Libre / Sans club', divName = p.div || 'Inconnue';
+    const meta = metaScore(p) || 0, paMeta = metaPaScore(p) || meta, age = getAge(p) || 0, val = p.value || 0, wage = p.wage || 0;
+
+    if (!clubMap.has(clubName)) clubMap.set(clubName, { name: clubName, div: divName, players: [], totalVal: 0, totalWage: 0 });
+    const cData = clubMap.get(clubName);
+    cData.players.push({ player: p, meta, paMeta, age, val, wage });
+    cData.totalVal += val; cData.totalWage += wage;
+
+    if (!divMap.has(divName)) divMap.set(divName, { name: divName, count: 0, totalMeta: 0, totalPaMeta: 0, totalVal: 0 });
+    const dData = divMap.get(divName);
+    dData.count++; dData.totalMeta += meta; dData.totalPaMeta += paMeta; dData.totalVal += val;
+  });
+
+  const clubs = [...clubMap.values()].filter(c => c.players.length >= 10).map(c => {
+    c.players.sort((a, b) => b.meta - a.meta);
+    const topPlayers = c.players.slice(0, 20), n = topPlayers.length;
+    let totalMeta = 0, totalPaMeta = 0, totalAge = 0;
+    topPlayers.forEach(tp => { totalMeta += tp.meta; totalPaMeta += tp.paMeta; totalAge += tp.age; });
+    return { name: c.name, div: c.div, count: c.players.length, avgMeta: n ? totalMeta / n : 0, avgPaMeta: n ? totalPaMeta / n : 0, avgAge: n ? totalAge / n : 0, totalVal: c.totalVal, totalWage: c.totalWage, topPlayer: c.players[0] ? c.players[0].player : null };
+  }).sort((a, b) => b.avgMeta - a.avgMeta);
+
+  const divisions = [...divMap.values()].filter(d => d.name !== 'Inconnue' && d.count >= 200).map(d => ({
+    name: d.name, count: d.count, avgMeta: d.count ? d.totalMeta / d.count : 0, avgPaMeta: d.count ? d.totalPaMeta / d.count : 0, totalVal: d.totalVal
+  })).sort((a, b) => b.avgMeta - a.avgMeta);
+
+  return { clubs, divisions };
+}
+
+function renderClubsView() {
+  const box = $('clubs-view');
+  if (!box) return;
+  const { clubs, divisions } = analyzeClubsAndDivisions();
+  const query = (clubsSearchTerm || '').toLowerCase();
+  const filteredClubs = clubs.filter(c => c.name.toLowerCase().includes(query) || c.div.toLowerCase().includes(query));
+
+  const clubsByDiv = new Map();
+  filteredClubs.forEach(c => {
+    if (!clubsByDiv.has(c.div)) clubsByDiv.set(c.div, []);
+    clubsByDiv.get(c.div).push(c);
+  });
+
+  let html = `<div style="padding: 20px; max-width: 1400px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2>📊 Analyse globale des Clubs & Divisions</h2>
+      <input type="text" id="clubs-search-input" value="${escHtml(clubsSearchTerm)}" placeholder="Rechercher..." oninput="onClubsSearchInput(this)" style="padding: 8px 14px; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 6px;">
+    </div>`;
+
+  if (clubsByDiv.size === 0) {
+    box.innerHTML = html + `<div style="text-align: center; color: #94a3b8; padding: 40px;">Aucun club trouvé.</div></div>`;
+    return;
+  }
+
+  divisions.forEach(div => {
+    const divClubs = clubsByDiv.get(div.name);
+    if (!divClubs || divClubs.length === 0) return;
+    html += `<div style="margin-bottom: 30px;">
+      <div style="background: #0f172a; border: 1px solid #334155; padding: 12px 16px; display: flex; justify-content: space-between;">
+        <span style="font-weight: bold; color: #38bdf8;">🏆 ${escHtml(div.name)}</span>
+        <div style="display: flex; gap: 20px; font-size: 12px; color: #94a3b8;">
+          <span>Clubs : <b style="color:#fff;">${divClubs.length}</b></span>
+          <span>Meta Moy : <b style="color: #34d399;">${div.avgMeta.toFixed(1)}</b></span>
+          <span>PA Meta Moy : <b style="color: #38bdf8;">${div.avgPaMeta.toFixed(1)}</b></span>
+        </div>
+      </div>
+      <div style="background: #1e293b; border: 1px solid #334155; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+          <thead>
+            <tr style="color: #64748b; border-bottom: 1px solid #334155; font-size: 11px; text-transform: uppercase;">
+              <th style="padding: 8px 14px;">Club</th>
+              <th style="padding: 8px 14px; text-align: center;">Effectif Pro</th>
+              <th style="padding: 8px 14px; text-align: center;">Moy. Âge</th>
+              <th style="padding: 8px 14px; text-align: center;">Meta Moyen (Top 20)</th>
+              <th style="padding: 8px 14px; text-align: center;">PA Meta Moyen</th>
+              <th style="padding: 8px 14px;">Top Player</th>
+              <th style="padding: 8px 14px; text-align: right;">Valeur Totale</th>
+            </tr>
+          </thead>
+          <tbody>`;
+    divClubs.forEach((c, idx) => {
+      const topPlayerName = c.topPlayer ? c.topPlayer.name : '–';
+      const topPlayerId = c.topPlayer ? c.topPlayer.id : null;
+
+      html += `<tr style="border-bottom: 1px solid rgba(51,65,85,0.4); ${idx % 2 === 0 ? 'background: rgba(30,41,59,0.3);' : ''}">
+        <td style="padding: 10px 14px; font-weight: bold; color: #fff;">${escHtml(c.name)}</td>
+        <td style="padding: 10px 14px; text-align: center; color: #cbd5e1;">${c.count}</td>
+        <td style="padding: 10px 14px; text-align: center; color: #cbd5e1;">${c.avgAge ? c.avgAge.toFixed(1) : '–'}</td>
+        <td style="padding: 10px 14px; text-align: center;"><b style="color: #34d399;">${c.avgMeta.toFixed(1)}</b></td>
+        <td style="padding: 10px 14px; text-align: center;"><b style="color: #38bdf8;">${c.avgPaMeta.toFixed(1)}</b></td>
+        <td style="padding: 10px 14px; color: #cbd5e1; cursor: pointer;" ${topPlayerId ? `onclick="showDetail(state.players.find(x=>x.id===${topPlayerId}))"` : ''}>${escHtml(topPlayerName)}</td>
+        <td style="padding: 10px 14px; text-align: right; color: #fbbf24; font-weight: 500;">${fmtMoney(c.totalVal)}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  });
+  box.innerHTML = html + `</div>`;
+}
+
+function onClubsSearchInput(input) {
+  clubsSearchTerm = input.value;
+  renderClubsView();
+  const newInput = $('clubs-search-input');
+  if (newInput) { newInput.focus(); newInput.setSelectionRange(newInput.value.length, newInput.value.length); }
+}
+
 // ---------- squad-behoefteanalyse ----------
 // Positiegroepen met een streefaantal (basis + degelijke cover) en de bijhorende pitch-codes.
 const SQUAD_GROUPS = [
@@ -4165,43 +4786,59 @@ function applyLang() {
 function setMode(mode) {
   state.mode = mode;
   const isAn = mode === 'analysis';
+  const isXi = mode === 'bestxi';
+  const isClubs = mode === 'clubs';
+  const isCustomView = isAn || isXi || isClubs;
+
   $('tab-players').classList.toggle('active', mode === 'players');
   $('tab-staff').classList.toggle('active', mode === 'staff');
   $('tab-shortlist').classList.toggle('active', mode === 'shortlist');
   $('tab-analysis').classList.toggle('active', isAn);
-  $('fg-pitch').style.display = mode === 'staff' || isAn ? 'none' : '';
+  if ($('tab-bestxi')) $('tab-bestxi').classList.toggle('active', isXi);
+  if ($('tab-clubs')) $('tab-clubs').classList.toggle('active', isClubs);
+
+  $('fg-pitch').style.display = mode === 'staff' || isCustomView ? 'none' : '';
   $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
-  buildGenderFilter();   // spelers- en staflijst kunnen apart gemengd zijn
-  $('fg-role').style.display = mode === 'staff' || isAn ? 'none' : '';
-  $('f-meta-row').style.display = mode === 'staff' ? 'none' : '';   // meta-score bestaat niet voor staf
+  buildGenderFilter();
+  $('fg-role').style.display = mode === 'staff' || isCustomView ? 'none' : '';
+  $('f-meta-row').style.display = mode === 'staff' ? 'none' : '';
   $('f-metapa-row').style.display = mode === 'staff' ? 'none' : '';
-  // Staf heeft geen lengte, voet of PA-groei in de dump; die filters horen daar niet.
   $('fg-physical').style.display = mode === 'staff' ? 'none' : '';
   $('f-wonderkid-row').style.display = mode === 'staff' ? 'none' : '';
-  renderDevSection();   // historie wordt alleen voor spelers bijgehouden
+  renderDevSection();
   renderIntakeBar();
-  // Kolom bestaat niet in deze modus: anders sorteert de tabel stilzwijgend op een
-  // kolom die er niet staat en toont de kop nergens een pijltje.
+
   if (hiddenStatCol(state.sortKey)) { state.sortKey = mode === 'staff' ? 'wage' : 'ca'; state.sortDir = -1; }
   $('sl-bar').classList.toggle('hidden', mode !== 'shortlist');
   renderMyTeamChips();
-  document.body.classList.toggle('mode-analysis', isAn);
+  document.body.classList.toggle('mode-analysis', isCustomView);
   state.selected = null;
   $('detail').classList.add('hidden');
-  if (isAn) {
-    $('chipbar').innerHTML = '';
-    $('table-wrap').style.display = 'none';
-    $('empty-state').classList.add('hidden');
-    $('analysis').classList.remove('hidden');
-    renderAnalysis();
-    return;
-  }
+
+  const toggleView = (id, show) => {
+    const el = $(id);
+    if (el) { el.style.display = show ? 'block' : 'none'; el.classList.toggle('hidden', !show); }
+  };
+
+  toggleView('table-wrap', !isCustomView);
+  toggleView('analysis', isAn);
+  toggleView('bestxi', isXi);
+  toggleView('clubs-view', isClubs);
+
+  if (isClubs) { $('chipbar').innerHTML = ''; renderClubsView(); return; }
+  if (isAn) { $('chipbar').innerHTML = ''; renderAnalysis(); return; }
+  if (isXi) { $('chipbar').innerHTML = ''; renderBestXI(); return; }
+
   $('table-wrap').style.display = '';
   $('analysis').classList.add('hidden');
   if (!activeCols().find(c => c.key === state.sortKey)) { state.sortKey = 'ca'; state.sortDir = -1; }
-  renderTable();   // andere modus = andere kolomset
+  renderTable();
   applyFilters();
 }
+
+// BINDINGS DES NOUVEAUX ONGLETS
+if ($('tab-bestxi')) $('tab-bestxi').onclick = () => setMode('bestxi');
+if ($('tab-clubs')) $('tab-clubs').onclick = () => setMode('clubs');
 $('tab-players').onclick = () => setMode('players');
 $('tab-staff').onclick = () => setMode('staff');
 $('tab-shortlist').onclick = () => setMode('shortlist');
