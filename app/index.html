@@ -116,8 +116,8 @@
       </select>
     </div>
 
-    <div class="fgroup" id="fg-staffrole" style="display:none">
-      <label data-i18n="staffrole">Staf-rol</label>
+    <div class="fsection" id="fg-staffrole" data-sec="staffrole" style="display:none">
+      <div class="fsec-head" data-i18n="staffrole">Staf-rol</div>
       <select id="f-staffrole"><option value="">–</option></select>
     </div>
 
@@ -161,8 +161,8 @@
 
     <div class="fsection" data-sec="financial">
       <div class="fsec-head" data-i18n="financial">Financieel</div>
-      <div class="frow"><span data-i18n="maxvalue">Max. waarde</span><input type="text" id="f-price" placeholder="10M"></div>
-      <div class="frow capa-row"><span data-i18n="maxfee">Max. vraagprijs</span><input type="text" id="f-fee" placeholder="15M"></div>
+      <div class="frow" id="f-price-row"><span data-i18n="maxvalue">Max. waarde</span><input type="text" id="f-price" placeholder="10M"></div>
+      <div class="frow capa-row" id="f-fee-row"><span data-i18n="maxfee">Max. vraagprijs</span><input type="text" id="f-fee" placeholder="15M"></div>
       <div class="frow"><span data-i18n="maxwage">Max. loon p/w</span><input type="text" id="f-wage" placeholder="50K"></div>
     </div>
 
@@ -181,14 +181,14 @@
 
     <div class="fsection" data-sec="availability">
       <div class="fsec-head" data-i18n="availability">Beschikbaarheid</div>
-      <div class="frow"><span><span data-i18n="interestmin">Wil naar jou ≥</span> <span class="col-help" data-help="interestHint">?</span></span>
+      <div class="frow" id="f-interest-row"><span><span data-i18n="interestmin">Wil naar jou ≥</span> <span class="col-help" data-help="interestHint">?</span></span>
         <select id="f-interest">
           <option value="0" data-i18n="all">Alle</option>
           <option value="25" data-i18n="int_small">Klein</option>
           <option value="45" data-i18n="int_ok">Redelijk</option>
           <option value="70" data-i18n="int_big">Groot</option>
         </select></div>
-      <div class="frow"><span data-i18n="tstatus">Transferstatus</span>
+      <div class="frow" id="f-tstatus-row"><span data-i18n="tstatus">Transferstatus</span>
         <select id="f-tstatus">
           <option value="" data-i18n="all">Alle</option>
           <option value="sale" data-i18n="tsSale">Te koop</option>
