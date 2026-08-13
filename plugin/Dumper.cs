@@ -647,10 +647,17 @@ internal static class Dumper
             int v = m.U8(pl + (ulong)Fields.PLAO_POSITIONS + (ulong)off);
             if (v >= 1) pos.Add((key, v));
         }
+        // Full list for scoring / Best XI — every position the player has trained in.
+        e.PosArr = pos.OrderByDescending(x => x.v).Select(x => x.k).ToList();
+        foreach (var (pk, pv) in pos) e.PosProficiency[pk] = pv;  // avoid net10 SDK ToDictionary overload conflict
+
+        // Display-only: Natural/Accomplished positions (original threshold filter).
         int top = pos.Count > 0 ? pos.Max(x => x.v) : 0;
-        e.PosArr = pos.Where(x => x.v >= System.Math.Max(15, top - 2)).OrderByDescending(x => x.v).Select(x => x.k).ToList();
-        if (e.PosArr.Count == 0 && pos.Count > 0)
-            e.PosArr = pos.OrderByDescending(x => x.v).Take(1).Select(x => x.k).ToList();
+        var dispPos = pos.Where(x => x.v >= System.Math.Max(15, top - 2))
+                         .OrderByDescending(x => x.v).Select(x => x.k).ToList();
+        if (dispPos.Count == 0 && pos.Count > 0)
+            dispPos = pos.OrderByDescending(x => x.v).Take(1).Select(x => x.k).ToList();
+        e.DisplayPos = string.Join(", ", dispPos);
 
         // Marktwaarde: 0x234 is FM's echte transferwaarde (geverifieerd via offset-discovery
         // tegen in-game bedragen); 0x238 is de vraagprijs (meestal niet ingesteld).
@@ -1056,8 +1063,15 @@ internal static class Dumper
         j.Prop("expires", p.Expires);
         if (isPlayer)
         {
-            j.Prop("pos", string.Join(", ", p.PosArr));
+            j.Prop("pos", p.DisplayPos);
             j.Key("posArr"); j.BeginArr(); foreach (var x in p.PosArr) j.Val(x); j.EndArr();
+            if (p.PosProficiency.Count > 0)
+            {
+                j.Key("posProficiency"); j.BeginObj();
+                foreach (var kv in p.PosProficiency.OrderByDescending(kv => kv.Value))
+                    j.Prop(kv.Key, (long)kv.Value);
+                j.EndObj();
+            }
             if (p.TeamType >= 0) j.Prop("teamType", p.TeamType);   // 0=1e, ~3=reserves, ≥10=jeugd
             j.Prop("foot", p.Foot);
             if (p.Height > 0) j.Prop("height", p.Height);
@@ -1215,6 +1229,8 @@ internal sealed class Person
     public int Height;
     public string Foot;
     public List<string> PosArr = new();
+    public Dictionary<string, int> PosProficiency = new();  // position → proficiency (1-20), all trained positions
+    public string DisplayPos = "";                            // Natural/Accomplished only, for UI display
     public long Value;
     public long GuideValue;
     public long Wage;

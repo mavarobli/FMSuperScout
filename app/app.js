@@ -27,6 +27,7 @@ const state = {
   hist: null,        // {dates, refIdx, map: Map<uid,[caRef,paRef,firstIdx]>} uit /api/history/deltas
   histPeriod: localStorage.getItem('fmss_histperiod') || 'y1',
   bestXiFormation: '4-3-3',
+  profThreshold: parseInt(localStorage.getItem('fmss_profthreshold') || '15', 10),
 };
 
 const mercatoDismissed = new Set();
@@ -138,7 +139,7 @@ const I18N = {
     step2: 'Druk in de game op <kbd>F9</kbd>, of klik hier op <b>Nieuwe data</b>',
     step3: 'De data laadt vanzelf zodra de dump klaar is',
     playersWord: 'spelers', staffWord: 'staf', clickClubFilter: 'Klik = filter op jouw club', repWord: 'reputatie',
-    roleFit: 'Tactische rol', roleColHdr: 'Rol', roleAny: 'Geen rol gekozen', bestRoles: 'Beste rollen',
+    roleFit: 'Tactische rol', roleColHdr: 'Rol', roleAny: 'Geen rol gekozen', bestRoles: 'Beste rollen', profThresholdLabel: 'Min. basisplaats',
     compare: 'Vergelijk', comparing: 'Vergelijken', addCompare: 'Vergelijk', compareFull: 'Max. 3 spelers',
     cmpTitle: 'Spelervergelijking', cmpValue: 'Waarde', cmpTopRole: 'Beste rol',
     cmpWinsBadge: '{n}× beste attribuut', avgLabel: 'Gemiddeld',
@@ -265,7 +266,7 @@ const I18N = {
     step2: 'Press <kbd>F9</kbd> in-game, or click <b>New data</b> here',
     step3: 'The data loads automatically once the dump is ready',
     playersWord: 'players', staffWord: 'staff', clickClubFilter: 'Click = filter on your club', repWord: 'reputation',
-    roleFit: 'Tactical role', roleColHdr: 'Role', roleAny: 'No role selected', bestRoles: 'Best roles',
+    roleFit: 'Tactical role', roleColHdr: 'Role', roleAny: 'No role selected', bestRoles: 'Best roles', profThresholdLabel: 'Min. proficiency',
     compare: 'Compare', comparing: 'Comparing', addCompare: 'Compare', compareFull: 'Max. 3 players',
     cmpTitle: 'Player comparison', cmpValue: 'Value', cmpTopRole: 'Best role',
     cmpWinsBadge: '{n}× best attribute', avgLabel: 'Average',
@@ -392,7 +393,7 @@ const I18N = {
     step2: 'Appuyez sur <kbd>F9</kbd> dans le jeu, ou cliquez ici sur <b>Nouvelles données</b>',
     step3: 'Les données se chargent dès que le dump est prêt',
     playersWord: 'joueurs', staffWord: 'staff', clickClubFilter: 'Clic = filtrer sur votre club', repWord: 'réputation',
-    roleFit: 'Rôle tactique', roleColHdr: 'Rôle', roleAny: 'Aucun rôle choisi', bestRoles: 'Meilleurs rôles',
+    roleFit: 'Rôle tactique', roleColHdr: 'Rôle', roleAny: 'Aucun rôle choisi', bestRoles: 'Meilleurs rôles', profThresholdLabel: 'Min. maîtrise',
     compare: 'Comparer', comparing: 'Comparaison', addCompare: 'Comparer', compareFull: '3 joueurs max.',
     cmpTitle: 'Comparaison de joueurs', cmpValue: 'Valeur', cmpTopRole: 'Meilleur rôle',
     cmpWinsBadge: '{n}× meilleur attribut', avgLabel: 'Moyenne',
@@ -519,7 +520,7 @@ const I18N = {
     step2: 'Drücke im Spiel <kbd>F9</kbd> oder klicke hier auf <b>Neue Daten</b>',
     step3: 'Die Daten laden automatisch, sobald der Dump fertig ist',
     playersWord: 'Spieler', staffWord: 'Mitarbeiter', clickClubFilter: 'Klick = nach deinem Verein filtern', repWord: 'Reputation',
-    roleFit: 'Taktische Rolle', roleColHdr: 'Rolle', roleAny: 'Keine Rolle gewählt', bestRoles: 'Beste Rollen',
+    roleFit: 'Taktische Rolle', roleColHdr: 'Rolle', roleAny: 'Keine Rolle gewählt', bestRoles: 'Beste Rollen', profThresholdLabel: 'Mind. Kompetenz',
     compare: 'Vergleichen', comparing: 'Vergleich', addCompare: 'Vergleichen', compareFull: 'Max. 3 Spieler',
     cmpTitle: 'Spielervergleich', cmpValue: 'Wert', cmpTopRole: 'Beste Rolle',
     cmpWinsBadge: '{n}× bestes Attribut', avgLabel: 'Durchschnitt',
@@ -1536,69 +1537,227 @@ function bestRoles(p, n = 5) {
 const roleClass = v => v == null ? '' : v >= 15 ? 'g5' : v >= 13 ? 'g4' : v >= 10.5 ? 'g3' : v >= 8 ? 'g2' : 'g1';
 
 // ---------- meta-score (FM-Arena attribute testing) ----------
-// Gewichten = de gemeten punten-impact per attribuut uit FM-Arena's attribute testing
-// (fm-arena.com/table/26-player-attributes-testing): per attribuut werd het effect op de
-// teamprestatie in de match engine gemeten. Snelheid/Versnelling domineren met afstand.
-// De score (1-20-schaal, key = zwaarder) zegt dus "hoe meta is deze speler", los van rol of CA.
-// Attributen zonder meetbaar positief effect tellen niet mee; keepers vallen buiten de test.
+// Weights = measured points-impact per attribute from FM-Arena's attribute testing
+// (fm-arena.com/table/26-player-attributes-testing). Pace/Acceleration dominate by far.
+// The score (1-20 scale) expresses "how meta are this player's attributes" independently
+// of role or CA. Attributes with no measurable positive effect are excluded.
+// Global baseline (fallback / PA projection). Not used by per-position routing any more.
 const META_W = {
   Pace: 20.5, Acceleration: 20.4, JumpingReach: 11.6, Dribbling: 9.8, Balance: 5.3,
   Concentration: 4.5, Anticipation: 4.3, Determination: 2.7, Agility: 2.7, Stamina: 2.5,
-  Strength: 1.9, FirstTouch: 1.5, Composure: 1.2, WorkRate: 1.1, Finishing: 1.1, Flair: 1.1,
-  LongShots: 1.0, Aggression: 1.0, Heading: 0.6, OffTheBall: 0.5,
+  Strength: 1.9, Composure: 1.2, WorkRate: 1.1, Finishing: 1.1, LongShots: 1.0,
+  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
+  InjuryProneness: 1.5, Dirtiness: 1.5,
 };
-// Keepers: eigen gewichten uit harvestgreen22's FM24-keeperhertest op FM-Arena
-// (fm-arena.com/thread/18816, winrate-effect per attribuut, 2000-7000 wedstrijden per
-// meting). FM26-keeperdata bestaat nog niet; het totale keeperseffect is volgens dezelfde
-// test grofweg een kwart van dat van veldspelers. Pressure is bij ons een
-// persoonlijkheidsveld (p.pressure), geen attrs-key; weightedMeta pakt hem daar.
-const META_GK_W = { Reflexes: 12.8, Agility: 8.0, Acceleration: 4.7, Pressure: 4.1, Pace: 3.5, AerialReach: 3.4 };
 
-// Attributen waarbij een HOGE waarde slecht is. Bij het gewogen gemiddelde wordt
-// (21 - waarde) gebruikt in plaats van de waarde zelf, zodat de schaal 1-20 intact
-// blijft: een 1 (beste) telt als 20, een 20 (slechtste) telt als 1.
-//
-// InjuryProneness en Dirtiness staan momenteel niet in META_W en tellen dus niet mee
-// in de meta-score. Deze set is alvast gedefinieerd zodat een toekomstige gewichtseditor
-// weet hoe hij ze moet behandelen.
-//
-// BELANGRIJK VOOR TOEKOMSTIGE BIJDRAGERS: voeg deze attributen NOOIT toe aan META_W met
-// een negatief gewicht. Negatieve gewichten breken de 1-20-schaal: de vloer zakt onder 0
-// en een speler met een slechte waarde (bijv. Dirtiness 20) wordt 20× harder gestraft dan
-// een speler met een goede waarde (Dirtiness 1) beloond wordt. Gebruik altijd een positief
-// gewicht in combinatie met de (21 - waarde)-inversie die META_ADVERSE bewaakt.
+// GK: harvestgreen22 FM24 keeper retest (fm-arena.com/thread/18816). FM26 unchanged.
+// Pressure on p.pressure (personality field), not p.attrs.
+const META_GK_W = {
+  Reflexes: 12.8, Agility: 8.0, Acceleration: 4.7, Pressure: 4.1, Pace: 3.5, AerialReach: 3.4,
+  Consistency: 2.0, ImportantMatches: 2.0, InjuryProneness: 1.5,
+};
+
+// ---------- per-position weight tables ----------
+// Source: harvestgreen22 FM26 global test + Orion FM24 per-position regression (same engine).
+// Tier 1 (Pace/Acc ~20): unchanged across all outfield positions.
+// Tier 2+: derived from Orion's per-position coefficients, scaled to same range.
+// Hidden attrs: Pressure (non-linear, massive effect), Consistency, ImportantMatches (modest).
+// Adverse attrs (high = bad): InjuryProneness (mid-match injury risk), Dirtiness (card risk).
+//   These are scored as (21 - value) * weight — NEVER use negative weights.
+// To tune a group: change its constant; everything else adapts automatically.
+
+// DC — JumpingReach rises to tier-1 (equal to Pace/Acc per Orion). Finishing removed.
+const META_DC_W = {
+  Pace: 20.5, Acceleration: 20.4, JumpingReach: 18.0,
+  WorkRate: 6.5, Anticipation: 6.5, Concentration: 5.5, Balance: 4.0,
+  Strength: 3.5, Determination: 3.0, Stamina: 2.5, Agility: 2.0, Aggression: 1.5,
+  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
+  InjuryProneness: 1.5, Dirtiness: 1.5,
+};
+
+// FB/WB — Stamina/WorkRate up vs DC; Crossing added (WB role); JumpingReach less critical.
+const META_FB_W = {
+  Pace: 20.5, Acceleration: 20.4,
+  Stamina: 7.0, WorkRate: 7.0, Agility: 4.5, Anticipation: 5.0,
+  Concentration: 5.0, Balance: 5.0, Dribbling: 3.5, Determination: 3.0,
+  Crossing: 2.5, JumpingReach: 1.5,
+  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
+  InjuryProneness: 1.5, Dirtiness: 1.5,
+};
+
+// DM — WorkRate/Anticipation up vs MC; JumpingReach present; Dribbling minimal.
+const META_DM_W = {
+  Pace: 20.5, Acceleration: 20.4,
+  WorkRate: 7.0, Stamina: 6.5, Anticipation: 6.0, JumpingReach: 5.0,
+  Concentration: 5.0, Balance: 4.0, Determination: 3.0,
+  Agility: 3.0, Strength: 2.5, Dribbling: 1.5,
+  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
+  InjuryProneness: 1.5, Dirtiness: 1.5,
+};
+
+// MC — Dribbling/Agility up vs DM; LongShots added (3× more impactful vs FM24).
+const META_MC_W = {
+  Pace: 20.5, Acceleration: 20.4,
+  WorkRate: 6.0, Stamina: 6.0, Agility: 5.5, Anticipation: 5.0,
+  Concentration: 5.0, Balance: 4.5, Dribbling: 4.5,
+  Determination: 3.0, LongShots: 2.5, Composure: 2.0,
+  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
+  InjuryProneness: 1.5, Dirtiness: 1.5,
+};
+
+// WM (ML/MR) — Dribbling/Crossing prominent; balanced Stamina/WorkRate.
+const META_WM_W = {
+  Pace: 20.5, Acceleration: 20.4,
+  Dribbling: 7.0, Agility: 6.0, Stamina: 5.5, WorkRate: 5.5, Balance: 5.0,
+  Anticipation: 4.0, Concentration: 4.0, Determination: 3.0,
+  Crossing: 3.5, Finishing: 2.5,
+  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
+  InjuryProneness: 1.5, Dirtiness: 1.5,
+};
+
+// AM/Wing (AML/AMR/AMC) — Dribbling/Finishing up; Crossing de-emphasised (non-linear per GFO).
+const META_AM_W = {
+  Pace: 20.5, Acceleration: 20.4,
+  Dribbling: 9.0, Agility: 7.0, Balance: 5.5, Finishing: 5.0,
+  WorkRate: 4.0, Stamina: 4.0, Anticipation: 4.0,
+  Composure: 3.5, Concentration: 3.0, Determination: 2.5,
+  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
+  InjuryProneness: 1.5, Dirtiness: 1.5,
+};
+
+// ST — Finishing rises to near-tier-1; LongShots significant (3× impact); JumpingReach still relevant.
+const META_ST_W = {
+  Pace: 20.5, Acceleration: 20.4, Finishing: 12.0, Dribbling: 7.5,
+  Agility: 5.5, Composure: 4.5, Balance: 4.5, LongShots: 4.0,
+  JumpingReach: 3.5, WorkRate: 3.5, Determination: 3.0, Concentration: 2.5,
+  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
+  InjuryProneness: 1.5, Dirtiness: 1.5,
+};
+
+// ---------- per-position routing ----------
+// Each FM position code maps to one of these named groups. To give a group its own
+// weight table, replace the entry in META_W_BY_GROUP below.
+const POS_TO_META_GROUP = {
+  GK:  'GK',
+  DC:  'DC',  DL: 'FB',  DR: 'FB',  WBL: 'FB',  WBR: 'FB',
+  DM:  'DM',
+  MC:  'MC',  ML: 'WM',  MR: 'WM',
+  AML: 'AM',  AMR: 'AM', AMC: 'AM',
+  ST:  'ST',
+};
+
+// Label shown next to each group's score in the player card
+const META_GROUP_LABEL = {
+  GK: 'GK', DC: 'DC', FB: 'FB', DM: 'DM', MC: 'MC', WM: 'WM', AM: 'AM', ST: 'ST',
+};
+
+// Weight table per group — each outfield group now has its own research-derived table.
+const META_W_BY_GROUP = {
+  GK: META_GK_W,
+  DC: META_DC_W,
+  FB: META_FB_W,
+  DM: META_DM_W,
+  MC: META_MC_W,
+  WM: META_WM_W,
+  AM: META_AM_W,
+  ST: META_ST_W,
+};
+
+// High value = bad. Use (21 - value) to keep the 1-20 scale intact.
+// NEVER add these to a weight table with a negative weight — that breaks the floor.
 const META_ADVERSE = new Set(['InjuryProneness', 'Dirtiness']);
 
-function weightedMeta(p, attrs) {
-  const W = (p.posArr || []).includes('GK') ? META_GK_W : META_W;
+// Non-linear attribute transforms applied after adverse-inversion.
+// WorkRate/Pressure: severe floor penalty below 6 (harvestgreen22: -18% win rate in 1-6 range).
+// Pace/Acc: accelerating returns above 15 (research: 17+ dominates; not strictly linear).
+const ATTR_TRANSFORM = {
+  WorkRate:     v => v < 6 ? v * 0.5 : v,
+  Pressure:     v => v < 6 ? v * 0.5 : v,
+  Pace:         v => v < 15 ? v : 15 + (v - 15) * 1.5,
+  Acceleration: v => v < 15 ? v : 15 + (v - 15) * 1.5,
+};
+
+function weightedMetaWithWeights(p, attrs, W) {
   let sum = 0, w = 0;
   for (const k in W) {
-    const v = k === 'Pressure' ? (p.pressure > 0 ? p.pressure : null) : attrs[k];
-    if (v != null) { sum += (META_ADVERSE.has(k) ? 21 - v : v) * W[k]; w += W[k]; }
+    const raw = k === 'Pressure' ? (p.pressure > 0 ? p.pressure : null) : (attrs ? attrs[k] : null);
+    if (raw == null) continue;
+    const effective = META_ADVERSE.has(k) ? 21 - raw : raw;
+    const transformed = ATTR_TRANSFORM[k] ? ATTR_TRANSFORM[k](effective) : effective;
+    sum += transformed * W[k];
+    w += W[k];
   }
   return w ? sum / w : null;
 }
-// Per speler gememoiseerd (_meta): de invoer verandert alleen bij een nieuwe dump, en dan
-// zijn het verse objecten. Zonder cache werd dit bij sorteren/filteren op Meta voor élke
-// rij per toetsaanslag herberekend.
+
+// Proficiency factor: linear fit to harvestgreen22's data (FM24/FM26 same engine).
+// prof=20 → 1.0, prof=4 → 0.592, prof=0 (untrained) → 0.40 (max penalty), clamped to [0.40, 1.0].
+// null = no proficiency data at all → 1.0 (no penalty; assume data unavailable, not untrained).
+function proficiencyFactor(prof) {
+  if (prof == null) return 1.0;
+  if (prof <= 0) return 0.40;
+  return Math.max(0.40, 0.49 + 0.51 * (prof / 20));
+}
+
+// Returns {group → rawScore} for all meta groups using the given attrs (no proficiency applied).
+function rawMetaByGroup(p, attrs) {
+  const out = {};
+  for (const [g, W] of Object.entries(META_W_BY_GROUP)) {
+    const s = weightedMetaWithWeights(p, attrs, W);
+    if (s != null) out[g] = s;
+  }
+  return out;
+}
+
+// Returns [{pos, group, label, prof, meta, effectiveMeta}] for each trained FM position,
+// sorted by effectiveMeta desc.
+//   meta         = raw score from the group's weight table (DR and WBR share the FB table)
+//   effectiveMeta = meta × proficiencyFactor(prof for that specific FM position only)
+// Falls back to posArr with prof=null (no penalty) when posProficiency is absent (old dump).
+function metaScoresByPosition(p, attrs) {
+  if (!attrs) return [];
+  const raw = rawMetaByGroup(p, attrs);
+  const profDict = p.posProficiency;
+  const hasProfData = profDict && Object.keys(profDict).length > 0;
+  const posEntries = hasProfData
+    ? Object.entries(profDict)
+    : (p.posArr || []).map(pos => [pos, null]);
+  const seen = new Set();
+  return posEntries
+    .map(([pos, prof]) => {
+      if (seen.has(pos)) return null;
+      seen.add(pos);
+      const group = POS_TO_META_GROUP[pos];
+      if (!group) return null;
+      const meta = raw[group];
+      if (meta == null) return null;
+      const effectiveMeta = meta * proficiencyFactor(prof);
+      return { pos, group, label: META_GROUP_LABEL[group], prof, meta, effectiveMeta };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.effectiveMeta - a.effectiveMeta);
+}
+
+// Single number for table sorting: best effective meta across all trained positions.
 function metaScore(p) {
   if (p._meta !== undefined) return p._meta;
   if (!p.attrs) return p._meta = null;
-  return p._meta = weightedMeta(p, p.attrs);
+  const positions = metaScoresByPosition(p, p.attrs);
+  return p._meta = positions.length ? positions[0].effectiveMeta : null;
 }
-// PA-meta: dezelfde weging, toegepast op de naar PA geprojecteerde attributen
-// (projectAttrs: positie-realistisch groeiprofiel, fysiek dooft uit na 23). Zonder
-// restpotentieel is de projectie leeg en is de potentie per definitie de huidige score.
-// Max(cur, proj) vangt afrondingsdips af: potentie kan nooit onder huidig liggen.
+
+// PA-meta: same logic with projected attributes, same proficiency.
 function metaPaScore(p) {
   if (p._metaPa !== undefined) return p._metaPa;
   const cur = metaScore(p);
   if (cur == null) return p._metaPa = null;
   const proj = projectAttrs(p);
   if (!proj) return p._metaPa = cur;
-  const s = weightedMeta(p, proj);
+  const positions = metaScoresByPosition(p, proj);
+  const s = positions.length ? positions[0].effectiveMeta : null;
   return p._metaPa = s == null ? cur : Math.max(cur, s);
 }
+
 function metaHtml(p) {
   const s = metaScore(p);
   return s == null ? '<span class="dim">–</span>' : `<span class="${roleClass(s)}" data-help="metaLabel">${s.toFixed(1)}</span>`;
@@ -1645,6 +1804,16 @@ function buildPitch() {
       applyFilters();
     };
   });
+  const thr = $('f-prof-threshold');
+  if (thr) {
+    thr.value = state.profThreshold;
+    thr.oninput = () => {
+      const v = Math.max(1, Math.min(20, parseInt(thr.value, 10) || 1));
+      state.profThreshold = v;
+      localStorage.setItem('fmss_profthreshold', v);
+      if (activePos.size) applyFilters();
+    };
+  }
 }
 
 // ---------- data laden ----------
@@ -2244,7 +2413,14 @@ function applyFilters() {
       if (r.min && av < r.min) return false;
       if (r.max && av > r.max) return false;
     }
-    if (activePos.size && !(p.posArr || []).some(x => activePos.has(x))) return false;
+    if (activePos.size) {
+      const prof = p.posProficiency;
+      const hasProfData = prof && Object.keys(prof).length > 0;
+      const pass = hasProfData
+        ? [...activePos].some(pos => (prof[pos] ?? 0) >= state.profThreshold)
+        : (p.posArr || []).some(x => activePos.has(x));   // old dump fallback
+      if (!pass) return false;
+    }
     if (state.mode === 'staff' && staffRole && p.job !== staffRole) return false;
     if (gsel === 'm' && p.gender === 1) return false;
     if (gsel === 'v' && p.gender !== 1) return false;
@@ -2938,8 +3114,21 @@ function showDetail(p) {
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
     ${p.ownerClub && p.ownerClub !== p.club ? `<div><b>${t('ownerLabel')}</b> ${escHtml(p.ownerClub)}</div>` : ''}
     ${p.height ? `<div><b>${t('height')}</b> ${p.height} cm</div>` : ''}
-    ${isPlayer && !state.hideMeta && metaScore(p) != null ? `<div data-help="metaHint"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
-    ${isPlayer && !state.hideMeta && !state.hideCapa && metaPaScore(p) != null ? `<div data-help="metaPaHint"><b>${t('c_metapa')}</b> <span class="${roleClass(metaPaScore(p))}">${metaPaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
+    ${isPlayer && !state.hideMeta && p.attrs ? (() => {
+      const positions = metaScoresByPosition(p, p.attrs);
+      if (!positions.length) return '';
+      const paMeta = !state.hideCapa ? metaPaScore(p) : null;
+      const paRow = paMeta != null
+        ? `<div data-help="metaPaHint" style="margin-bottom:2px"><b>${t('c_metapa')}<\/b> <span class="${roleClass(paMeta)}">${paMeta.toFixed(1)}<\/span> <span class="col-help">?<\/span><\/div>`
+        : '';
+      const td = (a = 'left') => `style="text-align:${a};padding:1px 5px 1px 0"`;
+      const th = (a = 'left') => `style="text-align:${a};padding:0 5px 3px 0;opacity:0.5;font-weight:normal"`;
+      const rows = positions.map(({ pos, prof, meta, effectiveMeta }) => {
+        const profCell = prof != null ? `<span class="${attrClass(prof)}">${prof}<\/span>` : '<span class="dim">?<\/span>';
+        return `<tr><td ${td()}>${pos}<\/td><td ${td('right')}>${profCell}<\/td><td ${td('right')}><span class="${roleClass(meta)}">${meta.toFixed(1)}<\/span><\/td><td ${td('right')}><span class="${roleClass(effectiveMeta)}">${effectiveMeta.toFixed(1)}<\/span><\/td><\/tr>`;
+      }).join('');
+      return `${paRow}<table data-help="metaHint" style="border-collapse:collapse;width:100%;font-size:0.83em;margin-top:2px"><tr><th ${th()}>Pos<\/th><th ${th('right')}>Prof<\/th><th ${th('right')}>Meta<\/th><th ${th('right')}>Eff<\/th><\/tr>${rows}<\/table>`;
+    })() : ''}
   </div>`;
 
   const flags = [];
@@ -2957,20 +3146,6 @@ function showDetail(p) {
     html += '<div id="dev-box"></div>';   // ontwikkel-grafiek (trends) laadt async
   }
 
-  // Beste tactische rollen (met de gekozen rol bovenaan als die past)
-  if (isPlayer && p.attrs) {
-    let roles = bestRoles(p, 5);
-    if (state.role && ROLE_BY_ID[state.role]) {
-      const sc = roleScore(p, ROLE_BY_ID[state.role]);
-      if (sc != null && !roles.some(r => r.id === state.role)) roles = [{ id: state.role, score: sc }, ...roles].slice(0, 5);
-    }
-    if (roles.length) {
-      html += `<div class="roles-box"><div class="rb-head">${t('bestRoles')}</div>` + roles.map(r => {
-        const sel = r.id === state.role ? ' sel' : '';
-        return `<div class="role-row${sel}"><span class="rn">${roleName(r.id)}</span><span class="abar rb"><i class="ab-${roleClass(r.score)}" style="width:${Math.min(100, r.score * 5)}%"></i></span><span class="v ${roleClass(r.score)}">${r.score.toFixed(1)}</span></div>`;
-      }).join('') + '</div>';
-    }
-  }
 
   if (isPlayer && p.attrs) {
     // Potentie leunt op PA (verborgen stat): toggle alleen tonen als verborgen stats aan staan.
@@ -3926,6 +4101,60 @@ const XI_FORMATIONS = {
   ]
 };
 
+// Maps a Best XI slot to a meta group name, so we use position-specific weights when scoring.
+// wing/if disambiguation: cm-line = wide mid (WM), am-line = attacking wing (AM).
+function slotMetaGroup(slot) {
+  switch (slot.role) {
+    case 'gk':                                        return 'GK';
+    case 'cd': case 'bpd':                            return 'DC';
+    case 'fb': case 'wb':                             return 'FB';
+    case 'dm': case 'dlp': case 'bwm':               return 'DM';
+    case 'cm': case 'b2b': case 'ap':                return 'MC';
+    case 'wing': case 'if':
+      return slot.line === 'cm' ? 'WM' : 'AM';
+    case 'am':                                        return 'AM';
+    case 'af': case 'poacher': case 'tm': case 'cf': return 'ST';
+    default: return null;
+  }
+}
+
+// Returns the specific FM position codes that a slot requires.
+// Only positions consistent with the slot's meta group are included, so proficiency
+// lookups are always against the right position (AML ≠ AMC even though both are 'AM' group).
+function slotFmPositions(slot) {
+  const { role, side, line } = slot;
+  switch (role) {
+    case 'gk':   return ['GK'];
+    case 'cd': case 'bpd':  return ['DC'];
+    case 'fb':
+      // Full-back role → classic DR/DL positions
+      if (side === 'L' || side === 'CL') return ['DL'];
+      if (side === 'R' || side === 'CR') return ['DR'];
+      return ['DL', 'DR'];
+    case 'wb':
+      // Wing-back role → WBR/WBL positions; DR=20/WBR=7 at a WBR slot uses WBR proficiency
+      if (side === 'L' || side === 'CL') return ['WBL'];
+      if (side === 'R' || side === 'CR') return ['WBR'];
+      return ['WBL', 'WBR'];
+    case 'dm': case 'dlp': case 'bwm': return ['DM'];
+    case 'cm': case 'b2b': case 'ap':  return ['MC'];
+    case 'wing': case 'if':
+      // am-line = AM weight table → AML/AMR; cm-line = WM weight table → ML/MR
+      if (line === 'am') {
+        if (side === 'L' || side === 'CL') return ['AML'];
+        if (side === 'R' || side === 'CR') return ['AMR'];
+        return ['AML', 'AMR'];
+      } else {
+        if (side === 'L' || side === 'CL') return ['ML'];
+        if (side === 'R' || side === 'CR') return ['MR'];
+        return ['ML', 'MR'];
+      }
+    case 'am':   return ['AMC'];
+    case 'af': case 'poacher': case 'tm': case 'cf': return ['ST'];
+    default: return [];
+  }
+}
+
 function canPlaySlot(p, slot) {
   const pos = p.posArr || [];
   if (!pos.length) return false;
@@ -3952,12 +4181,41 @@ function canPlaySlot(p, slot) {
 }
 
 function findOptimalLineup(squad, formation) {
+  // Pre-compute RAW (pre-proficiency) meta score per group per player.
+  // Proficiency is applied per-slot below, using slotFmPositions() so that AML and AMC
+  // are treated as distinct positions even though both belong to the 'AM' meta group.
+  const rawGroupCache = new Map(squad.map(p => [
+    p.id,
+    p.attrs
+      ? Object.fromEntries(
+          Object.entries(META_W_BY_GROUP)
+            .map(([g, W]) => [g, weightedMetaWithWeights(p, p.attrs, W)])
+            .filter(([, s]) => s != null)
+        )
+      : {},
+  ]));
+
   const candidatesForSlot = formation.map(f => {
+    const group = slotMetaGroup(f);
+    const fmPositions = slotFmPositions(f); // exact FM positions for this slot
     let list = squad.map(p => {
-      let score = metaScore(p);
-      const fitsSlot = canPlaySlot(p, f);
-      return { player: p, score: fitsSlot && score != null ? score : -1 };
-    }).filter(c => c.score > 0);
+      if (!p.attrs) return null;
+      let score;
+      if (group != null) {
+        const rawScore = (rawGroupCache.get(p.id) || {})[group];
+        if (rawScore == null) return null;
+        // Proficiency: best value across the specific FM positions this slot requires.
+        // null posProficiency → old dump with no data → no penalty (assume natural).
+        // Known zero → never trained there → max penalty (0.40).
+        const prof = p.posProficiency != null
+          ? Math.max(0, ...fmPositions.map(pos => p.posProficiency[pos] ?? 0))
+          : null;
+        score = rawScore * proficiencyFactor(prof);
+      } else {
+        score = metaScore(p);
+      }
+      return score != null && score > 0 ? { player: p, score } : null;
+    }).filter(Boolean);
     list.sort((a, b) => b.score - a.score);
     return list.slice(0, 15);
   });
