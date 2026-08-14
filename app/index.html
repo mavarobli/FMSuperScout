@@ -68,6 +68,16 @@
   <label class="set-row set-toggle"><span data-i18n="showMeta">Meta-score tonen</span>
     <input type="checkbox" id="set-hidemeta"></label>
   <div class="set-div"></div>
+  <div class="set-row set-meta-preset">
+    <span data-i18n="metaWeightsLabel" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="">Meta-gewichten</span>
+    <span id="meta-preset-name" style="font-size:0.78em;color:var(--c-dim,#64748b);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right" title="">…</span>
+  </div>
+  <div class="set-row" style="gap:6px">
+    <button id="meta-preset-load-btn" class="set-link" data-i18n="metaWeightsLoad" style="flex:1">Bestand laden…</button>
+    <button id="meta-preset-reset-btn" class="set-link" data-i18n="metaWeightsReset" style="flex:1">Standaard herstellen</button>
+  </div>
+  <input type="file" id="meta-preset-file" accept=".json" style="display:none">
+  <div class="set-div"></div>
   <div class="set-about">
     <span id="set-version"></span>
     <button id="btn-updcheck" class="set-link" data-i18n="updCheckBtn">Zoek updates</button>

@@ -639,6 +639,8 @@ internal static class Dumper
         int lf = Attr(m, pl + (ulong)Fields.PLAO_ATTRS + Fields.FOOT_LEFT);
         int rf = Attr(m, pl + (ulong)Fields.PLAO_ATTRS + Fields.FOOT_RIGHT);
         e.Foot = (rf >= 14 && lf >= 14) ? "Beide" : (rf >= lf ? "Rechts" : "Links");
+        e.FootLeft  = lf;
+        e.FootRight = rf;
 
         // posities
         var pos = new List<(string k, int v)>();
@@ -1074,6 +1076,8 @@ internal static class Dumper
             }
             if (p.TeamType >= 0) j.Prop("teamType", p.TeamType);   // 0=1e, ~3=reserves, ≥10=jeugd
             j.Prop("foot", p.Foot);
+            j.Prop("footLeft",  p.FootLeft);
+            j.Prop("footRight", p.FootRight);
             if (p.Height > 0) j.Prop("height", p.Height);
             Money(j, "value", p.Value);
             // Vraagprijs = waardeveld. Een los opgeslagen "echte vraagprijs" bestaat niet:
@@ -1228,6 +1232,8 @@ internal sealed class Person
     public ushort Pa;
     public int Height;
     public string Foot;
+    public int FootLeft;   // raw 1-20 value; FootRight ≥ FootLeft → right-footed
+    public int FootRight;  // raw 1-20 value; ≥14 both → two-footed
     public List<string> PosArr = new();
     public Dictionary<string, int> PosProficiency = new();  // position → proficiency (1-20), all trained positions
     public string DisplayPos = "";                            // Natural/Accomplished only, for UI display

@@ -176,6 +176,7 @@ const I18N = {
     metaPaHint: 'Dezelfde meta-weging, toegepast op de attributen die hij op zijn potentieel (PA) naar verwachting haalt. Projectie volgt het groeiprofiel van zijn positiegroep; fysieke groei stopt na 23.\n\nUitontwikkeld = gelijk aan Meta. Sorteer hierop voor de meta-toppers van morgen.',
     verWarn: 'FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x. Data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
     verWarnOldDump: 'Deze data komt van een oudere FMSuperScout-plugin. Alles werkt, maar haal verse data op (F9 in FM26 met je save geladen) voor het beste resultaat.',
+    metaWeightsLabel: 'Meta-gewichten', metaWeightsLoad: 'Bestand laden…', metaWeightsReset: 'Standaard herstellen',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -303,6 +304,7 @@ const I18N = {
     metaPaHint: 'The same meta weighting, applied to the attributes he is expected to reach at his potential (PA). The projection follows his position group\'s growth profile; physical growth stops after 23.\n\nFully developed = same as Meta. Sort on this for tomorrow\'s meta stars.',
     verWarn: 'FM version {v} detected; memory reading is calibrated for {s}.x. Data may be unreliable until FMSuperScout is updated.',
     verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM26 with your save loaded) for the best results.',
+    metaWeightsLabel: 'Meta weights', metaWeightsLoad: 'Load file…', metaWeightsReset: 'Reset to default',
   },
   fr: {
     players: 'Joueurs', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Nom ou club…',
@@ -430,6 +432,7 @@ const I18N = {
     metaPaHint: 'La même pondération méta, appliquée aux attributs qu\'il devrait atteindre à son potentiel (PA). La projection suit le profil de progression de son groupe de postes ; le physique cesse de progresser après 23 ans.\n\nJoueur abouti = identique au Méta. Triez dessus pour trouver les stars méta de demain.',
     verWarn: 'Version FM {v} détectée ; la lecture est calibrée pour {s}.x. Données possiblement peu fiables avant une mise à jour de FMSuperScout.',
     verWarnOldDump: 'Ces données viennent d\'un plugin FMSuperScout plus ancien. Tout fonctionne, mais rechargez des données fraîches (F9 dans FM26, sauvegarde chargée) pour un meilleur résultat.',
+    metaWeightsLabel: 'Pondération méta', metaWeightsLoad: 'Charger un fichier…', metaWeightsReset: 'Réinitialiser',
   },
   de: {
     players: 'Spieler', staff: 'Mitarbeiter', shortlist: 'Shortlist', searchph: 'Name oder Verein…',
@@ -557,6 +560,7 @@ const I18N = {
     metaPaHint: 'Dieselbe Meta-Gewichtung, angewandt auf die Attribute, die er an seinem Potenzial (PA) voraussichtlich erreicht. Die Projektion folgt dem Wachstumsprofil seiner Positionsgruppe; Physis wächst nach 23 nicht mehr.\n\nAusentwickelt = gleich Meta. Sortiere danach für die Meta-Stars von morgen.',
     verWarn: 'FM-Version {v} erkannt; das Auslesen ist auf {s}.x geeicht. Daten bis zu einem FMSuperScout-Update möglicherweise unzuverlässig.',
     verWarnOldDump: 'Diese Daten stammen von einem älteren FMSuperScout-Plugin. Alles funktioniert, aber hole frische Daten (F9 in FM26 mit geladenem Spielstand) für das beste Ergebnis.',
+    metaWeightsLabel: 'Meta-Gewichtung', metaWeightsLoad: 'Datei laden…', metaWeightsReset: 'Standard wiederherstellen',
   },
 };
 // Onbekende taalcode (oude versie in localStorage, gesynct profiel) mag de app niet
@@ -1677,32 +1681,113 @@ const ATTR_TRANSFORM = {
   Acceleration: v => v < 15 ? v : 15 + (v - 15) * 1.5,
 };
 
+// ── Runtime meta preset ──────────────────────────────────────────────────────
+// Loaded from a JSON file (meta-presets/default.json) at startup; can be swapped
+// at runtime via the settings menu without touching source code.
+// Falls back to the hardcoded constants above if the fetch fails.
+let META_PRESET = null;   // set by applyMetaPreset() before first render
+
+// Convert the DSL stored in the JSON "transforms" block into live functions.
+// Supported types:
+//   floor_penalty  → v => v < breakpoint ? v * factor : v
+//   ceiling_bonus  → v => v < breakpoint ? v : breakpoint + (v − breakpoint) * factor
+function buildTransformFns(spec) {
+  const fns = {};
+  if (!spec) return fns;
+  for (const [k, s] of Object.entries(spec)) {
+    if (k.startsWith('_')) continue;   // skip comment/note keys
+    if (s.type === 'floor_penalty')
+      fns[k] = v => v < s.breakpoint ? v * s.factor : v;
+    else if (s.type === 'ceiling_bonus')
+      fns[k] = v => v < s.breakpoint ? v : s.breakpoint + (v - s.breakpoint) * s.factor;
+  }
+  return fns;
+}
+
+// Install a parsed preset object as the active META_PRESET.
+// Clears per-player _meta/_metaPa caches so next render recomputes scores.
+function applyMetaPreset(data) {
+  META_PRESET = {
+    name:         data.name  || 'Custom',
+    weights:      data.position_weights || {},
+    adverse:      new Set(data.adverse_attributes || []),
+    transforms:   buildTransformFns(data.transforms),
+    proficiency:  Object.assign(
+                    { floor: 0.40, intercept: 0.49, slope: 0.51, max_prof: 20 },
+                    data.proficiency_factor || {}),
+    // player_fields: attr key in the weight table → field name on the player object (p[field]).
+    // Used for personality attrs like Professionalism, Ambition, Loyalty that live on p directly.
+    playerFields: data.player_fields || {},
+    raw: data,
+  };
+  if (state.players) {
+    for (const p of state.players) { delete p._meta; delete p._metaPa; }
+  }
+}
+
+// Build META_PRESET from the hardcoded constants as a synchronous fallback.
+function buildFallbackPreset() {
+  applyMetaPreset({
+    name: 'FMSuperScout Default',
+    position_weights: META_W_BY_GROUP,
+    adverse_attributes: [...META_ADVERSE],
+    transforms: {
+      WorkRate:     { type: 'floor_penalty',  breakpoint: 6,  factor: 0.5 },
+      Pressure:     { type: 'floor_penalty',  breakpoint: 6,  factor: 0.5 },
+      Pace:         { type: 'ceiling_bonus',  breakpoint: 15, factor: 1.5 },
+      Acceleration: { type: 'ceiling_bonus',  breakpoint: 15, factor: 1.5 },
+    },
+    proficiency_factor: { floor: 0.40, intercept: 0.49, slope: 0.51, max_prof: 20 },
+    player_fields: {},
+  });
+}
+
+// Initialise synchronously from the hardcoded tables so the first render works,
+// even before the async JSON fetch completes.
+buildFallbackPreset();
+
+// ── Meta-score calculation (reads from META_PRESET) ──────────────────────────
+
 function weightedMetaWithWeights(p, attrs, W) {
+  const adverse      = META_PRESET.adverse;
+  const transforms   = META_PRESET.transforms;
+  const playerFields = META_PRESET.playerFields;
   let sum = 0, w = 0;
   for (const k in W) {
-    const raw = k === 'Pressure' ? (p.pressure > 0 ? p.pressure : null) : (attrs ? attrs[k] : null);
+    let raw;
+    if (k === 'Pressure') {
+      raw = (p.pressure > 0 ? p.pressure : null);
+    } else if (playerFields[k] !== undefined) {
+      // Personality attrs stored directly on the player object (not in p.attrs).
+      const v = p[playerFields[k]];
+      raw = (v != null && v > 0 && v <= 20) ? v : null;
+    } else {
+      raw = attrs ? attrs[k] : null;
+    }
     if (raw == null) continue;
-    const effective = META_ADVERSE.has(k) ? 21 - raw : raw;
-    const transformed = ATTR_TRANSFORM[k] ? ATTR_TRANSFORM[k](effective) : effective;
+    const effective   = adverse.has(k) ? 21 - raw : raw;
+    const transformed = transforms[k] ? transforms[k](effective) : effective;
     sum += transformed * W[k];
-    w += W[k];
+    w   += W[k];
   }
   return w ? sum / w : null;
 }
 
 // Proficiency factor: linear fit to harvestgreen22's data (FM24/FM26 same engine).
-// prof=20 → 1.0, prof=4 → 0.592, prof=0 (untrained) → 0.40 (max penalty), clamped to [0.40, 1.0].
+// prof=20 → 1.0, prof=4 → 0.592, prof=0 (untrained) → floor (max penalty), clamped to [floor, 1.0].
 // null = no proficiency data at all → 1.0 (no penalty; assume data unavailable, not untrained).
+// Coefficients come from META_PRESET.proficiency so they can be overridden by a loaded preset.
 function proficiencyFactor(prof) {
+  const pf = META_PRESET.proficiency;
   if (prof == null) return 1.0;
-  if (prof <= 0) return 0.40;
-  return Math.max(0.40, 0.49 + 0.51 * (prof / 20));
+  if (prof <= 0)    return pf.floor;
+  return Math.max(pf.floor, pf.intercept + pf.slope * (prof / pf.max_prof));
 }
 
 // Returns {group → rawScore} for all meta groups using the given attrs (no proficiency applied).
 function rawMetaByGroup(p, attrs) {
   const out = {};
-  for (const [g, W] of Object.entries(META_W_BY_GROUP)) {
+  for (const [g, W] of Object.entries(META_PRESET.weights)) {
     const s = weightedMetaWithWeights(p, attrs, W);
     if (s != null) out[g] = s;
   }
@@ -5041,6 +5126,85 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#settings-menu') && !e.target.closest('#btn-settings')) $('settings-menu').classList.add('hidden');
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('settings-menu').classList.add('hidden'); });
+
+// ── Meta preset UI ────────────────────────────────────────────────────────────
+
+function updatePresetLabel() {
+  const el = $('meta-preset-name');
+  if (el) el.textContent = META_PRESET ? META_PRESET.name : '…';
+}
+
+// Load a preset from a JSON object, persist it, refresh scores, re-render.
+function loadAndApplyPreset(data) {
+  try {
+    applyMetaPreset(data);
+    try { localStorage.setItem('fmss_meta_preset', JSON.stringify(data)); } catch {}
+    updatePresetLabel();
+    renderTable();
+  } catch (e) {
+    console.error('Meta preset toepassen mislukt:', e);
+    alert('Preset laden mislukt: ' + e.message);
+  }
+}
+
+// File picker: user selects a .json file
+$('meta-preset-file').addEventListener('change', function () {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      loadAndApplyPreset(JSON.parse(ev.target.result));
+    } catch (e) {
+      alert('Ongeldig preset-bestand: ' + e.message);
+    }
+  };
+  reader.readAsText(file);
+  this.value = '';   // reset so the same file can be re-selected
+});
+
+$('meta-preset-load-btn').onclick = () => $('meta-preset-file').click();
+
+$('meta-preset-reset-btn').onclick = async () => {
+  try {
+    const r = await fetch('/meta-presets/default.json');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    loadAndApplyPreset(await r.json());
+  } catch {
+    // Network/file not found — fall back to hardcoded values
+    localStorage.removeItem('fmss_meta_preset');
+    buildFallbackPreset();
+    updatePresetLabel();
+    renderTable();
+  }
+};
+
+// Async startup: try localStorage → fetch default.json → hardcoded fallback (already applied).
+(async () => {
+  // 1. Restore last-used preset from localStorage
+  try {
+    const saved = localStorage.getItem('fmss_meta_preset');
+    if (saved) {
+      applyMetaPreset(JSON.parse(saved));
+      updatePresetLabel();
+      // Players may already be rendered; re-render to pick up restored preset.
+      if (state.players && state.players.length) renderTable();
+      return;
+    }
+  } catch {}
+  // 2. Fetch the bundled default.json and apply it (upgrades hardcoded fallback in place)
+  try {
+    const r = await fetch('/meta-presets/default.json');
+    if (r.ok) {
+      applyMetaPreset(await r.json());
+      updatePresetLabel();
+      // No re-render needed: default.json is identical to the hardcoded fallback.
+      return;
+    }
+  } catch {}
+  // 3. Already running on hardcoded fallback — just update the label.
+  updatePresetLabel();
+})();
 
 // nieuwe data ophalen (trigger de plugin)
 let fetchTimeout = null;
