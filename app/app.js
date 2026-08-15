@@ -26,7 +26,7 @@ const state = {
   advStaffF: jread('fmss_adv_staff', []), // staf attribuutfilter-regels [{k,min,max}]
   hist: null,        // {dates, refIdx, map: Map<uid,[caRef,paRef,firstIdx]>} uit /api/history/deltas
   histPeriod: localStorage.getItem('fmss_histperiod') || 'y1',
-  bestXiFormation: '4-3-3',
+  bestXiFormation: localStorage.getItem('fmss_xi_formation') || '4-3-3',
   profThreshold: parseInt(localStorage.getItem('fmss_profthreshold') || '15', 10),
 };
 
@@ -1707,17 +1707,33 @@ function buildTransformFns(spec) {
 // Install a parsed preset object as the active META_PRESET.
 // Clears per-player _meta/_metaPa caches so next render recomputes scores.
 function applyMetaPreset(data) {
+  const W = data.position_weights || {};
   META_PRESET = {
     name:         data.name  || 'Custom',
-    weights:      data.position_weights || {},
+    weights:      W,
     adverse:      new Set(data.adverse_attributes || []),
     transforms:   buildTransformFns(data.transforms),
     proficiency:  Object.assign(
                     { floor: 0.40, intercept: 0.49, slope: 0.51, max_prof: 20 },
                     data.proficiency_factor || {}),
+    // proficiency_weight: when set, proficiency is treated as an attribute-like additive term
+    // in the weighted average (weight = this value). Replaces the multiplicative proficiency_factor.
+    proficiency_weight: data.proficiency_weight ?? null,
+    // Precomputed sum of weights per group — needed for the additive proficiency formula.
+    weights_sum:  Object.fromEntries(
+                    Object.entries(W).map(([g, Wg]) => [g, Object.values(Wg).reduce((s, v) => s + v, 0)])
+                  ),
     // player_fields: attr key in the weight table → field name on the player object (p[field]).
     // Used for personality attrs like Professionalism, Ambition, Loyalty that live on p directly.
     playerFields: data.player_fields || {},
+    // interaction_penalties: adverse terms whose magnitude depends on a second attribute.
+    // Evaluated after the main weighted sum and subtracted from the numerator before dividing.
+    // Supported types:
+    //   inv_scale:    penalty = primary × (scale / (modifier × modifier_factor))
+    //                 e.g. InjuryProneness × (50 / (NaturalFitness × 0.85))
+    //   direct_scale: penalty = primary × primary_factor × (modifier × modifier_factor)
+    //                 e.g. Dirtiness × 32 × (Aggression × 0.1)
+    interactionPenalties: data.interaction_penalties || [],
     raw: data,
   };
   if (state.players) {
@@ -1749,28 +1765,52 @@ buildFallbackPreset();
 // ── Meta-score calculation (reads from META_PRESET) ──────────────────────────
 
 function weightedMetaWithWeights(p, attrs, W) {
-  const adverse      = META_PRESET.adverse;
-  const transforms   = META_PRESET.transforms;
-  const playerFields = META_PRESET.playerFields;
+  const adverse             = META_PRESET.adverse;
+  const transforms          = META_PRESET.transforms;
+  const playerFields        = META_PRESET.playerFields;
+  const interactionPenalties = META_PRESET.interactionPenalties;
+
+  // Read a named attribute from whatever location it lives in.
+  function readAttr(k) {
+    if (k === 'Pressure') return (p.pressure > 0 ? p.pressure : null);
+    if (playerFields[k] !== undefined) {
+      const v = p[playerFields[k]];
+      return (v != null && v > 0 && v <= 20) ? v : null;
+    }
+    return attrs ? (attrs[k] != null ? attrs[k] : null) : null;
+  }
+
   let sum = 0, w = 0;
   for (const k in W) {
-    let raw;
-    if (k === 'Pressure') {
-      raw = (p.pressure > 0 ? p.pressure : null);
-    } else if (playerFields[k] !== undefined) {
-      // Personality attrs stored directly on the player object (not in p.attrs).
-      const v = p[playerFields[k]];
-      raw = (v != null && v > 0 && v <= 20) ? v : null;
-    } else {
-      raw = attrs ? attrs[k] : null;
-    }
+    const raw = readAttr(k);
     if (raw == null) continue;
     const effective   = adverse.has(k) ? 21 - raw : raw;
     const transformed = transforms[k] ? transforms[k](effective) : effective;
     sum += transformed * W[k];
     w   += W[k];
   }
-  return w ? sum / w : null;
+  if (!w) return null;
+
+  // Interaction penalties: subtracted from the raw numerator, same weight denominator.
+  // This preserves the 1-20 output scale while implementing nonlinear adverse terms.
+  for (const pen of interactionPenalties) {
+    const pv = readAttr(pen.primary);
+    const mv = readAttr(pen.modifier);
+    if (pv == null || mv == null || mv <= 0) continue;
+    let penalty;
+    if (pen.type === 'inv_scale') {
+      // penalty = primary × (scale / (modifier × modifier_factor))
+      penalty = pv * (pen.scale / (mv * pen.modifier_factor));
+    } else if (pen.type === 'direct_scale') {
+      // penalty = primary × primary_factor × (modifier × modifier_factor)
+      penalty = pv * pen.primary_factor * (mv * pen.modifier_factor);
+    } else {
+      continue;
+    }
+    sum -= penalty;
+  }
+
+  return sum / w;
 }
 
 // Proficiency factor: linear fit to harvestgreen22's data (FM24/FM26 same engine).
@@ -1816,7 +1856,18 @@ function metaScoresByPosition(p, attrs) {
       if (!group) return null;
       const meta = raw[group];
       if (meta == null) return null;
-      const effectiveMeta = meta * proficiencyFactor(prof);
+      const profW = META_PRESET.proficiency_weight;
+      let effectiveMeta;
+      if (profW != null) {
+        // Additive formula: proficiency treated as an extra attribute in the weighted average.
+        // When prof is null (no dump data) we leave the raw score untouched.
+        const Wtotal = META_PRESET.weights_sum[group] || 0;
+        effectiveMeta = (Wtotal > 0 && prof != null)
+          ? (meta * Wtotal + profW * prof) / (Wtotal + profW)
+          : meta;
+      } else {
+        effectiveMeta = meta * proficiencyFactor(prof);
+      }
       return { pos, group, label: META_GROUP_LABEL[group], prof, meta, effectiveMeta };
     })
     .filter(Boolean)
@@ -4267,13 +4318,15 @@ function canPlaySlot(p, slot) {
 
 function findOptimalLineup(squad, formation) {
   // Pre-compute RAW (pre-proficiency) meta score per group per player.
+  // Uses META_PRESET.weights so the lineup scoring matches the loaded preset exactly.
   // Proficiency is applied per-slot below, using slotFmPositions() so that AML and AMC
   // are treated as distinct positions even though both belong to the 'AM' meta group.
+  const presetWeights = META_PRESET.weights;
   const rawGroupCache = new Map(squad.map(p => [
     p.id,
     p.attrs
       ? Object.fromEntries(
-          Object.entries(META_W_BY_GROUP)
+          Object.entries(presetWeights)
             .map(([g, W]) => [g, weightedMetaWithWeights(p, p.attrs, W)])
             .filter(([, s]) => s != null)
         )
@@ -4291,11 +4344,19 @@ function findOptimalLineup(squad, formation) {
         if (rawScore == null) return null;
         // Proficiency: best value across the specific FM positions this slot requires.
         // null posProficiency → old dump with no data → no penalty (assume natural).
-        // Known zero → never trained there → max penalty (0.40).
+        // Known zero → never trained there → max penalty.
         const prof = p.posProficiency != null
           ? Math.max(0, ...fmPositions.map(pos => p.posProficiency[pos] ?? 0))
           : null;
-        score = rawScore * proficiencyFactor(prof);
+        const profW = META_PRESET.proficiency_weight;
+        if (profW != null) {
+          const Wtotal = META_PRESET.weights_sum[group] || 0;
+          score = (Wtotal > 0 && prof != null)
+            ? (rawScore * Wtotal + profW * prof) / (Wtotal + profW)
+            : rawScore;
+        } else {
+          score = rawScore * proficiencyFactor(prof);
+        }
       } else {
         score = metaScore(p);
       }
@@ -4367,6 +4428,7 @@ function triggerBestFormationAuto() {
   const best = autoDetectBestFormation(squad);
   if (best && best.key) {
     state.bestXiFormation = best.key;
+    try { localStorage.setItem('fmss_xi_formation', best.key); } catch { }
     renderBestXI();
     showToast(`Compo optimale : ${best.key} (${(best.result.score / 11).toFixed(1)} moy.)`, "check");
   } else {
@@ -4467,7 +4529,15 @@ function renderBestXI() {
   box.innerHTML = html + layoutHtml + scoreFooter;
 }
 
-let customSelectedSlots = [];
+let customSelectedSlots = jread('fmss_xi_custom', []);
+// Herstel de custom tactiek als die bij vorige sessie bevestigd was
+if (state.bestXiFormation === 'custom_active') {
+  if (customSelectedSlots.length === 11) {
+    XI_FORMATIONS['custom_active'] = customSelectedSlots;
+  } else {
+    state.bestXiFormation = '4-3-3'; // onvolledige opgeslagen data: fallback
+  }
+}
 const INTERACTIVE_MAP = [
     { id: 'fw_C', role: 'af', line: 'fw', side: 'C', label: 'BT' },
     { id: 'fw_CL', role: 'af', line: 'fw', side: 'CL', label: 'BT (G)' },
@@ -4500,12 +4570,14 @@ function handleFormationChange() {
   if (!select) return;
   if (select.value === 'custom') {
     state.bestXiFormation = 'custom';
+    try { localStorage.setItem('fmss_xi_formation', 'custom'); } catch { }
     if (customSelectedSlots.length === 0) {
       customSelectedSlots = JSON.parse(JSON.stringify(XI_FORMATIONS['4-3-3']));
     }
     renderInteractiveMap();
   } else {
     state.bestXiFormation = select.value;
+    try { localStorage.setItem('fmss_xi_formation', select.value); } catch { }
     renderBestXI();
   }
 }
@@ -4554,6 +4626,8 @@ function confirmCustomTactics() {
   if (customSelectedSlots.length !== 11) return;
   XI_FORMATIONS['custom_active'] = customSelectedSlots;
   state.bestXiFormation = 'custom_active';
+  try { localStorage.setItem('fmss_xi_formation', 'custom_active'); } catch { }
+  try { localStorage.setItem('fmss_xi_custom', JSON.stringify(customSelectedSlots)); } catch { }
   renderBestXI();
 }
 
