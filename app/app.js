@@ -28,9 +28,11 @@ const state = {
   histPeriod: localStorage.getItem('fmss_histperiod') || 'y1',
   bestXiFormation: localStorage.getItem('fmss_xi_formation') || '4-3-3',
   profThreshold: parseInt(localStorage.getItem('fmss_profthreshold') || '15', 10),
+  metaViewPos: localStorage.getItem('fmss_metaviewpos') || null,  // null = best across all positions; else a specific FM position key e.g. 'DC'
+  xiIgnored: new Set(jread('fmss_xi_ignored', [])),  // player IDs excluded from Best XI calculation
 };
 
-const mercatoDismissed = new Set();
+const mercatoDismissed = new Set(jread('fmss_mercato_dismissed', []));
 // Beschadigde browseropslag (één ongeldige JSON-waarde) mag de app nooit vóór het
 // foutscherm laten crashen: kapotte sleutel → standaardwaarde, opslag opgeruimd.
 function jread(key, fallback) {
@@ -172,11 +174,39 @@ const I18N = {
     wagePer: 'Salaris per', perWeek: 'week', perMonth: 'maand', perYear: 'jaar',
     perWeekSuf: 'p/w', perMonthSuf: 'p/mnd', perYearSuf: 'p/jr', jobStaff: 'Staflid',
     c_meta: 'Meta', metaLabel: 'Meta-score', c_metapa: 'PA-meta',
-    metaHint: 'Gewogen gemiddelde (1-20) van de attributen die volgens FM-Arena\'s match-engine-tests wedstrijden winnen; Snelheid en Versnelling tellen veruit het zwaarst. Keepers: eigen weging uit de keeperstest (Reflexen, Behendigheid).\n\n15+ elite, 13-15 sterk, 11-13 degelijk. Bij gelijke CA presteert de hoogste Meta meestal beter.',
-    metaPaHint: 'Dezelfde meta-weging, toegepast op de attributen die hij op zijn potentieel (PA) naar verwachting haalt. Projectie volgt het groeiprofiel van zijn positiegroep; fysieke groei stopt na 23.\n\nUitontwikkeld = gelijk aan Meta. Sorteer hierop voor de meta-toppers van morgen.',
+    metaViewLabel: 'Toon meta voor positie...', metaViewBest: 'Beste (auto)',
+    metaHint: 'Gecombineerde bijdrage van de attributen die wedstrijden winnen, gewogen naar FM-Arena-testresultaten. Snelheid en Versnelling tellen veruit het zwaarst. Keepers: eigen keepersweging (Reflexen, Behendigheid).\n\nHogere score = betere verwachte prestatie bij gelijke CA. Het gebruikte meta-preset bepaalt de schaal (zie instellingen → meta-gewichten).',
+    metaPaHint: 'Dezelfde weging, toegepast op de attributen die hij op zijn potentieel (PA) naar verwachting haalt. Projectie volgt het groeiprofiel van zijn positiegroep; fysieke groei stopt na 23.\n\nUitontwikkeld = gelijk aan Meta. Sorteer hierop voor de meta-toppers van morgen.',
     verWarn: 'FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x. Data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
     verWarnOldDump: 'Deze data komt van een oudere FMSuperScout-plugin. Alles werkt, maar haal verse data op (F9 in FM26 met je save geladen) voor het beste resultaat.',
     metaWeightsLabel: 'Meta-gewichten', metaWeightsLoad: 'Bestand laden…', metaWeightsReset: 'Standaard herstellen',
+    billion: 'mld',
+    bestxi_title: 'Beste XI & Bank (Doublures)', bestxi_mercato: 'Mercato Rapport',
+    bestxi_autoFind: 'Beste formatie zoeken', bestxi_editTactic: 'Tactiek aanpassen',
+    bestxi_customOpt: '⚙️ Aangepaste Tactiek (Interactief)',
+    bestxi_noClub: 'Geen club gedetecteerd. Selecteer een team via de filters (Mijn club).',
+    bestxi_noPlayer: 'Geen speler', bestxi_vacantPost: 'Positie vacant',
+    bestxi_bench: '🪑 Mijn Bank (Doublures)', bestxi_left: '(Links)', bestxi_right: '(Rechts)',
+    bestxi_avgScore: 'Gemiddelde XI meta-score:',
+    bestxi_autoToast: 'Optimale formatie: {f} ({s} gem.)',
+    bestxi_autoFail: 'Geen formatie gevonden', bestxi_autoNoClub: 'Geen club geselecteerd',
+    bestxi_ignore: 'Negeer', bestxi_resetIgnored: 'Reset uitgeslotenen', bestxi_ignored: 'Niet beschikbaar',
+    tabBestxi: 'Beste XI', tabClubs: 'Clubs & Divisies',
+    tactic_title: 'Aangepaste Tactiek ({n}/11 posities)', tactic_confirm: 'Bevestig opstelling',
+    tactic_maxStarters: 'Maximum 11 basisspelers bereikt.',
+    mercato_title: '🎯 Mercato Rapport & Prioritaire Doelen',
+    mercato_resetDismissed: '🔄 Afgewezen doelen resetten ({n})',
+    mercato_noData: 'Geen club gedetecteerd of database leeg.',
+    mercato_noTargets: 'Geen doelen voldoen aan de filters.',
+    mercato_slot: 'Positie:', mercato_current: 'Titularis:',
+    mercato_price: 'Prijs:', mercato_qp: 'K/P:', mercato_interest: 'Interesse:',
+    mercato_resetToast: 'Afgewezen doelen gereset', mercato_none: 'Geen',
+    clubs_title: '📊 Globale Club- & Divisieanalyse', clubs_searchPh: 'Zoeken…',
+    clubs_noResults: 'Geen clubs gevonden.', clubs_divCount: 'Clubs:',
+    clubs_avgMeta: 'Meta gem.:', clubs_avgPaMeta: 'PA Meta gem.:',
+    clubs_colClub: 'Club', clubs_colCount: 'Profkern', clubs_colAvgAge: 'Gem. leeftijd',
+    clubs_colAvgMeta: 'Gem. meta (top 20)', clubs_colAvgPaMeta: 'Gem. PA meta',
+    clubs_colTopPlayer: 'Topspeler', clubs_colTotalVal: 'Totale waarde',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -300,11 +330,39 @@ const I18N = {
     wagePer: 'Wage per', perWeek: 'week', perMonth: 'month', perYear: 'year',
     perWeekSuf: '/wk', perMonthSuf: '/mo', perYearSuf: '/yr', jobStaff: 'Staff member',
     c_meta: 'Meta', metaLabel: 'Meta score', c_metapa: 'PA meta',
-    metaHint: 'Weighted average (1-20) of the attributes that win matches according to FM-Arena\'s match-engine tests; Pace and Acceleration count heaviest by far. Goalkeepers: own weighting from the keeper test (Reflexes, Agility).\n\n15+ elite, 13-15 strong, 11-13 decent. At equal CA the higher Meta usually performs better.',
-    metaPaHint: 'The same meta weighting, applied to the attributes he is expected to reach at his potential (PA). The projection follows his position group\'s growth profile; physical growth stops after 23.\n\nFully developed = same as Meta. Sort on this for tomorrow\'s meta stars.',
+    metaViewLabel: 'Show meta for position...', metaViewBest: 'Best (auto)',
+    metaHint: 'Combined contribution of the attributes that win matches, weighted by FM-Arena test results. Pace and Acceleration count heaviest by far. Goalkeepers: own keeper weighting (Reflexes, Agility).\n\nHigher score = better expected performance at equal CA. The scale depends on the active meta preset (see settings → meta weights).',
+    metaPaHint: 'The same weighting, applied to the attributes he is expected to reach at his potential (PA). The projection follows his position group\'s growth profile; physical growth stops after 23.\n\nFully developed = same as Meta. Sort on this for tomorrow\'s meta stars.',
     verWarn: 'FM version {v} detected; memory reading is calibrated for {s}.x. Data may be unreliable until FMSuperScout is updated.',
     verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM26 with your save loaded) for the best results.',
     metaWeightsLabel: 'Meta weights', metaWeightsLoad: 'Load file…', metaWeightsReset: 'Reset to default',
+    billion: 'B',
+    bestxi_title: 'Best XI & Bench (Cover)', bestxi_mercato: 'Mercato Report',
+    bestxi_autoFind: 'Find best formation', bestxi_editTactic: 'Edit tactic',
+    bestxi_customOpt: '⚙️ Custom Tactic (Interactive)',
+    bestxi_noClub: 'No club detected. Select a team via the filters (My club).',
+    bestxi_noPlayer: 'No player', bestxi_vacantPost: 'Vacant position',
+    bestxi_bench: '🪑 My Bench (Cover)', bestxi_left: '(Left)', bestxi_right: '(Right)',
+    bestxi_avgScore: 'Average XI meta score:',
+    bestxi_autoToast: 'Optimal formation: {f} ({s} avg.)',
+    bestxi_autoFail: 'Could not find a formation', bestxi_autoNoClub: 'No club selected',
+    bestxi_ignore: 'Ignore', bestxi_resetIgnored: 'Reset unavailable', bestxi_ignored: 'Unavailable',
+    tabBestxi: 'Best XI', tabClubs: 'Clubs & Divisions',
+    tactic_title: 'Custom Tactic ({n}/11 positions)', tactic_confirm: 'Confirm formation',
+    tactic_maxStarters: 'Maximum 11 starters reached.',
+    mercato_title: '🎯 Mercato Report & Priority Targets',
+    mercato_resetDismissed: '🔄 Reset dismissed targets ({n})',
+    mercato_noData: 'No club detected or database empty.',
+    mercato_noTargets: 'No targets match your filters.',
+    mercato_slot: 'Position:', mercato_current: 'Starter:',
+    mercato_price: 'Price:', mercato_qp: 'V/P:', mercato_interest: 'Interest:',
+    mercato_resetToast: 'Dismissed targets reset', mercato_none: 'None',
+    clubs_title: '📊 Global Club & Division Analysis', clubs_searchPh: 'Search…',
+    clubs_noResults: 'No clubs found.', clubs_divCount: 'Clubs:',
+    clubs_avgMeta: 'Avg meta:', clubs_avgPaMeta: 'PA avg meta:',
+    clubs_colClub: 'Club', clubs_colCount: 'Pro squad', clubs_colAvgAge: 'Avg age',
+    clubs_colAvgMeta: 'Avg meta (top 20)', clubs_colAvgPaMeta: 'Avg PA meta',
+    clubs_colTopPlayer: 'Top player', clubs_colTotalVal: 'Total value',
   },
   fr: {
     players: 'Joueurs', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Nom ou club…',
@@ -428,11 +486,39 @@ const I18N = {
     wagePer: 'Salaire par', perWeek: 'semaine', perMonth: 'mois', perYear: 'an',
     perWeekSuf: '/sem', perMonthSuf: '/mois', perYearSuf: '/an', jobStaff: 'Membre du staff',
     c_meta: 'Méta', metaLabel: 'Score méta', c_metapa: 'Méta PA',
+    metaViewLabel: 'Afficher le méta pour le poste...', metaViewBest: 'Meilleur (auto)',
     metaHint: 'Moyenne pondérée (1-20) des attributs qui gagnent des matchs selon les tests du moteur de FM-Arena ; Vitesse et Accélération pèsent de loin le plus lourd. Gardiens : pondération propre issue du test des gardiens (Réflexes, Agilité).\n\n15+ élite, 13-15 fort, 11-13 correct. À CA égale, le Méta le plus haut performe en général mieux.',
     metaPaHint: 'La même pondération méta, appliquée aux attributs qu\'il devrait atteindre à son potentiel (PA). La projection suit le profil de progression de son groupe de postes ; le physique cesse de progresser après 23 ans.\n\nJoueur abouti = identique au Méta. Triez dessus pour trouver les stars méta de demain.',
     verWarn: 'Version FM {v} détectée ; la lecture est calibrée pour {s}.x. Données possiblement peu fiables avant une mise à jour de FMSuperScout.',
     verWarnOldDump: 'Ces données viennent d\'un plugin FMSuperScout plus ancien. Tout fonctionne, mais rechargez des données fraîches (F9 dans FM26, sauvegarde chargée) pour un meilleur résultat.',
     metaWeightsLabel: 'Pondération méta', metaWeightsLoad: 'Charger un fichier…', metaWeightsReset: 'Réinitialiser',
+    billion: ' Md',
+    bestxi_title: 'Meilleur XI & Banc (Doublures)', bestxi_mercato: 'Rapport Mercato',
+    bestxi_autoFind: 'Trouver la meilleure compo', bestxi_editTactic: 'Modifier la tactique',
+    bestxi_customOpt: '⚙️ Tactique Personnalisée (Interactive)',
+    bestxi_noClub: 'Aucun club détecté. Sélectionnez une équipe via les filtres (Mon club).',
+    bestxi_noPlayer: 'Aucun joueur', bestxi_vacantPost: 'Poste vacant',
+    bestxi_bench: '🪑 Mon Banc (Doublures)', bestxi_left: '(Gauche)', bestxi_right: '(Droit)',
+    bestxi_avgScore: 'Score moyen Meta du XI :',
+    bestxi_autoToast: 'Compo optimale : {f} ({s} moy.)',
+    bestxi_autoFail: 'Impossible de trouver une formation', bestxi_autoNoClub: 'Aucun club sélectionné',
+    bestxi_ignore: 'Exclure', bestxi_resetIgnored: 'Réintégrer tous', bestxi_ignored: 'Indisponibles',
+    tabBestxi: 'Meilleur XI', tabClubs: 'Clubs & Divisions',
+    tactic_title: 'Tactique Personnalisée ({n}/11 postes)', tactic_confirm: 'Confirmer la compo',
+    tactic_maxStarters: 'Maximum 11 titulaires atteints.',
+    mercato_title: '🎯 Rapport Mercato & Cibles Prioritaires',
+    mercato_resetDismissed: '🔄 Réinitialiser les cibles rejetées ({n})',
+    mercato_noData: 'Aucun club détecté ou base vide.',
+    mercato_noTargets: 'Aucune cible ne correspond à vos filtres.',
+    mercato_slot: 'Poste :', mercato_current: 'Titulaire :',
+    mercato_price: 'Prix :', mercato_qp: 'Q/P :', mercato_interest: 'Intérêt :',
+    mercato_resetToast: 'Cibles réinitialisées avec succès', mercato_none: 'Aucun',
+    clubs_title: '📊 Analyse globale des Clubs & Divisions', clubs_searchPh: 'Rechercher…',
+    clubs_noResults: 'Aucun club trouvé.', clubs_divCount: 'Clubs :',
+    clubs_avgMeta: 'Meta Moy :', clubs_avgPaMeta: 'PA Meta Moy :',
+    clubs_colClub: 'Club', clubs_colCount: 'Effectif Pro', clubs_colAvgAge: 'Moy. Âge',
+    clubs_colAvgMeta: 'Meta Moyen (Top 20)', clubs_colAvgPaMeta: 'PA Meta Moyen',
+    clubs_colTopPlayer: 'Top Player', clubs_colTotalVal: 'Valeur Totale',
   },
   de: {
     players: 'Spieler', staff: 'Mitarbeiter', shortlist: 'Shortlist', searchph: 'Name oder Verein…',
@@ -556,11 +642,39 @@ const I18N = {
     wagePer: 'Gehalt pro', perWeek: 'Woche', perMonth: 'Monat', perYear: 'Jahr',
     perWeekSuf: '/Wo', perMonthSuf: '/Mon.', perYearSuf: '/Jahr', jobStaff: 'Mitarbeiter',
     c_meta: 'Meta', metaLabel: 'Meta-Score', c_metapa: 'PA-Meta',
+    metaViewLabel: 'Meta für Position anzeigen...', metaViewBest: 'Beste (auto)',
     metaHint: 'Gewichteter Durchschnitt (1-20) der Attribute, die laut FM-Arenas Match-Engine-Tests Spiele gewinnen; Schnelligkeit und Antritt zählen mit Abstand am meisten. Torhüter: eigene Gewichtung aus dem Torwart-Test (Reflexe, Beweglichkeit).\n\n15+ Elite, 13-15 stark, 11-13 solide. Bei gleicher CA spielt der höhere Meta meist besser.',
     metaPaHint: 'Dieselbe Meta-Gewichtung, angewandt auf die Attribute, die er an seinem Potenzial (PA) voraussichtlich erreicht. Die Projektion folgt dem Wachstumsprofil seiner Positionsgruppe; Physis wächst nach 23 nicht mehr.\n\nAusentwickelt = gleich Meta. Sortiere danach für die Meta-Stars von morgen.',
     verWarn: 'FM-Version {v} erkannt; das Auslesen ist auf {s}.x geeicht. Daten bis zu einem FMSuperScout-Update möglicherweise unzuverlässig.',
     verWarnOldDump: 'Diese Daten stammen von einem älteren FMSuperScout-Plugin. Alles funktioniert, aber hole frische Daten (F9 in FM26 mit geladenem Spielstand) für das beste Ergebnis.',
     metaWeightsLabel: 'Meta-Gewichtung', metaWeightsLoad: 'Datei laden…', metaWeightsReset: 'Standard wiederherstellen',
+    billion: ' Mrd.',
+    bestxi_title: 'Bestes XI & Bank (Ersatz)', bestxi_mercato: 'Transferbericht',
+    bestxi_autoFind: 'Beste Aufstellung finden', bestxi_editTactic: 'Taktik bearbeiten',
+    bestxi_customOpt: '⚙️ Benutzerdefinierte Taktik (Interaktiv)',
+    bestxi_noClub: 'Kein Verein erkannt. Wähle ein Team über die Filter (Mein Verein).',
+    bestxi_noPlayer: 'Kein Spieler', bestxi_vacantPost: 'Freie Position',
+    bestxi_bench: '🪑 Meine Bank (Ersatz)', bestxi_left: '(Links)', bestxi_right: '(Rechts)',
+    bestxi_avgScore: 'Durchschnittlicher XI-Meta-Score:',
+    bestxi_autoToast: 'Optimale Aufstellung: {f} ({s} Ø)',
+    bestxi_autoFail: 'Keine Aufstellung gefunden', bestxi_autoNoClub: 'Kein Verein ausgewählt',
+    bestxi_ignore: 'Ignorieren', bestxi_resetIgnored: 'Alle reaktivieren', bestxi_ignored: 'Nicht verfügbar',
+    tabBestxi: 'Bestes XI', tabClubs: 'Vereine & Ligen',
+    tactic_title: 'Benutzerdefinierte Taktik ({n}/11 Positionen)', tactic_confirm: 'Aufstellung bestätigen',
+    tactic_maxStarters: 'Maximum 11 Startspieler erreicht.',
+    mercato_title: '🎯 Transferbericht & Prioritätsziele',
+    mercato_resetDismissed: '🔄 Abgelehnte Ziele zurücksetzen ({n})',
+    mercato_noData: 'Kein Verein erkannt oder Datenbank leer.',
+    mercato_noTargets: 'Keine Ziele entsprechen den Filtern.',
+    mercato_slot: 'Position:', mercato_current: 'Stammspieler:',
+    mercato_price: 'Preis:', mercato_qp: 'V/P:', mercato_interest: 'Interesse:',
+    mercato_resetToast: 'Abgelehnte Ziele zurückgesetzt', mercato_none: 'Keiner',
+    clubs_title: '📊 Globale Vereins- & Divisionsanalyse', clubs_searchPh: 'Suchen…',
+    clubs_noResults: 'Keine Vereine gefunden.', clubs_divCount: 'Vereine:',
+    clubs_avgMeta: 'Ø Meta:', clubs_avgPaMeta: 'Ø PA-Meta:',
+    clubs_colClub: 'Verein', clubs_colCount: 'Profikader', clubs_colAvgAge: 'Ø Alter',
+    clubs_colAvgMeta: 'Ø Meta (Top 20)', clubs_colAvgPaMeta: 'Ø PA-Meta',
+    clubs_colTopPlayer: 'Topspieler', clubs_colTotalVal: 'Gesamtwert',
   },
 };
 // Onbekende taalcode (oude versie in localStorage, gesynct profiel) mag de app niet
@@ -984,7 +1098,7 @@ function fmtMoney(v) {
   const val = v * CUR_RATE[sym];
   if (val === 0) return sym + '0';
   const abs = Math.abs(val);
-  if (abs >= 1e9) return sym + (val / 1e9).toFixed(2) + ({ nl: ' mld', en: 'B', fr: ' Md', de: ' Mrd.' }[state.lang] || 'B');
+  if (abs >= 1e9) return sym + (val / 1e9).toFixed(2) + t('billion');
   if (abs >= 1e6) return sym + (val / 1e6).toFixed(1) + 'M';
   if (abs >= 1e3) return sym + Math.round(val / 1e3) + 'K';
   return sym + Math.round(val);
@@ -1469,31 +1583,31 @@ function advDialog() {
 // op de 1-20 schaal (key telt 2x, pref 1x), zodat het naast de losse attributen leesbaar blijft.
 const ROLES = [
   // Keepers
-  { id: 'gk', short: 'DK', pos: ['GK'], key: ['Handling', 'Reflexes', 'OneOnOnes', 'Positioning', 'Concentration', 'Agility'], pref: ['AerialReach', 'CommandOfArea', 'Communication', 'Kicking', 'Anticipation', 'Decisions', 'Bravery'] },
-  { id: 'sk', short: 'Sweeper', pos: ['GK'], key: ['Reflexes', 'OneOnOnes', 'RushingOut', 'Handling', 'Positioning', 'Agility', 'Composure', 'Decisions'], pref: ['CommandOfArea', 'Communication', 'Kicking', 'FirstTouch', 'Passing', 'Anticipation', 'Concentration'] },
+  { id: 'gk', pos: ['GK'], key: ['Handling', 'Reflexes', 'OneOnOnes', 'Positioning', 'Concentration', 'Agility'], pref: ['AerialReach', 'CommandOfArea', 'Communication', 'Kicking', 'Anticipation', 'Decisions', 'Bravery'] },
+  { id: 'sk', pos: ['GK'], key: ['Reflexes', 'OneOnOnes', 'RushingOut', 'Handling', 'Positioning', 'Agility', 'Composure', 'Decisions'], pref: ['CommandOfArea', 'Communication', 'Kicking', 'FirstTouch', 'Passing', 'Anticipation', 'Concentration'] },
   // Centrale verdedigers
-  { id: 'cd', short: 'CV', pos: ['DC'], key: ['Marking', 'Tackling', 'Positioning', 'Heading', 'JumpingReach', 'Strength', 'Concentration', 'Decisions'], pref: ['Anticipation', 'Bravery', 'Composure', 'Aggression', 'Pace', 'Acceleration'] },
-  { id: 'bpd', short: 'Opbouwer', pos: ['DC'], key: ['Marking', 'Tackling', 'Positioning', 'Passing', 'Composure', 'Vision', 'Decisions', 'JumpingReach'], pref: ['Heading', 'Strength', 'FirstTouch', 'Technique', 'Anticipation', 'Concentration', 'Pace'] },
+  { id: 'cd', pos: ['DC'], key: ['Marking', 'Tackling', 'Positioning', 'Heading', 'JumpingReach', 'Strength', 'Concentration', 'Decisions'], pref: ['Anticipation', 'Bravery', 'Composure', 'Aggression', 'Pace', 'Acceleration'] },
+  { id: 'bpd', pos: ['DC'], key: ['Marking', 'Tackling', 'Positioning', 'Passing', 'Composure', 'Vision', 'Decisions', 'JumpingReach'], pref: ['Heading', 'Strength', 'FirstTouch', 'Technique', 'Anticipation', 'Concentration', 'Pace'] },
   // Backs
-  { id: 'fb', short: 'Vleugelverd.', pos: ['DL', 'DR'], key: ['Marking', 'Tackling', 'Positioning', 'Anticipation', 'Concentration', 'Stamina', 'Pace', 'WorkRate'], pref: ['Crossing', 'Dribbling', 'Passing', 'Decisions', 'Teamwork', 'Acceleration', 'Agility'] },
-  { id: 'wb', short: 'Wingback', pos: ['DL', 'DR', 'WBL', 'WBR'], key: ['Crossing', 'Dribbling', 'Tackling', 'OffTheBall', 'Stamina', 'Pace', 'Acceleration', 'WorkRate', 'Teamwork'], pref: ['Marking', 'FirstTouch', 'Passing', 'Technique', 'Anticipation', 'Positioning', 'Agility', 'Balance'] },
+  { id: 'fb', pos: ['DL', 'DR'], key: ['Marking', 'Tackling', 'Positioning', 'Anticipation', 'Concentration', 'Stamina', 'Pace', 'WorkRate'], pref: ['Crossing', 'Dribbling', 'Passing', 'Decisions', 'Teamwork', 'Acceleration', 'Agility'] },
+  { id: 'wb', pos: ['DL', 'DR', 'WBL', 'WBR'], key: ['Crossing', 'Dribbling', 'Tackling', 'OffTheBall', 'Stamina', 'Pace', 'Acceleration', 'WorkRate', 'Teamwork'], pref: ['Marking', 'FirstTouch', 'Passing', 'Technique', 'Anticipation', 'Positioning', 'Agility', 'Balance'] },
   // Verdedigende middenvelders
-  { id: 'dm', short: 'Verd. MV', pos: ['DM'], key: ['Tackling', 'Marking', 'Positioning', 'Anticipation', 'Concentration', 'Teamwork', 'WorkRate', 'Decisions', 'Stamina'], pref: ['Aggression', 'Passing', 'Composure', 'Strength', 'Bravery', 'FirstTouch'] },
-  { id: 'dlp', short: 'Regisseur', pos: ['DM', 'MC'], key: ['Passing', 'Vision', 'FirstTouch', 'Technique', 'Composure', 'Decisions', 'Teamwork', 'OffTheBall'], pref: ['Anticipation', 'Positioning', 'Tackling', 'Balance', 'WorkRate', 'Flair'] },
-  { id: 'bwm', short: 'Baljager', pos: ['DM', 'MC'], key: ['Tackling', 'Aggression', 'WorkRate', 'Stamina', 'Teamwork', 'Anticipation', 'Marking', 'Bravery'], pref: ['Positioning', 'Determination', 'Concentration', 'Strength', 'Acceleration', 'Pace'] },
+  { id: 'dm', pos: ['DM'], key: ['Tackling', 'Marking', 'Positioning', 'Anticipation', 'Concentration', 'Teamwork', 'WorkRate', 'Decisions', 'Stamina'], pref: ['Aggression', 'Passing', 'Composure', 'Strength', 'Bravery', 'FirstTouch'] },
+  { id: 'dlp', pos: ['DM', 'MC'], key: ['Passing', 'Vision', 'FirstTouch', 'Technique', 'Composure', 'Decisions', 'Teamwork', 'OffTheBall'], pref: ['Anticipation', 'Positioning', 'Tackling', 'Balance', 'WorkRate', 'Flair'] },
+  { id: 'bwm', pos: ['DM', 'MC'], key: ['Tackling', 'Aggression', 'WorkRate', 'Stamina', 'Teamwork', 'Anticipation', 'Marking', 'Bravery'], pref: ['Positioning', 'Determination', 'Concentration', 'Strength', 'Acceleration', 'Pace'] },
   // Centrale middenvelders
-  { id: 'cm', short: 'Centrale MV', pos: ['MC'], key: ['Passing', 'Tackling', 'Decisions', 'Teamwork', 'WorkRate', 'Stamina', 'FirstTouch', 'Composure'], pref: ['Technique', 'Vision', 'OffTheBall', 'Anticipation', 'Positioning'] },
-  { id: 'b2b', short: 'Box-to-box', pos: ['MC'], key: ['Stamina', 'WorkRate', 'Tackling', 'Passing', 'OffTheBall', 'Teamwork', 'Decisions', 'FirstTouch'], pref: ['Finishing', 'LongShots', 'Technique', 'Composure', 'Anticipation', 'Strength', 'Acceleration', 'Determination'] },
-  { id: 'ap', short: 'Aanv. spelmaker', pos: ['MC', 'AMC'], key: ['Passing', 'Vision', 'Technique', 'FirstTouch', 'Composure', 'Decisions', 'OffTheBall', 'Flair'], pref: ['Dribbling', 'Anticipation', 'Agility', 'Teamwork', 'Acceleration'] },
+  { id: 'cm', pos: ['MC'], key: ['Passing', 'Tackling', 'Decisions', 'Teamwork', 'WorkRate', 'Stamina', 'FirstTouch', 'Composure'], pref: ['Technique', 'Vision', 'OffTheBall', 'Anticipation', 'Positioning'] },
+  { id: 'b2b', pos: ['MC'], key: ['Stamina', 'WorkRate', 'Tackling', 'Passing', 'OffTheBall', 'Teamwork', 'Decisions', 'FirstTouch'], pref: ['Finishing', 'LongShots', 'Technique', 'Composure', 'Anticipation', 'Strength', 'Acceleration', 'Determination'] },
+  { id: 'ap', pos: ['MC', 'AMC'], key: ['Passing', 'Vision', 'Technique', 'FirstTouch', 'Composure', 'Decisions', 'OffTheBall', 'Flair'], pref: ['Dribbling', 'Anticipation', 'Agility', 'Teamwork', 'Acceleration'] },
   // Aanvallende / brede middenvelders
-  { id: 'wing', short: 'Buitenspeler', pos: ['ML', 'MR', 'AML', 'AMR'], key: ['Crossing', 'Dribbling', 'Technique', 'Pace', 'Acceleration', 'Agility', 'OffTheBall'], pref: ['FirstTouch', 'Passing', 'Flair', 'Balance', 'Stamina', 'Anticipation'] },
-  { id: 'if', short: 'Schaduwspits', pos: ['AML', 'AMR'], key: ['Dribbling', 'Finishing', 'FirstTouch', 'Technique', 'OffTheBall', 'Pace', 'Acceleration', 'Agility', 'Composure'], pref: ['LongShots', 'Passing', 'Flair', 'Anticipation', 'Balance', 'Vision'] },
-  { id: 'am', short: 'Hangende spits', pos: ['AMC'], key: ['OffTheBall', 'FirstTouch', 'Technique', 'Finishing', 'Composure', 'Decisions', 'Dribbling', 'Passing'], pref: ['LongShots', 'Vision', 'Flair', 'Anticipation', 'Acceleration', 'Agility'] },
+  { id: 'wing', pos: ['ML', 'MR', 'AML', 'AMR'], key: ['Crossing', 'Dribbling', 'Technique', 'Pace', 'Acceleration', 'Agility', 'OffTheBall'], pref: ['FirstTouch', 'Passing', 'Flair', 'Balance', 'Stamina', 'Anticipation'] },
+  { id: 'if', pos: ['AML', 'AMR'], key: ['Dribbling', 'Finishing', 'FirstTouch', 'Technique', 'OffTheBall', 'Pace', 'Acceleration', 'Agility', 'Composure'], pref: ['LongShots', 'Passing', 'Flair', 'Anticipation', 'Balance', 'Vision'] },
+  { id: 'am', pos: ['AMC'], key: ['OffTheBall', 'FirstTouch', 'Technique', 'Finishing', 'Composure', 'Decisions', 'Dribbling', 'Passing'], pref: ['LongShots', 'Vision', 'Flair', 'Anticipation', 'Acceleration', 'Agility'] },
   // Spitsen
-  { id: 'af', short: 'Diepe spits', pos: ['ST'], key: ['Finishing', 'OffTheBall', 'Composure', 'FirstTouch', 'Dribbling', 'Technique', 'Acceleration', 'Pace'], pref: ['Anticipation', 'Decisions', 'Agility', 'Balance', 'Flair'] },
-  { id: 'poacher', short: 'Afmaker', pos: ['ST'], key: ['Finishing', 'OffTheBall', 'Anticipation', 'Composure', 'FirstTouch'], pref: ['Dribbling', 'Heading', 'Technique', 'Decisions', 'Acceleration', 'Pace'] },
-  { id: 'tm', short: 'Targetman', pos: ['ST'], key: ['Heading', 'JumpingReach', 'Strength', 'Bravery', 'FirstTouch', 'OffTheBall', 'Finishing', 'Balance'], pref: ['Aggression', 'Anticipation', 'Composure', 'Teamwork', 'Determination'] },
-  { id: 'cf', short: 'Complete spits', pos: ['ST'], key: ['Finishing', 'FirstTouch', 'Technique', 'OffTheBall', 'Composure', 'Dribbling', 'Heading', 'Strength', 'Acceleration', 'Pace'], pref: ['Passing', 'Vision', 'LongShots', 'Anticipation', 'Decisions', 'Agility', 'Balance', 'JumpingReach'] },
+  { id: 'af', pos: ['ST'], key: ['Finishing', 'OffTheBall', 'Composure', 'FirstTouch', 'Dribbling', 'Technique', 'Acceleration', 'Pace'], pref: ['Anticipation', 'Decisions', 'Agility', 'Balance', 'Flair'] },
+  { id: 'poacher', pos: ['ST'], key: ['Finishing', 'OffTheBall', 'Anticipation', 'Composure', 'FirstTouch'], pref: ['Dribbling', 'Heading', 'Technique', 'Decisions', 'Acceleration', 'Pace'] },
+  { id: 'tm', pos: ['ST'], key: ['Heading', 'JumpingReach', 'Strength', 'Bravery', 'FirstTouch', 'OffTheBall', 'Finishing', 'Balance'], pref: ['Aggression', 'Anticipation', 'Composure', 'Teamwork', 'Determination'] },
+  { id: 'cf', pos: ['ST'], key: ['Finishing', 'FirstTouch', 'Technique', 'OffTheBall', 'Composure', 'Dribbling', 'Heading', 'Strength', 'Acceleration', 'Pace'], pref: ['Passing', 'Vision', 'LongShots', 'Anticipation', 'Decisions', 'Agility', 'Balance', 'JumpingReach'] },
 ];
 const ROLE_LABEL = {
   nl: { gk: 'Keeper', sk: 'Meevoetballende keeper', cd: 'Centrale verdediger', bpd: 'Opbouwende verdediger', fb: 'Vleugelverdediger', wb: 'Wingback', dm: 'Verdedigende middenvelder', dlp: 'Verdiepte spelmaker', bwm: 'Baljagende middenvelder', cm: 'Centrale middenvelder', b2b: 'Box-to-box middenvelder', ap: 'Aanvallende spelmaker', wing: 'Buitenspeler', if: 'Schaduwspits', am: 'Hangende spits', af: 'Diepliggende spits', poacher: 'Afmaker', tm: 'Targetman', cf: 'Complete spits' },
@@ -1540,107 +1654,57 @@ function bestRoles(p, n = 5) {
 }
 const roleClass = v => v == null ? '' : v >= 15 ? 'g5' : v >= 13 ? 'g4' : v >= 10.5 ? 'g3' : v >= 8 ? 'g2' : 'g1';
 
-// ---------- meta-score (FM-Arena attribute testing) ----------
-// Weights = measured points-impact per attribute from FM-Arena's attribute testing
-// (fm-arena.com/table/26-player-attributes-testing). Pace/Acceleration dominate by far.
-// The score (1-20 scale) expresses "how meta are this player's attributes" independently
-// of role or CA. Attributes with no measurable positive effect are excluded.
-// Global baseline (fallback / PA projection). Not used by per-position routing any more.
-const META_W = {
-  Pace: 20.5, Acceleration: 20.4, JumpingReach: 11.6, Dribbling: 9.8, Balance: 5.3,
-  Concentration: 4.5, Anticipation: 4.3, Determination: 2.7, Agility: 2.7, Stamina: 2.5,
-  Strength: 1.9, Composure: 1.2, WorkRate: 1.1, Finishing: 1.1, LongShots: 1.0,
-  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
-  InjuryProneness: 1.5, Dirtiness: 1.5,
+// Points-contribution meta display helpers.
+// fmtMeta: formats a raw points score with sign and 2 decimals (e.g. "+7.71", "-0.50").
+const fmtMeta = v => v == null ? '–' : (v >= 0 ? '+' : '') + v.toFixed(2);
+// metaClass: colour band for a points score. Uses precomputed thresholds[group].
+function metaClass(v, group) {
+  if (v == null) return '';
+  const t = META_PRESET && META_PRESET.thresholds && META_PRESET.thresholds[group];
+  if (!t) return 'g2';
+  return v >= t[3] ? 'g5' : v >= t[2] ? 'g4' : v >= t[1] ? 'g3' : v >= t[0] ? 'g2' : 'g1';
+}
+
+// ---------- meta-score (direct / points-contribution engine) ----------
+// Source: attribute testing on a 38-match season (weight = points improvement attr 8→20).
+// score = Σ (attr − 8) × coeff[attr]  +  (prof − 20) × coeff_prof
+// Baseline 8, proficiency baseline 20 (Natural = no effect).
+// All outfield positions share one unified weight table; GK uses a separate set.
+
+// Shared outfield weights (DC/FB/DM/MC/WM/AM/ST all identical in the default direct preset).
+const _OUTFIELD_W = {
+  Pace: 64, Acceleration: 64, Stamina: 19, JumpingReach: 16, Balance: 13,
+  Strength: 10, Agility: 8, NaturalFitness: 2,
+  Anticipation: 18, WorkRate: 12, Concentration: 9, Determination: 6,
+  Decisions: 1, Composure: 1, Dribbling: 19, Finishing: 8, LongShots: 6,
+  Heading: 5, Crossing: 4, FirstTouch: 3, Passing: 2, Technique: 1,
+  Tackling: 1, Consistency: 10, Corners: 0.5, FreeKicks: 0.5,
 };
 
-// GK: harvestgreen22 FM24 keeper retest (fm-arena.com/thread/18816). FM26 unchanged.
-// Pressure on p.pressure (personality field), not p.attrs.
-const META_GK_W = {
-  Reflexes: 12.8, Agility: 8.0, Acceleration: 4.7, Pressure: 4.1, Pace: 3.5, AerialReach: 3.4,
-  Consistency: 2.0, ImportantMatches: 2.0, InjuryProneness: 1.5,
-};
-
-// ---------- per-position weight tables ----------
-// Source: harvestgreen22 FM26 global test + Orion FM24 per-position regression (same engine).
-// Tier 1 (Pace/Acc ~20): unchanged across all outfield positions.
-// Tier 2+: derived from Orion's per-position coefficients, scaled to same range.
-// Hidden attrs: Pressure (non-linear, massive effect), Consistency, ImportantMatches (modest).
-// Adverse attrs (high = bad): InjuryProneness (mid-match injury risk), Dirtiness (card risk).
-//   These are scored as (21 - value) * weight — NEVER use negative weights.
-// To tune a group: change its constant; everything else adapts automatically.
-
-// DC — JumpingReach rises to tier-1 (equal to Pace/Acc per Orion). Finishing removed.
-const META_DC_W = {
-  Pace: 20.5, Acceleration: 20.4, JumpingReach: 18.0,
-  WorkRate: 6.5, Anticipation: 6.5, Concentration: 5.5, Balance: 4.0,
-  Strength: 3.5, Determination: 3.0, Stamina: 2.5, Agility: 2.0, Aggression: 1.5,
-  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
-  InjuryProneness: 1.5, Dirtiness: 1.5,
-};
-
-// FB/WB — Stamina/WorkRate up vs DC; Crossing added (WB role); JumpingReach less critical.
-const META_FB_W = {
-  Pace: 20.5, Acceleration: 20.4,
-  Stamina: 7.0, WorkRate: 7.0, Agility: 4.5, Anticipation: 5.0,
-  Concentration: 5.0, Balance: 5.0, Dribbling: 3.5, Determination: 3.0,
-  Crossing: 2.5, JumpingReach: 1.5,
-  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
-  InjuryProneness: 1.5, Dirtiness: 1.5,
-};
-
-// DM — WorkRate/Anticipation up vs MC; JumpingReach present; Dribbling minimal.
-const META_DM_W = {
-  Pace: 20.5, Acceleration: 20.4,
-  WorkRate: 7.0, Stamina: 6.5, Anticipation: 6.0, JumpingReach: 5.0,
-  Concentration: 5.0, Balance: 4.0, Determination: 3.0,
-  Agility: 3.0, Strength: 2.5, Dribbling: 1.5,
-  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
-  InjuryProneness: 1.5, Dirtiness: 1.5,
-};
-
-// MC — Dribbling/Agility up vs DM; LongShots added (3× more impactful vs FM24).
-const META_MC_W = {
-  Pace: 20.5, Acceleration: 20.4,
-  WorkRate: 6.0, Stamina: 6.0, Agility: 5.5, Anticipation: 5.0,
-  Concentration: 5.0, Balance: 4.5, Dribbling: 4.5,
-  Determination: 3.0, LongShots: 2.5, Composure: 2.0,
-  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
-  InjuryProneness: 1.5, Dirtiness: 1.5,
-};
-
-// WM (ML/MR) — Dribbling/Crossing prominent; balanced Stamina/WorkRate.
-const META_WM_W = {
-  Pace: 20.5, Acceleration: 20.4,
-  Dribbling: 7.0, Agility: 6.0, Stamina: 5.5, WorkRate: 5.5, Balance: 5.0,
-  Anticipation: 4.0, Concentration: 4.0, Determination: 3.0,
-  Crossing: 3.5, Finishing: 2.5,
-  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
-  InjuryProneness: 1.5, Dirtiness: 1.5,
-};
-
-// AM/Wing (AML/AMR/AMC) — Dribbling/Finishing up; Crossing de-emphasised (non-linear per GFO).
-const META_AM_W = {
-  Pace: 20.5, Acceleration: 20.4,
-  Dribbling: 9.0, Agility: 7.0, Balance: 5.5, Finishing: 5.0,
-  WorkRate: 4.0, Stamina: 4.0, Anticipation: 4.0,
-  Composure: 3.5, Concentration: 3.0, Determination: 2.5,
-  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
-  InjuryProneness: 1.5, Dirtiness: 1.5,
-};
-
-// ST — Finishing rises to near-tier-1; LongShots significant (3× impact); JumpingReach still relevant.
-const META_ST_W = {
-  Pace: 20.5, Acceleration: 20.4, Finishing: 12.0, Dribbling: 7.5,
-  Agility: 5.5, Composure: 4.5, Balance: 4.5, LongShots: 4.0,
-  JumpingReach: 3.5, WorkRate: 3.5, Determination: 3.0, Concentration: 2.5,
-  Pressure: 5.0, Consistency: 2.0, ImportantMatches: 2.0,
-  InjuryProneness: 1.5, Dirtiness: 1.5,
+// Built-in preset (mirrors app/meta-presets/default_direct.json).
+// Used as the synchronous fallback before the async fetch completes.
+const BUILTIN_PRESET = {
+  name: 'FMSuperScout Direct',
+  baseline: 8,
+  proficiency_baseline: 20,
+  group_scale: { GK: 1, DC: 10, FB: 10, DM: 10, MC: 10, WM: 10, AM: 10, ST: 10 },
+  proficiency_test: { points: 6, range: 5 },
+  attr_test_ranges: { JumpingReach: 9 },
+  position_weights: {
+    GK: {
+      Reflexes: 8, Agility: 6, Acceleration: 2,
+      OneOnOnes: 0.3, AerialReach: 0.1, CommandOfArea: 0.1,
+      Communication: 0.1, Handling: 0.1, Anticipation: 0.1,
+      Concentration: 0.1, Positioning: 0.1,
+    },
+    DC: _OUTFIELD_W, FB: _OUTFIELD_W, DM: _OUTFIELD_W,
+    MC: _OUTFIELD_W, WM: _OUTFIELD_W, AM: _OUTFIELD_W, ST: _OUTFIELD_W,
+  },
+  player_fields: {},
 };
 
 // ---------- per-position routing ----------
-// Each FM position code maps to one of these named groups. To give a group its own
-// weight table, replace the entry in META_W_BY_GROUP below.
+// Each FM position code maps to one of these named groups.
 const POS_TO_META_GROUP = {
   GK:  'GK',
   DC:  'DC',  DL: 'FB',  DR: 'FB',  WBL: 'FB',  WBR: 'FB',
@@ -1655,180 +1719,152 @@ const META_GROUP_LABEL = {
   GK: 'GK', DC: 'DC', FB: 'FB', DM: 'DM', MC: 'MC', WM: 'WM', AM: 'AM', ST: 'ST',
 };
 
-// Weight table per group — each outfield group now has its own research-derived table.
-const META_W_BY_GROUP = {
-  GK: META_GK_W,
-  DC: META_DC_W,
-  FB: META_FB_W,
-  DM: META_DM_W,
-  MC: META_MC_W,
-  WM: META_WM_W,
-  AM: META_AM_W,
-  ST: META_ST_W,
-};
-
-// High value = bad. Use (21 - value) to keep the 1-20 scale intact.
-// NEVER add these to a weight table with a negative weight — that breaks the floor.
-const META_ADVERSE = new Set(['InjuryProneness', 'Dirtiness']);
-
-// Non-linear attribute transforms applied after adverse-inversion.
-// WorkRate/Pressure: severe floor penalty below 6 (harvestgreen22: -18% win rate in 1-6 range).
-// Pace/Acc: accelerating returns above 15 (research: 17+ dominates; not strictly linear).
-const ATTR_TRANSFORM = {
-  WorkRate:     v => v < 6 ? v * 0.5 : v,
-  Pressure:     v => v < 6 ? v * 0.5 : v,
-  Pace:         v => v < 15 ? v : 15 + (v - 15) * 1.5,
-  Acceleration: v => v < 15 ? v : 15 + (v - 15) * 1.5,
-};
-
 // ── Runtime meta preset ──────────────────────────────────────────────────────
-// Loaded from a JSON file (meta-presets/default.json) at startup; can be swapped
+// Loaded from meta-presets/default_direct.json at startup; can be swapped
 // at runtime via the settings menu without touching source code.
-// Falls back to the hardcoded constants above if the fetch fails.
+// Falls back to BUILTIN_PRESET if the fetch fails.
 let META_PRESET = null;   // set by applyMetaPreset() before first render
 
-// Convert the DSL stored in the JSON "transforms" block into live functions.
-// Supported types:
-//   floor_penalty  → v => v < breakpoint ? v * factor : v
-//   ceiling_bonus  → v => v < breakpoint ? v : breakpoint + (v − breakpoint) * factor
-function buildTransformFns(spec) {
-  const fns = {};
-  if (!spec) return fns;
-  for (const [k, s] of Object.entries(spec)) {
-    if (k.startsWith('_')) continue;   // skip comment/note keys
-    if (s.type === 'floor_penalty')
-      fns[k] = v => v < s.breakpoint ? v * s.factor : v;
-    else if (s.type === 'ceiling_bonus')
-      fns[k] = v => v < s.breakpoint ? v : s.breakpoint + (v - s.breakpoint) * s.factor;
-  }
-  return fns;
-}
-
 // Install a parsed preset object as the active META_PRESET.
-// Clears per-player _meta/_metaPa caches so next render recomputes scores.
+// Clears per-player _meta/_metaPa/_metaGroup caches so next render recomputes scores.
+//
+// Only the direct (points-contribution) engine is supported:
+//   score = Σ (attr − baseline) × coeff[attr] + (prof − profBaseline) × coeff_prof
+//   Coefficients are precomputed here from the test-data weights stored in the JSON.
 function applyMetaPreset(data) {
+  if (data.baseline == null) {
+    console.error('applyMetaPreset: preset missing "baseline" — only the direct engine is supported.');
+    return;
+  }
+
   const W = data.position_weights || {};
+
+  const baseline      = data.baseline;                // attribute baseline (e.g. 8)
+  const profBaseline  = data.proficiency_baseline ?? 20;
+  const groupScale    = data.group_scale    || {};
+  const profTest      = data.proficiency_test || { points: 6, range: 5 };
+  // Support from/to fields in addition to explicit range (editor saves all three)
+  if (profTest.from != null && profTest.to != null) profTest.range = Math.max(1, Math.abs(profTest.to - profTest.from));
+  const attrTestRanges = data.attr_test_ranges || {};
+  const defaultRange  = 20 - baseline;       // 12 for baseline=8
+
+  const coeffs     = {};
+  const coeff_prof = {};
+  const thresholds = {};
+
+  for (const [g, Wg] of Object.entries(W)) {
+    const scale = groupScale[g] ?? 10;
+    const gCoeffs = {};
+    for (const [attr, weight] of Object.entries(Wg)) {
+      if (Array.isArray(weight)) {
+        // Piecewise segments: [{from, to, pts}, ...]
+        gCoeffs[attr] = weight.map(seg => {
+          const from = seg.from ?? 1, to = seg.to ?? 20;
+          return { from, to, coeff: (to - from) > 0 ? (seg.pts ?? 0) / (scale * (to - from)) : 0 };
+        });
+      } else {
+        const range = attrTestRanges[attr] ?? defaultRange;
+        gCoeffs[attr] = weight / (scale * range);
+      }
+    }
+    coeffs[g] = gCoeffs;
+    if (profTest.segments && profTest.segments.length) {
+      // Piecewise proficiency — store sorted descending [{from, to, coeff}]
+      coeff_prof[g] = [...profTest.segments]
+        .sort((a, b) => b.from - a.from)
+        .map(seg => {
+          const from = seg.from ?? 1, to = seg.to ?? 20;
+          return { from, to, coeff: (to - from) > 0 ? (seg.pts ?? 0) / (scale * (to - from)) : 0 };
+        });
+    } else {
+      coeff_prof[g] = profTest.points / (scale * profTest.range);
+    }
+    // Thresholds: score of a fake player with all attrs = V (piecewise-aware).
+    const clampContrib = (V, c) => Array.isArray(c)
+      ? c.reduce((s, {from, to, coeff}) =>
+          s + (Math.max(from, Math.min(to, V)) - Math.max(from, Math.min(to, baseline))) * coeff, 0)
+      : (V - baseline) * c;
+    const sumForV = V => Object.values(gCoeffs).reduce((s, c) => s + clampContrib(V, c), 0);
+    thresholds[g] = [0, sumForV(11), sumForV(14), sumForV(17)];
+  }
+
   META_PRESET = {
-    name:         data.name  || 'Custom',
-    weights:      W,
-    adverse:      new Set(data.adverse_attributes || []),
-    transforms:   buildTransformFns(data.transforms),
-    proficiency:  Object.assign(
-                    { floor: 0.40, intercept: 0.49, slope: 0.51, max_prof: 20 },
-                    data.proficiency_factor || {}),
-    // proficiency_weight: when set, proficiency is treated as an attribute-like additive term
-    // in the weighted average (weight = this value). Replaces the multiplicative proficiency_factor.
-    proficiency_weight: data.proficiency_weight ?? null,
-    // Precomputed sum of weights per group — needed for the additive proficiency formula.
-    weights_sum:  Object.fromEntries(
-                    Object.entries(W).map(([g, Wg]) => [g, Object.values(Wg).reduce((s, v) => s + v, 0)])
-                  ),
-    // player_fields: attr key in the weight table → field name on the player object (p[field]).
-    // Used for personality attrs like Professionalism, Ambition, Loyalty that live on p directly.
+    name:        data.name || 'Custom',
+    weights:     W,
+    baseline,
+    profBaseline,
+    coeffs,
+    coeff_prof,
+    thresholds,
+    // player_fields: attr key → field name on the player object.
     playerFields: data.player_fields || {},
-    // interaction_penalties: adverse terms whose magnitude depends on a second attribute.
-    // Evaluated after the main weighted sum and subtracted from the numerator before dividing.
-    // Supported types:
-    //   inv_scale:    penalty = primary × (scale / (modifier × modifier_factor))
-    //                 e.g. InjuryProneness × (50 / (NaturalFitness × 0.85))
-    //   direct_scale: penalty = primary × primary_factor × (modifier × modifier_factor)
-    //                 e.g. Dirtiness × 32 × (Aggression × 0.1)
-    interactionPenalties: data.interaction_penalties || [],
     raw: data,
   };
+
   if (state.players) {
-    for (const p of state.players) { delete p._meta; delete p._metaPa; }
+    for (const p of state.players) { delete p._meta; delete p._metaPa; delete p._metaGroup; }
   }
 }
 
-// Build META_PRESET from the hardcoded constants as a synchronous fallback.
-function buildFallbackPreset() {
-  applyMetaPreset({
-    name: 'FMSuperScout Default',
-    position_weights: META_W_BY_GROUP,
-    adverse_attributes: [...META_ADVERSE],
-    transforms: {
-      WorkRate:     { type: 'floor_penalty',  breakpoint: 6,  factor: 0.5 },
-      Pressure:     { type: 'floor_penalty',  breakpoint: 6,  factor: 0.5 },
-      Pace:         { type: 'ceiling_bonus',  breakpoint: 15, factor: 1.5 },
-      Acceleration: { type: 'ceiling_bonus',  breakpoint: 15, factor: 1.5 },
-    },
-    proficiency_factor: { floor: 0.40, intercept: 0.49, slope: 0.51, max_prof: 20 },
-    player_fields: {},
-  });
+// Populate the position dropdown for the "show meta as" selector.
+// Lists the FM positions that exist in the current preset, in a logical top-to-bottom order.
+// Called after every applyMetaPreset() and on page load.
+function populateMetaGroupSelect() {
+  const sel = $('f-meta-group');
+  if (!sel) return;
+  // Canonical order: GK → defenders → DM → midfielders → attackers
+  const knownPos = ['GK', 'DC', 'DL', 'DR', 'WBL', 'WBR', 'DM', 'MC', 'ML', 'MR', 'AML', 'AMC', 'AMR', 'ST'];
+  // Only show positions whose group exists in the preset
+  const presetGroups = new Set(Object.keys(META_PRESET.coeffs || {}));
+  const available = knownPos.filter(pos => presetGroups.has(POS_TO_META_GROUP[pos]));
+  sel.innerHTML = `<option value="">${t('metaViewBest')}</option>` +
+    available.map(pos => `<option value="${pos}"${state.metaViewPos === pos ? ' selected' : ''}>${pos}</option>`).join('');
 }
 
-// Initialise synchronously from the hardcoded tables so the first render works,
+// Initialise synchronously from the built-in preset so the first render works,
 // even before the async JSON fetch completes.
-buildFallbackPreset();
+applyMetaPreset(BUILTIN_PRESET);
 
 // ── Meta-score calculation (reads from META_PRESET) ──────────────────────────
 
-function weightedMetaWithWeights(p, attrs, W) {
-  const adverse             = META_PRESET.adverse;
-  const transforms          = META_PRESET.transforms;
-  const playerFields        = META_PRESET.playerFields;
-  const interactionPenalties = META_PRESET.interactionPenalties;
-
-  // Read a named attribute from whatever location it lives in.
-  function readAttr(k) {
-    if (k === 'Pressure') return (p.pressure > 0 ? p.pressure : null);
-    if (playerFields[k] !== undefined) {
-      const v = p[playerFields[k]];
-      return (v != null && v > 0 && v <= 20) ? v : null;
-    }
-    return attrs ? (attrs[k] != null ? attrs[k] : null) : null;
-  }
-
-  let sum = 0, w = 0;
-  for (const k in W) {
-    const raw = readAttr(k);
-    if (raw == null) continue;
-    const effective   = adverse.has(k) ? 21 - raw : raw;
-    const transformed = transforms[k] ? transforms[k](effective) : effective;
-    sum += transformed * W[k];
-    w   += W[k];
-  }
-  if (!w) return null;
-
-  // Interaction penalties: subtracted from the raw numerator, same weight denominator.
-  // This preserves the 1-20 output scale while implementing nonlinear adverse terms.
-  for (const pen of interactionPenalties) {
-    const pv = readAttr(pen.primary);
-    const mv = readAttr(pen.modifier);
-    if (pv == null || mv == null || mv <= 0) continue;
-    let penalty;
-    if (pen.type === 'inv_scale') {
-      // penalty = primary × (scale / (modifier × modifier_factor))
-      penalty = pv * (pen.scale / (mv * pen.modifier_factor));
-    } else if (pen.type === 'direct_scale') {
-      // penalty = primary × primary_factor × (modifier × modifier_factor)
-      penalty = pv * pen.primary_factor * (mv * pen.modifier_factor);
+// Points-contribution scoring (META_PRESET.coeffs must be set).
+// Returns the raw season-points delta relative to an all-attribute-8 baseline player,
+// NOT including the proficiency term (that is added in metaScoresByPosition).
+// Returns null if no attribute data is available.
+function pointsContribution(p, attrs, group) {
+  const gCoeffs = META_PRESET.coeffs && META_PRESET.coeffs[group];
+  if (!gCoeffs) return null;
+  const baseline = META_PRESET.baseline ?? 8;
+  const playerFields = META_PRESET.playerFields;
+  let sum = 0, hasAny = false;
+  for (const [attr, coeff] of Object.entries(gCoeffs)) {
+    let v;
+    if (attr === 'Pressure') {
+      v = p.pressure > 0 ? p.pressure : null;
+    } else if (playerFields[attr] !== undefined) {
+      const raw = p[playerFields[attr]];
+      v = (raw != null && raw > 0 && raw <= 20) ? raw : null;
     } else {
-      continue;
+      v = attrs ? (attrs[attr] != null ? attrs[attr] : null) : null;
     }
-    sum -= penalty;
+    if (v == null) continue;
+    if (Array.isArray(coeff)) {
+      for (const { from, to, coeff: c } of coeff) {
+        sum += (Math.max(from, Math.min(to, v)) - Math.max(from, Math.min(to, baseline))) * c;
+      }
+    } else {
+      sum += (v - baseline) * coeff;
+    }
+    hasAny = true;
   }
-
-  return sum / w;
-}
-
-// Proficiency factor: linear fit to harvestgreen22's data (FM24/FM26 same engine).
-// prof=20 → 1.0, prof=4 → 0.592, prof=0 (untrained) → floor (max penalty), clamped to [floor, 1.0].
-// null = no proficiency data at all → 1.0 (no penalty; assume data unavailable, not untrained).
-// Coefficients come from META_PRESET.proficiency so they can be overridden by a loaded preset.
-function proficiencyFactor(prof) {
-  const pf = META_PRESET.proficiency;
-  if (prof == null) return 1.0;
-  if (prof <= 0)    return pf.floor;
-  return Math.max(pf.floor, pf.intercept + pf.slope * (prof / pf.max_prof));
+  return hasAny ? sum : null;
 }
 
 // Returns {group → rawScore} for all meta groups using the given attrs (no proficiency applied).
 function rawMetaByGroup(p, attrs) {
   const out = {};
-  for (const [g, W] of Object.entries(META_PRESET.weights)) {
-    const s = weightedMetaWithWeights(p, attrs, W);
+  for (const g of Object.keys(META_PRESET.coeffs)) {
+    const s = pointsContribution(p, attrs, g);
     if (s != null) out[g] = s;
   }
   return out;
@@ -1836,8 +1872,8 @@ function rawMetaByGroup(p, attrs) {
 
 // Returns [{pos, group, label, prof, meta, effectiveMeta}] for each trained FM position,
 // sorted by effectiveMeta desc.
-//   meta         = raw score from the group's weight table (DR and WBR share the FB table)
-//   effectiveMeta = meta × proficiencyFactor(prof for that specific FM position only)
+//   meta          = raw points delta relative to the all-8 baseline player
+//   effectiveMeta = meta + proficiency term (additive; below Accomplished the slope doubles)
 // Falls back to posArr with prof=null (no penalty) when posProficiency is absent (old dump).
 function metaScoresByPosition(p, attrs) {
   if (!attrs) return [];
@@ -1856,17 +1892,27 @@ function metaScoresByPosition(p, attrs) {
       if (!group) return null;
       const meta = raw[group];
       if (meta == null) return null;
-      const profW = META_PRESET.proficiency_weight;
+      // Points-contribution engine: prof term is purely additive.
+      // Below Accomplished (15) the scalar slope doubles.
       let effectiveMeta;
-      if (profW != null) {
-        // Additive formula: proficiency treated as an extra attribute in the weighted average.
-        // When prof is null (no dump data) we leave the raw score untouched.
-        const Wtotal = META_PRESET.weights_sum[group] || 0;
-        effectiveMeta = (Wtotal > 0 && prof != null)
-          ? (meta * Wtotal + profW * prof) / (Wtotal + profW)
-          : meta;
+      const cp = META_PRESET.coeff_prof[group] || 0;
+      if (Array.isArray(cp) && prof != null) {
+        // Piecewise proficiency: clamp-integral over explicit segments.
+        // Bottom segment's coeff extends implicitly down to 1.
+        const profBase = META_PRESET.profBaseline ?? 20;
+        let profTerm = 0;
+        for (const { from, to, coeff } of cp) {
+          profTerm += (Math.max(from, Math.min(to, prof)) - Math.max(from, Math.min(to, profBase))) * coeff;
+        }
+        const botSeg = cp[cp.length - 1];
+        if (botSeg && botSeg.from > 1) {
+          const extTo = botSeg.from - 1;
+          profTerm += (Math.max(1, Math.min(extTo, prof)) - Math.max(1, Math.min(extTo, profBase))) * botSeg.coeff;
+        }
+        effectiveMeta = meta + profTerm;
       } else {
-        effectiveMeta = meta * proficiencyFactor(prof);
+        // Scalar proficiency: (prof − profBaseline) × coeff_prof, slope doubles below Accomplished (15).
+        effectiveMeta = meta + (prof != null ? (prof - META_PRESET.profBaseline) * cp * (prof < 15 ? 2 : 1) : 0);
       }
       return { pos, group, label: META_GROUP_LABEL[group], prof, meta, effectiveMeta };
     })
@@ -1874,15 +1920,33 @@ function metaScoresByPosition(p, attrs) {
     .sort((a, b) => b.effectiveMeta - a.effectiveMeta);
 }
 
-// Single number for table sorting: best effective meta across all trained positions.
+// Single number for table sorting and display.
+// When state.metaViewPos is set (e.g. 'DC', 'AML'), returns the effective meta for that exact
+// FM position — including its own proficiency term — so DC and DL can differ for the same player.
+// null = "best" mode: highest effective meta across all trained positions (default).
+// Also caches p._metaGroup for colour classification.
 function metaScore(p) {
   if (p._meta !== undefined) return p._meta;
-  if (!p.attrs) return p._meta = null;
+  if (!p.attrs) { p._metaGroup = null; return p._meta = null; }
   const positions = metaScoresByPosition(p, p.attrs);
-  return p._meta = positions.length ? positions[0].effectiveMeta : null;
+  if (!positions.length) { p._metaGroup = null; return p._meta = null; }
+  if (state.metaViewPos) {
+    const entry = positions.find(e => e.pos === state.metaViewPos);
+    if (entry) { p._metaGroup = entry.group; return p._meta = entry.effectiveMeta; }
+    p._metaGroup = null; return p._meta = null;
+  }
+  p._metaGroup = positions[0].group;
+  return p._meta = positions[0].effectiveMeta;
+}
+// Returns the meta group of the best position (populates cache if needed).
+function metaGroup(p) {
+  if (p._metaGroup !== undefined) return p._metaGroup;
+  metaScore(p);
+  return p._metaGroup;
 }
 
 // PA-meta: same logic with projected attributes, same proficiency.
+// Respects state.metaViewGroup — only considers the selected group when set.
 function metaPaScore(p) {
   if (p._metaPa !== undefined) return p._metaPa;
   const cur = metaScore(p);
@@ -1890,17 +1954,22 @@ function metaPaScore(p) {
   const proj = projectAttrs(p);
   if (!proj) return p._metaPa = cur;
   const positions = metaScoresByPosition(p, proj);
-  const s = positions.length ? positions[0].effectiveMeta : null;
+  const relevant = state.metaViewPos
+    ? positions.filter(e => e.pos === state.metaViewPos)
+    : positions;
+  const s = relevant.length ? relevant[0].effectiveMeta : null;
   return p._metaPa = s == null ? cur : Math.max(cur, s);
 }
 
 function metaHtml(p) {
   const s = metaScore(p);
-  return s == null ? '<span class="dim">–</span>' : `<span class="${roleClass(s)}" data-help="metaLabel">${s.toFixed(1)}</span>`;
+  const g = metaGroup(p);
+  return s == null ? '<span class="dim">–</span>' : `<span class="${metaClass(s, g)}" data-help="metaLabel">${fmtMeta(s)}</span>`;
 }
 function metaPaHtml(p) {
   const s = metaPaScore(p);
-  return s == null ? '<span class="dim">–</span>' : `<span class="${roleClass(s)}" data-help="metaPaHint">${s.toFixed(1)}</span>`;
+  const g = metaGroup(p); // use same group as current best position
+  return s == null ? '<span class="dim">–</span>' : `<span class="${metaClass(s, g)}" data-help="metaPaHint">${fmtMeta(s)}</span>`;
 }
 // Groei in de tabel: dezelfde kleurtaal als de ontwikkelgrafiek. Nieuwe spelers krijgen
 // "nieuw" in plaats van een streepje, want dát is de informatie die je zoekt.
@@ -2149,9 +2218,9 @@ async function loadDump(force = false) {
     if (loads >= 3) coffeeGlow();
     return true;
   } catch (e) {
-    console.error(e);
+    console.error('loadDump:', e);
     localStorage.removeItem('fmss_loadmark');   // nette fout, geen crash: marker weg
-    $('dump-info').textContent = 'fout';
+    $('dump-info').textContent = '!';
     // Er ligt (waarschijnlijk) wél een dump, maar het inlezen faalde. Maak dat zichtbaar
     // op het lege scherm i.p.v. het stil weg te slikken; anders blijft de gebruiker met
     // een leeg scherm en de misleidende "druk op F9"-stappen achter.
@@ -3140,7 +3209,6 @@ function exportShortlist() {
 // ---------- detailpaneel ----------
 // FM-attribuutkleuren: 16-20 groen, 11-15 oranje, 1-10 witachtig. Ook voor potentie-projectie.
 const attrClass = v => v >= 16 ? 'at-hi' : v >= 11 ? 'at-mid' : 'at-lo';
-const abar = v => `<span class="abar"><i class="${attrClass(v)}" style="width:${Math.min(100, v * 5)}%"></i></span>`;
 // Attribuutfamilies voor de potentie-projectie.
 const PHYS_ATTRS = new Set(['Acceleration', 'Agility', 'Balance', 'JumpingReach', 'NaturalFitness', 'Pace', 'Stamina', 'Strength']);
 const MENTAL_ATTRS = new Set(['Aggression', 'Anticipation', 'Bravery', 'Composure', 'Concentration', 'Decisions', 'Determination', 'Flair', 'Leadership', 'OffTheBall', 'Positioning', 'Teamwork', 'Vision', 'WorkRate']);
@@ -3254,14 +3322,15 @@ function showDetail(p) {
       const positions = metaScoresByPosition(p, p.attrs);
       if (!positions.length) return '';
       const paMeta = !state.hideCapa ? metaPaScore(p) : null;
+      const bestGroup = positions.length ? positions[0].group : null;
       const paRow = paMeta != null
-        ? `<div data-help="metaPaHint" style="margin-bottom:2px"><b>${t('c_metapa')}<\/b> <span class="${roleClass(paMeta)}">${paMeta.toFixed(1)}<\/span> <span class="col-help">?<\/span><\/div>`
+        ? `<div data-help="metaPaHint" style="margin-bottom:2px"><b>${t('c_metapa')}<\/b> <span class="${metaClass(paMeta, bestGroup)}">${fmtMeta(paMeta)}<\/span> <span class="col-help">?<\/span><\/div>`
         : '';
       const td = (a = 'left') => `style="text-align:${a};padding:1px 5px 1px 0"`;
       const th = (a = 'left') => `style="text-align:${a};padding:0 5px 3px 0;opacity:0.5;font-weight:normal"`;
-      const rows = positions.map(({ pos, prof, meta, effectiveMeta }) => {
+      const rows = positions.map(({ pos, group, prof, meta, effectiveMeta }) => {
         const profCell = prof != null ? `<span class="${attrClass(prof)}">${prof}<\/span>` : '<span class="dim">?<\/span>';
-        return `<tr><td ${td()}>${pos}<\/td><td ${td('right')}>${profCell}<\/td><td ${td('right')}><span class="${roleClass(meta)}">${meta.toFixed(1)}<\/span><\/td><td ${td('right')}><span class="${roleClass(effectiveMeta)}">${effectiveMeta.toFixed(1)}<\/span><\/td><\/tr>`;
+        return `<tr><td ${td()}>${pos}<\/td><td ${td('right')}>${profCell}<\/td><td ${td('right')}><span class="${metaClass(meta, group)}">${fmtMeta(meta)}<\/span><\/td><td ${td('right')}><span class="${metaClass(effectiveMeta, group)}">${fmtMeta(effectiveMeta)}<\/span><\/td><\/tr>`;
       }).join('');
       return `${paRow}<table data-help="metaHint" style="border-collapse:collapse;width:100%;font-size:0.83em;margin-top:2px"><tr><th ${th()}>Pos<\/th><th ${th('right')}>Prof<\/th><th ${th('right')}>Meta<\/th><th ${th('right')}>Eff<\/th><\/tr>${rows}<\/table>`;
     })() : ''}
@@ -3288,9 +3357,29 @@ function showDetail(p) {
     const canPot = !state.hideCapa && p.pa > p.ca;
     if (!state.hideCapa)
       html += `<label class="potswitch${canPot ? '' : ' off'}"><input type="checkbox" id="pot-toggle" ${state.showPot ? 'checked' : ''} ${canPot ? '' : 'disabled'}> ${t('showPot')}${state.showPot ? ` <span class="dim">(${t('potNote')})</span>` : ''}</label>`;
-    const isGk = (p.posArr || []).includes('GK');
+    // A player is a "GK" for display purposes only when GK is their natural primary position.
+    // posArr includes GK for virtually every FM player (all positions appear at prof=1), so
+    // checking posArr would incorrectly show the Goalkeeping panel for all outfield players.
+    const isGk = p.pos === 'GK';
     const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
     const proj = (!state.hideCapa && state.showPot) ? projectAttrs(p) : null;
+
+    // Meta-contribution indicator: shows (val − baseline) × coeff for the player's best position.
+    // Only available when the Direct engine is active (META_PRESET.coeffs != null).
+    const metaPositions = metaScoresByPosition(p, p.attrs);
+    const bestMetaGroup = metaPositions.length ? metaPositions[0].group : null;
+    const gCoeffs = (bestMetaGroup && META_PRESET.coeffs) ? META_PRESET.coeffs[bestMetaGroup] : null;
+    const metaBaseline = META_PRESET.baseline ?? 8;
+    const contribSpan = (k, val) => {
+      if (!gCoeffs) return '';
+      const coeff = gCoeffs[k] ?? 0;
+      if (!coeff) return '';
+      const c = (val - metaBaseline) * coeff;
+      const sign = c >= 0 ? '+' : '';
+      const cls = c >= 0 ? 'pos' : 'neg';
+      return `<span class="attr-contrib ${cls}">${sign}${c.toFixed(2)}</span>`;
+    };
+
     const col = {};
     for (const [gk, keys] of groups) {
       const rows = sortByLabel(keys).filter(k => p.attrs[k] != null);
@@ -3298,7 +3387,7 @@ function showDetail(p) {
         const raw = p.attrs[k];
         const shown = proj ? (proj[k] ?? raw) : raw;
         const grew = state.showPot && shown > raw;
-        return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span><span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
+        return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span>${contribSpan(k, shown)}<span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
       }).join('') + '</div>';
     }
     // Persoonlijkheid (verborgen kenmerken) — net als een normale eigenschappengroep.
@@ -3308,12 +3397,13 @@ function showDetail(p) {
     const persHtml = pd.length ? `<div class="attr-col"><h3>${t('personaTitle')}</h3>` + pd.map(([k, v], idx) =>
       `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
     // Overige verborgen kenmerken. Bij InjuryProneness/Dirtiness is HOOG slecht → kleur omkeren.
+    // Hidden attrs (Consistency, ImportantMatches, Versatility) can have meta coefficients too.
     const hd = [['Consistency', true], ['ImportantMatches', true], ['Versatility', true],
       ['InjuryProneness', false], ['Dirtiness', false]]
       .map(([k, good]) => [k, p.attrs ? p.attrs[k] : 0, good]).filter(x => x[1] > 0);
     const hidHtml = hd.length ? `<div class="attr-col"><h3>${t('hiddenTitle')}</h3>` + hd.map(([k, v, good], idx) => {
       const cls = good ? attrClass(v) : attrClass(21 - v);   // "slecht-hoog": omgekeerde kleur
-      return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t('a_' + k)}</span><span class="v ${cls}">${v}</span></div>`;
+      return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t('a_' + k)}</span>${contribSpan(k, v)}<span class="v ${cls}">${v}</span></div>`;
     }).join('') + '</div>' : '';
     // Grid: links Technisch/Keepen + Standaardsituaties (Mentaal loopt ernaast over 2 rijen),
     // onderste rij links Fysiek + Verborgen kenmerken, rechts Persoonlijkheid.
@@ -3535,7 +3625,7 @@ function buildCardModel(p) {
     club: p.club || L.sFree, division: p.div || '', nation: natsLabel(p) || '',
     positions: (p.posArr || []).slice(0, 3).join(' · ') || '–',
     age: getAge(p), foot: footLabel(p), height: p.height ? p.height + ' cm' : '–',
-    ca, pa, hideNum, hexNum: state.hideMeta ? null : meta != null ? meta.toFixed(1) : '–',
+    ca, pa, hideNum, hexNum: state.hideMeta ? null : meta != null ? fmtMeta(meta) : '–',
     groups: cardGroups(p, isGk), roles,
     value: ev.v > 0 ? (ev.est ? '~' : '') + fmtMoney(ev.v) : '–',
     ask, wage: p.wage > 0 ? fmtWage(p.wage) + ' ' + wageSuf() : '–', contract: fmtDate(p.expires) || '–',
@@ -3691,7 +3781,7 @@ function downloadPlayerCard(p) {
     drawPlayerCard(p).toBlob(b => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(b);
-      a.download = `fmss-${(p.name || 'speler').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '')}.png`;
+      a.download = `fmss-${(p.name || 'player').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '')}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     }, 'image/png');
@@ -4031,8 +4121,8 @@ function openCompare() {
     body += row('CA', players.map(p => p.ca));
     body += row('PA', players.map(p => p.pa));
   }
-  if (!state.hideMeta) body += row(t('c_meta'), players.map(p => metaScore(p)), { fmt: v => v.toFixed(1) });
-  if (!state.hideMeta && !state.hideCapa) body += row(t('c_metapa'), players.map(p => metaPaScore(p)), { fmt: v => v.toFixed(1) });
+  if (!state.hideMeta) body += row(t('c_meta'), players.map(p => metaScore(p)), { fmt: v => v.toFixed(2) });
+  if (!state.hideMeta && !state.hideCapa) body += row(t('c_metapa'), players.map(p => metaPaScore(p)), { fmt: v => v.toFixed(2) });
   body += row(t('cmpValue'), players.map(p => estValue(p).v), { fmt: fmtMoney, hi: null });
   if (!state.hideCapa)
     body += row(t('c_fee'), players.map(p => { const f = feeEstimate(p); return f.v > 0 ? f.v : null; }), { fmt: fmtMoney, hi: false });
@@ -4318,23 +4408,24 @@ function canPlaySlot(p, slot) {
 
 function findOptimalLineup(squad, formation) {
   // Pre-compute RAW (pre-proficiency) meta score per group per player.
-  // Uses META_PRESET.weights so the lineup scoring matches the loaded preset exactly.
   // Proficiency is applied per-slot below, using slotFmPositions() so that AML and AMC
   // are treated as distinct positions even though both belong to the 'AM' meta group.
-  const presetWeights = META_PRESET.weights;
   const rawGroupCache = new Map(squad.map(p => [
     p.id,
     p.attrs
       ? Object.fromEntries(
-          Object.entries(presetWeights)
-            .map(([g, W]) => [g, weightedMetaWithWeights(p, p.attrs, W)])
+          Object.keys(META_PRESET.coeffs)
+            .map(g => [g, pointsContribution(p, p.attrs, g)])
             .filter(([, s]) => s != null)
         )
       : {},
   ]));
 
-  const candidatesForSlot = formation.map(f => {
-    const group = slotMetaGroup(f);
+  // Remember which meta group each formation slot maps to (needed for colour display).
+  const groupForSlot = formation.map(f => slotMetaGroup(f));
+
+  const candidatesForSlot = formation.map((f, slotIdx) => {
+    const group = groupForSlot[slotIdx];
     const fmPositions = slotFmPositions(f); // exact FM positions for this slot
     let list = squad.map(p => {
       if (!p.attrs) return null;
@@ -4348,25 +4439,19 @@ function findOptimalLineup(squad, formation) {
         const prof = p.posProficiency != null
           ? Math.max(0, ...fmPositions.map(pos => p.posProficiency[pos] ?? 0))
           : null;
-        const profW = META_PRESET.proficiency_weight;
-        if (profW != null) {
-          const Wtotal = META_PRESET.weights_sum[group] || 0;
-          score = (Wtotal > 0 && prof != null)
-            ? (rawScore * Wtotal + profW * prof) / (Wtotal + profW)
-            : rawScore;
-        } else {
-          score = rawScore * proficiencyFactor(prof);
-        }
+        // Additive proficiency term; slope doubles below Accomplished (15).
+        const cp = META_PRESET.coeff_prof[group] || 0;
+        score = rawScore + (prof != null ? (prof - META_PRESET.profBaseline) * cp * (prof < 15 ? 2 : 1) : 0);
       } else {
         score = metaScore(p);
       }
-      return score != null && score > 0 ? { player: p, score } : null;
+      return score != null ? { player: p, score } : null;
     }).filter(Boolean);
     list.sort((a, b) => b.score - a.score);
     return list.slice(0, 15);
   });
 
-  let bestSum = -1, bestLineup = null;
+  let bestSum = -Infinity, bestLineup = null;
   let maxRemaining = new Array(12).fill(0);
   for (let i = 10; i >= 0; i--) {
     maxRemaining[i] = maxRemaining[i + 1] + (candidatesForSlot[i][0] ? candidatesForSlot[i][0].score : 0);
@@ -4385,15 +4470,15 @@ function findOptimalLineup(squad, formation) {
         found = true;
         assignedIds.add(cand.player.id);
         currentLineup[slotIdx] = {
-          player: cand.player, score: cand.score, role: formation[slotIdx].role,
-          t: formation[slotIdx].t, l: formation[slotIdx].l
+          player: cand.player, score: cand.score, group: groupForSlot[slotIdx],
+          role: formation[slotIdx].role, t: formation[slotIdx].t, l: formation[slotIdx].l
         };
         dfs(slotIdx + 1, currentSum + cand.score);
         assignedIds.delete(cand.player.id);
       }
     }
     if (!found) {
-      currentLineup[slotIdx] = { player: null, score: 0, role: formation[slotIdx].role, t: formation[slotIdx].t, l: formation[slotIdx].l };
+      currentLineup[slotIdx] = { player: null, score: 0, group: groupForSlot[slotIdx], role: formation[slotIdx].role, t: formation[slotIdx].t, l: formation[slotIdx].l };
       dfs(slotIdx + 1, currentSum);
     }
   }
@@ -4403,13 +4488,13 @@ function findOptimalLineup(squad, formation) {
 }
 
 function autoDetectBestFormation(squad) {
-  let bestFormationKey = null, bestResult = null, highestAvgScore = -1;
+  let bestFormationKey = null, bestResult = null, highestAvgScore = -Infinity;
   const formationKeys = Object.keys(XI_FORMATIONS).filter(k => k !== 'custom' && k !== 'custom_active');
 
   formationKeys.forEach(fKey => {
     const formation = XI_FORMATIONS[fKey];
     const res = findOptimalLineup(squad, formation);
-    if (res && res.score > 0) {
+    if (res && res.lineup) {
       const avg = res.score / 11;
       if (avg > highestAvgScore) {
         highestAvgScore = avg;
@@ -4423,19 +4508,30 @@ function autoDetectBestFormation(squad) {
 
 function triggerBestFormationAuto() {
   const myClub = (state.meta.myClub || '').toLowerCase();
-  if (!myClub) { showToast("Aucun club sélectionné", "warning"); return; }
+  if (!myClub) { showToast(t('bestxi_autoNoClub'), 'warning'); return; }
   const squad = state.players.filter(p => (p.club || '').toLowerCase() === myClub);
   const best = autoDetectBestFormation(squad);
   if (best && best.key) {
     state.bestXiFormation = best.key;
     try { localStorage.setItem('fmss_xi_formation', best.key); } catch { }
     renderBestXI();
-    showToast(`Compo optimale : ${best.key} (${(best.result.score / 11).toFixed(1)} moy.)`, "check");
+    showToast(tf('bestxi_autoToast', { f: best.key, s: fmtMeta(best.result.score / 11) }), 'check');
   } else {
-    showToast("Impossible de trouver une formation", "warning");
+    showToast(t('bestxi_autoFail'), 'warning');
   }
 }
 window.triggerBestFormationAuto = triggerBestFormationAuto;
+
+function xiIgnorePlayer(id) {
+  state.xiIgnored.add(id);
+  try { localStorage.setItem('fmss_xi_ignored', JSON.stringify([...state.xiIgnored])); } catch {}
+  renderBestXI();
+}
+function xiResetIgnored() {
+  state.xiIgnored.clear();
+  try { localStorage.setItem('fmss_xi_ignored', '[]'); } catch {}
+  renderBestXI();
+}
 
 function renderBestXI() {
   const box = $('bestxi');
@@ -4444,25 +4540,32 @@ function renderBestXI() {
   if (state.bestXiFormation === 'custom') { renderInteractiveMap(); return; }
 
   const myClub = (state.meta.myClub || '').toLowerCase();
+  const hasIgnored = state.xiIgnored.size > 0;
+
   let html = `<div class="an-head" style="display:flex; justify-content:space-between; align-items:center; padding: 15px 20px; flex-wrap: wrap; gap: 10px;">
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-        <h2 style="margin:0;">Meilleur XI & Banc (Doublures)</h2>
-        <button onclick="openMercatoModal()" style="padding: 5px 12px; background: #059669; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">📊 Rapport Mercato</button>
-        <button onclick="triggerBestFormationAuto()" style="padding: 5px 12px; background: #d97706; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">⚡ Trouver la meilleure compo</button>
-        <button onclick="state.bestXiFormation = 'custom'; renderBestXI();" style="padding: 5px 12px; background: #7c3aed; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">✏️ Modifier la tactique</button>
+        <h2 style="margin:0;">${escHtml(t('bestxi_title'))}</h2>
+        <button onclick="openMercatoModal()" style="padding: 5px 12px; background: #059669; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">📊 ${escHtml(t('bestxi_mercato'))}</button>
+        <button onclick="triggerBestFormationAuto()" style="padding: 5px 12px; background: #d97706; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">⚡ ${escHtml(t('bestxi_autoFind'))}</button>
+        <button onclick="state.bestXiFormation = 'custom'; renderBestXI();" style="padding: 5px 12px; background: #7c3aed; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">✏️ ${escHtml(t('bestxi_editTactic'))}</button>
+        ${hasIgnored ? `<button onclick="xiResetIgnored()" style="padding: 5px 12px; background: #dc2626; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">↺ ${escHtml(t('bestxi_resetIgnored'))}</button>` : ''}
     </div>
     <select id="xi-formation" onchange="handleFormationChange()" style="padding: 5px 10px; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 5px; font-weight: bold; cursor: pointer;">
         ${Object.keys(XI_FORMATIONS).filter(f => f !== 'custom_active').map(f => `<option value="${f}" ${state.bestXiFormation === f ? 'selected' : ''}>${f}</option>`).join('')}
-        <option value="custom" ${state.bestXiFormation === 'custom' || state.bestXiFormation === 'custom_active' ? 'selected' : ''}>⚙️ Tactique Personnalisée (Interactive)</option>
+        <option value="custom" ${state.bestXiFormation === 'custom' || state.bestXiFormation === 'custom_active' ? 'selected' : ''}>${escHtml(t('bestxi_customOpt'))}</option>
     </select>
   </div>`;
 
   if (!myClub) {
-    box.innerHTML = html + `<div class="an-empty" style="text-align:center; padding: 20px;">Aucun club détecté. Sélectionnez une équipe via les filtres (Mijn club).</div>`;
+    box.innerHTML = html + `<div class="an-empty" style="text-align:center; padding: 20px;">${escHtml(t('bestxi_noClub'))}</div>`;
     return;
   }
 
-  const squad = state.players.filter(p => (p.club || '').toLowerCase() === myClub);
+  // Filter out ignored players from all XI/bench calculations
+  const fullSquad = state.players.filter(p => (p.club || '').toLowerCase() === myClub);
+  const squad = fullSquad.filter(p => !state.xiIgnored.has(p.id));
+  const ignoredPlayers = fullSquad.filter(p => state.xiIgnored.has(p.id));
+
   const formation = state.bestXiFormation === 'custom_active' ? XI_FORMATIONS['custom_active'] : XI_FORMATIONS[state.bestXiFormation];
   if (!formation) return;
 
@@ -4474,6 +4577,9 @@ function renderBestXI() {
     benchResult = findOptimalLineup(remainingSquad, formation);
   }
 
+  // Ignore button style (small, appears below player name on pitch / inline on bench)
+  const ignBtn = (id) => `<button onclick="event.stopPropagation();xiIgnorePlayer(${id})" title="${escHtml(t('bestxi_ignore'))}" style="margin-top:3px; padding:1px 6px; background:rgba(220,38,38,0.75); color:#fff; border:none; border-radius:3px; font-size:9px; cursor:pointer; line-height:14px;">✕</button>`;
+
   let layoutHtml = `<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; align-items: flex-start; padding: 20px;">`;
   let pitchHtml = `<div id="xi-pitch-container" style="position:relative; width:100%; max-width:600px; height:720px; background-color:#12301c; border-radius:12px; border:2px solid #2a3441; overflow:hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); flex-shrink: 0;">
       <div style="position:absolute; top:50%; left:0; right:0; height:2px; background:#2a4a34;"></div>
@@ -4483,13 +4589,14 @@ function renderBestXI() {
 
   if (result && result.lineup) {
     result.lineup.forEach(slot => {
-      let score = slot.score > 0 ? slot.score.toFixed(1) : '–';
-      let name = slot.player ? slot.player.name : 'Aucun joueur';
-      let cls = slot.score > 0 ? roleClass(slot.score) : '';
-      pitchHtml += `<div style="position:absolute; top:${slot.t}%; left:${slot.l}%; transform:translate(-50%, -50%); text-align:center; color:white; z-index:10; cursor:pointer;" ${slot.player ? `onclick="showDetail(state.players.find(p=>p.id===${slot.player.id}))"` : ''}>
-         <div class="v ${cls}" style="width:38px; height:38px; line-height:38px; border-radius:50%; margin:0 auto; font-weight:bold; background:#1e293b; border:2px solid rgba(255,255,255,0.2); font-size:13px;">${score}</div>
-         <div style="font-size:11px; font-weight:bold; background:rgba(15,23,42,0.95); padding:3px 6px; border-radius:4px; margin-top:4px; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</div>
+      let score = slot.player ? fmtMeta(slot.score) : '–';
+      let name = slot.player ? escHtml(slot.player.name) : escHtml(t('bestxi_noPlayer'));
+      let cls = slot.player ? metaClass(slot.score, slot.group) : '';
+      pitchHtml += `<div style="position:absolute; top:${slot.t}%; left:${slot.l}%; transform:translate(-50%, -50%); text-align:center; color:white; z-index:10;">
+         <div class="v ${cls}" style="width:48px; height:38px; line-height:38px; border-radius:8px; margin:0 auto; font-weight:bold; background:#1e293b; border:2px solid rgba(255,255,255,0.2); font-size:11px; cursor:pointer;" ${slot.player ? `onclick="showDetail(state.players.find(p=>p.id===${slot.player.id}))"` : ''}>${score}</div>
+         <div style="font-size:11px; font-weight:bold; background:rgba(15,23,42,0.95); padding:3px 6px; border-radius:4px; margin-top:4px; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" ${slot.player ? `onclick="showDetail(state.players.find(p=>p.id===${slot.player.id}))"` : ''}>${name}</div>
          <div style="font-size:9px; color:#cbd5e1; margin-top:1px; font-weight:bold;">${roleName(slot.role)}</div>
+         ${slot.player ? ignBtn(slot.player.id) : ''}
       </div>`;
     });
   }
@@ -4497,7 +4604,7 @@ function renderBestXI() {
 
   let benchHtml = `<div style="width: 100%; max-width: 320px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; display: flex; flex-direction: column; height: 720px; overflow: hidden; flex-shrink: 0;">
     <div style="padding: 12px 15px; background: #0f172a; border-bottom: 1px solid #334155; font-weight: bold; color: #fbbf24; font-size: 13px;">
-        <span>🪑 Mon Banc (Doublures)</span>
+        <span>${escHtml(t('bestxi_bench'))}</span>
     </div>
     <div style="padding: 12px; overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">`;
 
@@ -4507,26 +4614,46 @@ function renderBestXI() {
 
     sortedBench.forEach(slot => {
       let rName = roleName(slot.role).toUpperCase();
-      let sideText = slot.l < 30 ? ' (Gauche)' : slot.l > 70 ? ' (Droit)' : '';
+      let sideText = slot.l < 30 ? ' ' + t('bestxi_left') : slot.l > 70 ? ' ' + t('bestxi_right') : '';
       let formatRoleLabel = rName + sideText;
-      let playerName = slot.player ? slot.player.name : 'Poste vacant';
-      let scoreVal = slot.score > 0 ? slot.score.toFixed(1) : '–';
-      let cls = slot.score > 0 ? roleClass(slot.score) : '';
+      let playerName = slot.player ? escHtml(slot.player.name) : escHtml(t('bestxi_vacantPost'));
+      let scoreVal = slot.player ? fmtMeta(slot.score) : '–';
+      let cls = slot.player ? metaClass(slot.score, slot.group) : '';
 
       benchHtml += `<div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; ${!slot.player ? 'opacity: 0.5;' : ''}">
-          <div>
+          <div style="flex:1; min-width:0;">
               <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: bold;">${formatRoleLabel}</div>
-              <div style="font-size: 12px; font-weight: bold; color: #fff; margin-top: 1px; cursor: pointer; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" ${slot.player ? `onclick="showDetail(state.players.find(p=>p.id===${slot.player.id}))"` : ''}>${playerName}</div>
+              <div style="font-size: 12px; font-weight: bold; color: #fff; margin-top: 1px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" ${slot.player ? `onclick="showDetail(state.players.find(p=>p.id===${slot.player.id}))"` : ''}>${playerName}</div>
           </div>
-          <div class="v ${cls}" style="width: 28px; height: 28px; line-height: 28px; text-align: center; border-radius: 50%; font-weight: bold; font-size: 11px; background: #1e293b; border: 1px solid rgba(255,255,255,0.2);">${scoreVal}</div>
+          <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+              <div class="v ${cls}" style="width: 28px; height: 28px; line-height: 28px; text-align: center; border-radius: 50%; font-weight: bold; font-size: 11px; background: #1e293b; border: 1px solid rgba(255,255,255,0.2);">${scoreVal}</div>
+              ${slot.player ? `<button onclick="xiIgnorePlayer(${slot.player.id})" title="${escHtml(t('bestxi_ignore'))}" style="padding:2px 6px; background:rgba(220,38,38,0.75); color:#fff; border:none; border-radius:3px; font-size:11px; cursor:pointer; line-height:16px;">✕</button>` : ''}
+          </div>
       </div>`;
     });
   }
   benchHtml += `</div></div>`;
   layoutHtml += pitchHtml + benchHtml + `</div>`;
 
-  let scoreFooter = result && result.score ? `<div style="text-align:center; color:#94a3b8; font-size:15px; margin-top:10px; font-weight:bold;">Score moyen Meta du XI : <strong style="color:#34d399; font-size:17px;">${(result.score / 11).toFixed(2)}</strong></div>` : '';
-  box.innerHTML = html + layoutHtml + scoreFooter;
+  let scoreFooter = result && result.lineup ? `<div style="text-align:center; color:#94a3b8; font-size:15px; margin-top:10px; font-weight:bold;">${escHtml(t('bestxi_avgScore'))} <strong style="color:#34d399; font-size:17px;">${fmtMeta(result.score / 11)}</strong></div>` : '';
+
+  // Unavailable panel — shown when any player is ignored
+  let ignoredHtml = '';
+  if (ignoredPlayers.length > 0) {
+    ignoredHtml = `<div style="margin: 0 20px 20px; background: #1e293b; border: 1px solid #7f1d1d; border-radius: 10px; padding: 12px 16px;">
+      <div style="font-size:11px; font-weight:bold; color:#fca5a5; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">🚫 ${escHtml(t('bestxi_ignored'))}</div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        ${ignoredPlayers.map(p => {
+          return `<div style="display:flex; align-items:center; gap:5px; background:#0f172a; border:1px solid #7f1d1d; border-radius:6px; padding:4px 8px;">
+            <span style="font-size:11px; color:#fecaca; cursor:pointer;" onclick="showDetail(state.players.find(q=>q.id===${p.id}))">${escHtml(p.name)}</span>
+            <button onclick="state.xiIgnored.delete(${p.id}); try{localStorage.setItem('fmss_xi_ignored',JSON.stringify([...state.xiIgnored]))}catch{}; renderBestXI();" style="padding:1px 5px; background:rgba(74,222,128,0.2); color:#4ade80; border:1px solid #4ade80; border-radius:3px; font-size:10px; cursor:pointer;">+</button>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  box.innerHTML = html + layoutHtml + scoreFooter + ignoredHtml;
 }
 
 let customSelectedSlots = jread('fmss_xi_custom', []);
@@ -4590,13 +4717,13 @@ function renderInteractiveMap() {
   const isReady = customSelectedSlots.length === 11;
 
   let html = `<div class="an-head" style="display:flex; justify-content:space-between; align-items:center; padding: 15px 20px;">
-      <h2>Tactique Personnalisée (${customSelectedSlots.length}/11 postes)</h2>
+      <h2>${escHtml(tf('tactic_title', { n: customSelectedSlots.length }))}</h2>
       <div style="display: flex; gap: 10px;">
           <select id="xi-formation" onchange="handleFormationChange()" style="padding: 5px 10px; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 5px; font-weight: bold; cursor: pointer;">
               ${Object.keys(XI_FORMATIONS).map(f => `<option value="${f}">${f}</option>`).join('')}
-              <option value="custom" selected>⚙️ Tactique Personnalisée (Interactive)</option>
+              <option value="custom" selected>${escHtml(t('bestxi_customOpt'))}</option>
           </select>
-          <button onclick="confirmCustomTactics()" ${!isReady ? 'disabled' : ''} style="padding: 6px 14px; background: ${isReady ? '#8b5cf6' : '#334155'}; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: ${isReady ? 'pointer' : 'not-allowed'}; font-size: 12px;">Confirmer la compo</button>
+          <button onclick="confirmCustomTactics()" ${!isReady ? 'disabled' : ''} style="padding: 6px 14px; background: ${isReady ? '#8b5cf6' : '#334155'}; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: ${isReady ? 'pointer' : 'not-allowed'}; font-size: 12px;">${escHtml(t('tactic_confirm'))}</button>
       </div>
   </div>`;
 
@@ -4616,7 +4743,7 @@ function toggleCustomSlot(line, side, role) {
   const index = customSelectedSlots.findIndex(s => s.line === line && s.side === side);
   if (index !== -1) { customSelectedSlots.splice(index, 1); }
   else {
-    if (customSelectedSlots.length >= 11) { alert("Maximum 11 titulaires atteints."); return; }
+    if (customSelectedSlots.length >= 11) { showToast(t('tactic_maxStarters'), 'warning'); return; }
     customSelectedSlots.push({ role, line, side, t: line === 'fw' ? 15 : line === 'am' ? 30 : line === 'cm' ? 45 : line === 'dm' ? 60 : line === 'df' ? 75 : 90, l: side === 'L' ? 15 : side === 'CL' ? 33 : side === 'C' ? 50 : side === 'CR' ? 67 : 85 });
   }
   renderInteractiveMap();
@@ -4636,7 +4763,7 @@ function openMercatoModal() {
   if (!modal || !content) return;
   const myClub = (state.meta.myClub || '').toLowerCase();
   if (!myClub || !state.players.length) {
-    content.innerHTML = `<div style="text-align: center; color: #94a3b8; padding: 40px;">Aucun club détecté ou base vide.</div>`;
+    content.innerHTML = `<div style="text-align: center; color: #94a3b8; padding: 40px;">${escHtml(t('mercato_noData'))}</div>`;
     modal.classList.remove('hidden'); modal.style.display = 'flex'; return;
   }
 
@@ -4657,7 +4784,7 @@ function openMercatoModal() {
   formation.forEach((slot, idx) => {
     let currentSlot = optimalLineup.lineup[idx];
     let currentScore = currentSlot && currentSlot.player ? metaScore(currentSlot.player) || 0 : 0;
-    let currentName = currentSlot && currentSlot.player ? currentSlot.player.name : "Aucun";
+    let currentName = currentSlot && currentSlot.player ? escHtml(currentSlot.player.name) : t('mercato_none');
     let targets = [];
 
     state.players.forEach(dbPlayer => {
@@ -4689,35 +4816,35 @@ function openMercatoModal() {
   });
 
   let html = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-      <h3 style="color: #fff; margin: 0;">🎯 Rapport Mercato & Cibles Prioritaires</h3>
-      ${mercatoDismissed.size > 0 ? `<button onclick="resetMercatoDismissed()" style="background: #334155; color: #cbd5e1; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer;">🔄 Réinitialiser les cibles rejetées (${mercatoDismissed.size})</button>` : ''}
+      <h3 style="color: #fff; margin: 0;">${escHtml(t('mercato_title'))}</h3>
+      ${mercatoDismissed.size > 0 ? `<button onclick="resetMercatoDismissed()" style="background: #334155; color: #cbd5e1; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer;">${escHtml(tf('mercato_resetDismissed', { n: mercatoDismissed.size }))}</button>` : ''}
   </div>`;
 
   if (suggestions.length === 0) {
-    html += `<div style="text-align: center; color: #94a3b8; padding: 40px;">Aucune cible ne correspond à vos filtres.</div>`;
+    html += `<div style="text-align: center; color: #94a3b8; padding: 40px;">${escHtml(t('mercato_noTargets'))}</div>`;
   } else {
     html += suggestions.map(group => `
       <div style="background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 14px; margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 10px;">
-          <span style="color: #34d399; font-weight: bold;">Poste : ${group.role}</span>
-          <span style="font-size: 12px; color: #94a3b8;">Titulaire : <b style="color: #fff;">${group.currentName}</b> (${group.currentScore.toFixed(1)})</span>
+          <span style="color: #34d399; font-weight: bold;">${escHtml(t('mercato_slot'))} ${escHtml(group.role)}</span>
+          <span style="font-size: 12px; color: #94a3b8;">${escHtml(t('mercato_current'))} <b style="color: #fff;">${group.currentName}</b> (${fmtMeta(group.currentScore)})</span>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px;">
-          ${group.targets.map(t => {
-            const p = t.player, iObj = interestEstimate(p), feeObj = feeEstimate(p);
+          ${group.targets.map(tgt => {
+            const p = tgt.player, iObj = interestEstimate(p), feeObj = feeEstimate(p);
             const feeVal = feeObj.v ?? estValue(p).v ?? 0;
-            const qpVal = (feeVal / 1e6) > 0 ? (t.dbScore / (feeVal / 1e6)).toFixed(2) : 'Max';
+            const qpVal = (feeVal / 1e6) > 0 ? (tgt.dbScore / (feeVal / 1e6)).toFixed(2) : 'Max';
             return `<div style="position: relative; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px;">
               <button onclick="dismissMercatoTarget(${p.id})" style="position: absolute; top: 8px; right: 8px; background: none; border: none; color: #94a3b8; cursor: pointer;">✕</button>
-              <div style="font-weight: bold; color: #fff; cursor: pointer;" onclick="showDetail(state.players.find(x=>x.id===${p.id}))">${p.name}</div>
-              <div style="font-size: 12px; color: #94a3b8;">${p.club || 'Libre'} • ${getAge(p) || '?'} ans</div>
+              <div style="font-weight: bold; color: #fff; cursor: pointer;" onclick="showDetail(state.players.find(x=>x.id===${p.id}))">${escHtml(p.name)}</div>
+              <div style="font-size: 12px; color: #94a3b8;">${escHtml(p.club || t('clubless'))} • ${getAge(p) || '?'}</div>
               <div style="font-size: 11px; color: #cbd5e1; margin-top: 6px;">
-                <div>Prix : <b style="color: #fff;">${fmtMoney(feeVal)}</b> | Q/P : <b style="color: #34d399;">${qpVal}</b></div>
-                <div>Intérêt : <b style="color: #38bdf8;">${iObj ? iObj.score : '?'}/100</b></div>
+                <div>${escHtml(t('mercato_price'))} <b style="color: #fff;">${fmtMoney(feeVal)}</b> | ${escHtml(t('mercato_qp'))} <b style="color: #34d399;">${qpVal}</b></div>
+                <div>${escHtml(t('mercato_interest'))} <b style="color: #38bdf8;">${iObj ? iObj.score : '?'}/100</b></div>
               </div>
               <div style="margin-top: 10px; display: flex; justify-content: space-between; font-size: 12px;">
-                <span>Meta : <b>${t.dbScore.toFixed(1)}</b></span>
-                <span style="color: #34d399; font-weight: bold;">+${t.improvement.toFixed(1)} pts</span>
+                <span>${escHtml(t('c_meta'))}: <b>${fmtMeta(tgt.dbScore)}</b></span>
+                <span style="color: #34d399; font-weight: bold;">${fmtMeta(tgt.improvement)}</span>
               </div>
             </div>`;
           }).join('')}
@@ -4735,13 +4862,15 @@ function closeMercatoModal() {
 
 function dismissMercatoTarget(playerId) {
   mercatoDismissed.add(playerId);
+  try { localStorage.setItem('fmss_mercato_dismissed', JSON.stringify([...mercatoDismissed])); } catch { }
   openMercatoModal();
 }
 
 function resetMercatoDismissed() {
   mercatoDismissed.clear();
+  try { localStorage.removeItem('fmss_mercato_dismissed'); } catch { }
   openMercatoModal();
-  showToast("Cibles réinitialisées avec succès", "check");
+  showToast(t('mercato_resetToast'), 'check');
 }
 
 let clubsSearchTerm = '';
@@ -4749,7 +4878,7 @@ function analyzeClubsAndDivisions() {
   const clubMap = new Map(), divMap = new Map();
   state.players.forEach(p => {
     if (p.teamType != null && p.teamType !== 0) return;
-    const clubName = p.club || 'Libre / Sans club', divName = p.div || 'Inconnue';
+    const clubName = p.club || t('clubless'), divName = p.div || null;
     const meta = metaScore(p) || 0, paMeta = metaPaScore(p) || meta, age = getAge(p) || 0, val = p.value || 0, wage = p.wage || 0;
 
     if (!clubMap.has(clubName)) clubMap.set(clubName, { name: clubName, div: divName, players: [], totalVal: 0, totalWage: 0 });
@@ -4770,7 +4899,7 @@ function analyzeClubsAndDivisions() {
     return { name: c.name, div: c.div, count: c.players.length, avgMeta: n ? totalMeta / n : 0, avgPaMeta: n ? totalPaMeta / n : 0, avgAge: n ? totalAge / n : 0, totalVal: c.totalVal, totalWage: c.totalWage, topPlayer: c.players[0] ? c.players[0].player : null };
   }).sort((a, b) => b.avgMeta - a.avgMeta);
 
-  const divisions = [...divMap.values()].filter(d => d.name !== 'Inconnue' && d.count >= 200).map(d => ({
+  const divisions = [...divMap.values()].filter(d => d.name !== null && d.count >= 200).map(d => ({
     name: d.name, count: d.count, avgMeta: d.count ? d.totalMeta / d.count : 0, avgPaMeta: d.count ? d.totalPaMeta / d.count : 0, totalVal: d.totalVal
   })).sort((a, b) => b.avgMeta - a.avgMeta);
 
@@ -4782,7 +4911,7 @@ function renderClubsView() {
   if (!box) return;
   const { clubs, divisions } = analyzeClubsAndDivisions();
   const query = (clubsSearchTerm || '').toLowerCase();
-  const filteredClubs = clubs.filter(c => c.name.toLowerCase().includes(query) || c.div.toLowerCase().includes(query));
+  const filteredClubs = clubs.filter(c => c.name.toLowerCase().includes(query) || (c.div || '').toLowerCase().includes(query));
 
   const clubsByDiv = new Map();
   filteredClubs.forEach(c => {
@@ -4792,12 +4921,12 @@ function renderClubsView() {
 
   let html = `<div style="padding: 20px; max-width: 1400px; margin: 0 auto;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-      <h2>📊 Analyse globale des Clubs & Divisions</h2>
-      <input type="text" id="clubs-search-input" value="${escHtml(clubsSearchTerm)}" placeholder="Rechercher..." oninput="onClubsSearchInput(this)" style="padding: 8px 14px; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 6px;">
+      <h2>${escHtml(t('clubs_title'))}</h2>
+      <input type="text" id="clubs-search-input" value="${escHtml(clubsSearchTerm)}" placeholder="${escHtml(t('clubs_searchPh'))}" oninput="onClubsSearchInput(this)" style="padding: 8px 14px; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 6px;">
     </div>`;
 
   if (clubsByDiv.size === 0) {
-    box.innerHTML = html + `<div style="text-align: center; color: #94a3b8; padding: 40px;">Aucun club trouvé.</div></div>`;
+    box.innerHTML = html + `<div style="text-align: center; color: #94a3b8; padding: 40px;">${escHtml(t('clubs_noResults'))}</div></div>`;
     return;
   }
 
@@ -4808,22 +4937,22 @@ function renderClubsView() {
       <div style="background: #0f172a; border: 1px solid #334155; padding: 12px 16px; display: flex; justify-content: space-between;">
         <span style="font-weight: bold; color: #38bdf8;">🏆 ${escHtml(div.name)}</span>
         <div style="display: flex; gap: 20px; font-size: 12px; color: #94a3b8;">
-          <span>Clubs : <b style="color:#fff;">${divClubs.length}</b></span>
-          <span>Meta Moy : <b style="color: #34d399;">${div.avgMeta.toFixed(1)}</b></span>
-          <span>PA Meta Moy : <b style="color: #38bdf8;">${div.avgPaMeta.toFixed(1)}</b></span>
+          <span>${escHtml(t('clubs_divCount'))} <b style="color:#fff;">${divClubs.length}</b></span>
+          <span>${escHtml(t('clubs_avgMeta'))} <b style="color: #34d399;">${fmtMeta(div.avgMeta)}</b></span>
+          <span>${escHtml(t('clubs_avgPaMeta'))} <b style="color: #38bdf8;">${fmtMeta(div.avgPaMeta)}</b></span>
         </div>
       </div>
       <div style="background: #1e293b; border: 1px solid #334155; overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
           <thead>
             <tr style="color: #64748b; border-bottom: 1px solid #334155; font-size: 11px; text-transform: uppercase;">
-              <th style="padding: 8px 14px;">Club</th>
-              <th style="padding: 8px 14px; text-align: center;">Effectif Pro</th>
-              <th style="padding: 8px 14px; text-align: center;">Moy. Âge</th>
-              <th style="padding: 8px 14px; text-align: center;">Meta Moyen (Top 20)</th>
-              <th style="padding: 8px 14px; text-align: center;">PA Meta Moyen</th>
-              <th style="padding: 8px 14px;">Top Player</th>
-              <th style="padding: 8px 14px; text-align: right;">Valeur Totale</th>
+              <th style="padding: 8px 14px;">${escHtml(t('clubs_colClub'))}</th>
+              <th style="padding: 8px 14px; text-align: center;">${escHtml(t('clubs_colCount'))}</th>
+              <th style="padding: 8px 14px; text-align: center;">${escHtml(t('clubs_colAvgAge'))}</th>
+              <th style="padding: 8px 14px; text-align: center;">${escHtml(t('clubs_colAvgMeta'))}</th>
+              <th style="padding: 8px 14px; text-align: center;">${escHtml(t('clubs_colAvgPaMeta'))}</th>
+              <th style="padding: 8px 14px;">${escHtml(t('clubs_colTopPlayer'))}</th>
+              <th style="padding: 8px 14px; text-align: right;">${escHtml(t('clubs_colTotalVal'))}</th>
             </tr>
           </thead>
           <tbody>`;
@@ -4835,8 +4964,8 @@ function renderClubsView() {
         <td style="padding: 10px 14px; font-weight: bold; color: #fff;">${escHtml(c.name)}</td>
         <td style="padding: 10px 14px; text-align: center; color: #cbd5e1;">${c.count}</td>
         <td style="padding: 10px 14px; text-align: center; color: #cbd5e1;">${c.avgAge ? c.avgAge.toFixed(1) : '–'}</td>
-        <td style="padding: 10px 14px; text-align: center;"><b style="color: #34d399;">${c.avgMeta.toFixed(1)}</b></td>
-        <td style="padding: 10px 14px; text-align: center;"><b style="color: #38bdf8;">${c.avgPaMeta.toFixed(1)}</b></td>
+        <td style="padding: 10px 14px; text-align: center;"><b style="color: #34d399;">${fmtMeta(c.avgMeta)}</b></td>
+        <td style="padding: 10px 14px; text-align: center;"><b style="color: #38bdf8;">${fmtMeta(c.avgPaMeta)}</b></td>
         <td style="padding: 10px 14px; color: #cbd5e1; cursor: pointer;" ${topPlayerId ? `onclick="showDetail(state.players.find(x=>x.id===${topPlayerId}))"` : ''}>${escHtml(topPlayerName)}</td>
         <td style="padding: 10px 14px; text-align: right; color: #fbbf24; font-weight: 500;">${fmtMoney(c.totalVal)}</td>
       </tr>`;
@@ -4978,6 +5107,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   let tm; $(id).addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(applyFilters, 150); });
 });
 ['f-eu', 'f-myclub', 'f-tstatus', 'f-contract', 'f-shortlist', 'f-wonderkid', 'f-foot', 'f-new'].forEach(id => $(id).addEventListener('change', applyFilters));
+$('f-meta-group').addEventListener('change', () => {
+  state.metaViewPos = $('f-meta-group').value || null;
+  localStorage.setItem('fmss_metaviewpos', state.metaViewPos || '');
+  for (const p of state.players) { delete p._meta; delete p._metaPa; delete p._metaGroup; }
+  applyFilters();
+});
 $('f-hist-period').addEventListener('change', async () => {
   await setHistPeriod($('f-hist-period').value);
   renderTable();     // groeikolom leest andere peildata
@@ -5200,6 +5335,7 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#settings-menu') && !e.target.closest('#btn-settings')) $('settings-menu').classList.add('hidden');
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('settings-menu').classList.add('hidden'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('weight-editor-modal')?.style.display !== 'none') closeWeightEditor(); });
 
 // ── Meta preset UI ────────────────────────────────────────────────────────────
 
@@ -5214,6 +5350,7 @@ function loadAndApplyPreset(data) {
     applyMetaPreset(data);
     try { localStorage.setItem('fmss_meta_preset', JSON.stringify(data)); } catch {}
     updatePresetLabel();
+    populateMetaGroupSelect();
     renderTable();
   } catch (e) {
     console.error('Meta preset toepassen mislukt:', e);
@@ -5241,19 +5378,564 @@ $('meta-preset-load-btn').onclick = () => $('meta-preset-file').click();
 
 $('meta-preset-reset-btn').onclick = async () => {
   try {
-    const r = await fetch('/meta-presets/default.json');
+    const r = await fetch('/meta-presets/default_direct.json');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     loadAndApplyPreset(await r.json());
   } catch {
-    // Network/file not found — fall back to hardcoded values
+    // Network/file not found — fall back to built-in preset
     localStorage.removeItem('fmss_meta_preset');
-    buildFallbackPreset();
+    applyMetaPreset(BUILTIN_PRESET);
     updatePresetLabel();
     renderTable();
   }
 };
 
-// Async startup: try localStorage → fetch default.json → hardcoded fallback (already applied).
+$('meta-preset-edit-btn').onclick = () => openWeightEditor();
+
+// ── Weight editor ─────────────────────────────────────────────────────────────
+
+let _weActiveTab = '';
+// _weSegments[g][attr] = [{from, to, pts}, ...] sorted descending by from (ceiling first)
+let _weSegments = {};
+
+// All FM attributes grouped by category, used to populate every position tab.
+const WE_OUTFIELD_SECTIONS = [
+  { label: 'Technical', color: '#7dd3fc', attrs: ['Corners', 'Crossing', 'Dribbling', 'Finishing', 'FirstTouch', 'FreeKicks', 'Heading', 'LongShots', 'LongThrows', 'Marking', 'Passing', 'PenaltyTaking', 'Tackling', 'Technique'] },
+  { label: 'Mental',    color: '#a5b4fc', attrs: ['Aggression', 'Anticipation', 'Bravery', 'Composure', 'Concentration', 'Decisions', 'Determination', 'Flair', 'Leadership', 'OffTheBall', 'Positioning', 'Teamwork', 'Vision', 'WorkRate'] },
+  { label: 'Physical',  color: '#86efac', attrs: ['Acceleration', 'Agility', 'Balance', 'JumpingReach', 'NaturalFitness', 'Pace', 'Stamina', 'Strength'] },
+  { label: 'Hidden',    color: '#fca5a5', attrs: ['Consistency', 'ImportantMatches', 'InjuryProneness', 'Versatility', 'Dirtiness'] },
+];
+const WE_GK_SECTIONS = [
+  { label: 'Goalkeeping', color: '#fdba74', attrs: ['AerialReach', 'CommandOfArea', 'Communication', 'Eccentricity', 'FirstTouch', 'Handling', 'Kicking', 'OneOnOnes', 'Passing', 'Punching', 'Reflexes', 'RushingOut', 'Technique', 'Throwing'] },
+  { label: 'Mental',      color: '#a5b4fc', attrs: ['Aggression', 'Anticipation', 'Bravery', 'Composure', 'Concentration', 'Decisions', 'Determination', 'Flair', 'Leadership', 'OffTheBall', 'Positioning', 'Teamwork', 'Vision', 'WorkRate'] },
+  { label: 'Physical',    color: '#86efac', attrs: ['Acceleration', 'Agility', 'Balance', 'JumpingReach', 'NaturalFitness', 'Pace', 'Stamina', 'Strength'] },
+  { label: 'Hidden',      color: '#fca5a5', attrs: ['Consistency', 'ImportantMatches', 'InjuryProneness', 'Versatility', 'Dirtiness'] },
+];
+
+// Localized label for any attr (including hidden attrs which live in the i18n object under 'a_*').
+function weAttrLabel(a) {
+  const map = ATTR_LABEL[state.lang] || ATTR_LABEL.en;
+  if (map[a]) return map[a];
+  // Hidden attrs
+  const hi18n = { Consistency: 'a_Consistency', ImportantMatches: 'a_ImportantMatches', InjuryProneness: 'a_InjuryProneness', Versatility: 'a_Versatility', Dirtiness: 'a_Dirtiness' };
+  return hi18n[a] ? t(hi18n[a]) : a;
+}
+
+// ── Piecewise segment helpers ─────────────────────────────────────────────────
+
+// Enforce ceiling=20, floor=1, derive all 'to' values from adjacent 'from' values.
+function weNormalizeSegs(segs) {
+  if (!segs || !segs.length) return [{ from: 1, to: 20, pts: 0 }];
+  const s = [...segs].sort((a, b) => b.from - a.from);
+  s[0].to = 20;                                          // ceiling always locked
+  for (let i = 1; i < s.length; i++) s[i].to = s[i - 1].from - 1;  // derive all to's
+  // floor NOT forced to 1 — bottom segment keeps its actual FROM (the test start)
+  return s;
+}
+
+// Build the innerHTML for one attribute's segment rows (used both on init and on update).
+// g/attr may be '' for the proficiency special case (uses weProfPtsChange / weProfBreakpoint).
+function weBuildSegRows(g, attr, segs, scale, opts) {
+  opts = opts || {};
+  const isProficiency = opts.isProficiency || false;
+  const N = segs.length;
+  const inpS = 'padding:1px 3px;background:#0f172a;border:1px solid #1e293b;color:#94a3b8;border-radius:3px;font-size:11px;text-align:center;box-sizing:border-box;width:27px;';
+
+  let rows = segs.map((seg, i) => {
+    const isFirst = i === 0, isLast = i === N - 1;
+    const range = seg.to - seg.from;
+    const coeff = range > 0 ? (seg.pts / (scale * range)).toFixed(4) : '—';
+    const cc = seg.pts > 0 ? '#34d399' : seg.pts < 0 ? '#f87171' : '#475569';
+
+    // FROM: editable unless it literally equals 1 (can't go below floor)
+    // onchange (not oninput) so multi-digit numbers can be typed without mid-input clamping
+    const fromLocked = seg.from === 1;
+    const fromCell = fromLocked
+      ? `<span style="${inpS}display:inline-block;color:#475569;">1</span>`
+      : isProficiency
+        ? `<input type="number" value="${seg.from}" min="1" max="20" step="1"
+             style="${inpS}" onchange="weProfBreakpointChange(${i},this.value)">`
+        : `<input type="number" value="${seg.from}" min="1" max="20" step="1"
+             style="${inpS}" onchange="weBreakpointChange('${g}','${attr}',${i},this.value)">`;
+
+    // TO: ceiling (20) locked for first; auto-derived for others
+    const toCell = isFirst
+      ? `<span style="${inpS}display:inline-block;color:#475569;">20</span>`
+      : `<span style="${inpS}display:inline-block;color:#334155;">${seg.to}</span>`;
+
+    const ptsOninput = isProficiency
+      ? `weProfPtsChange(${i},this.value)`
+      : `wePtsChange('${g}','${attr}',${i},this.value)`;
+    const rmOninput = isProficiency
+      ? `weProfRemoveSeg(${i})`
+      : `weRemoveSeg('${g}','${attr}',${i})`;
+    const rmBtn = N > 1
+      ? `<button onclick="${rmOninput}"
+           style="padding:0 4px;line-height:1.3;background:none;border:1px solid #334155;color:#64748b;border-radius:3px;font-size:10px;cursor:pointer;" title="Remove segment">×</button>`
+      : '<span style="display:inline-block;width:20px;"></span>';
+
+    // ×2 / ÷2 slope buttons: only on non-first segments — sets this seg's pts relative to the segment above
+    const btnStyle = 'padding:0 3px;line-height:1.3;background:none;border:1px solid #334155;color:#7dd3fc;border-radius:3px;font-size:9px;cursor:pointer;';
+    const slopeBtns = i > 0
+      ? (isProficiency
+          ? `<button onclick="weProfSlopeMultiply(${i},2)"   style="${btnStyle}" title="Double slope vs segment above">×2</button>` +
+            `<button onclick="weProfSlopeMultiply(${i},0.5)" style="${btnStyle}" title="Halve slope vs segment above">÷2</button>`
+          : `<button onclick="weSlopeMultiply('${g}','${attr}',${i},2)"   style="${btnStyle}" title="Double slope vs segment above">×2</button>` +
+            `<button onclick="weSlopeMultiply('${g}','${attr}',${i},0.5)" style="${btnStyle}" title="Halve slope vs segment above">÷2</button>`)
+      : '';
+
+    return `<div style="display:flex;align-items:center;gap:3px;padding:1px 0;">
+      <input type="number" class="${isProficiency ? 'we-prof-pts' : 'we-pts'}"
+        ${isProficiency ? '' : `data-we-group="${g}" data-attr="${attr}"`}
+        data-scale="${scale}" data-seg="${i}"
+        value="${seg.pts}" step="0.5" oninput="${ptsOninput}"
+        style="width:54px;padding:2px 4px;background:#0f172a;border:1px solid #334155;color:#fff;border-radius:4px;font-size:12px;text-align:right;box-sizing:border-box;">
+      <span style="font-size:10px;color:#475569;">pts</span>
+      ${fromCell}<span style="font-size:10px;color:#334155;">→</span>${toCell}
+      <span style="font-size:11px;color:${cc};font-family:monospace;min-width:44px;text-align:right;">${coeff}</span>
+      ${slopeBtns}${rmBtn}
+    </div>`;
+  }).join('');
+
+  // Extension note: when the bottom segment doesn't reach 1, behaviour continues downward.
+  // • attrs / multi-seg prof: same coeff (piecewise clamp-integral extension)
+  // • single-seg prof: legacy scalar path doubles the coeff below Accomplished (15)
+  const bottom = segs[N - 1];
+  if (bottom && bottom.from > 1) {
+    const extRange = bottom.to - bottom.from;
+    const extCoeff = extRange > 0 ? (bottom.pts / (scale * extRange)).toFixed(4) : '—';
+    const noteLabel = (isProficiency && N === 1) ? '×2 below 15' : '≈ same';
+    rows += `<div style="display:flex;align-items:center;gap:3px;padding:1px 0;opacity:0.45;font-style:italic;">
+      <span style="width:54px;font-size:10px;color:#475569;text-align:right;">${noteLabel}</span>
+      <span style="font-size:10px;color:#475569;margin-left:4px;">1 → ${bottom.from - 1}</span>
+      <span style="font-size:10px;font-family:monospace;min-width:44px;margin-left:auto;color:#334155;">${extCoeff}</span>
+      <span style="display:inline-block;width:20px;"></span>
+    </div>`;
+  }
+
+  return rows;
+}
+
+// Re-render one attribute's segment rows from _weSegments state.
+function weRenderAttrSegs(g, attr) {
+  const box = document.getElementById(`we-segbox-${g}-${attr}`);
+  if (!box) return;
+  const scale = parseFloat(box.dataset.scale) || 10;
+  const segs  = (_weSegments[g] || {})[attr] || [];
+  box.innerHTML = weBuildSegRows(g, attr, segs, scale);
+}
+
+function weBreakpointChange(g, attr, idx, val) {
+  const segs = (_weSegments[g] || {})[attr];
+  if (!segs) return;
+  const isLast = idx === segs.length - 1;
+  // Bottom segment's from = test-range start (can be e.g. 8, min=1)
+  // Interior breakpoints: must stay between adjacent segments
+  const lo = isLast ? 1 : (idx + 1 < segs.length ? segs[idx + 1].from + 1 : 1);
+  const hi = idx > 0 ? segs[idx - 1].from - 1 : 20;
+  const v  = Math.max(lo, Math.min(hi, parseInt(val) || lo));
+  segs[idx].from = v;
+  // Re-derive the segment immediately below
+  if (idx + 1 < segs.length) segs[idx + 1].to = v - 1;
+  weRenderAttrSegs(g, attr);
+}
+
+function wePtsChange(g, attr, idx, val) {
+  const segs = (_weSegments[g] || {})[attr];
+  if (segs && segs[idx] != null) segs[idx].pts = parseFloat(val) || 0;
+  weRenderAttrSegs(g, attr);
+}
+
+function weAddSeg(g, attr) {
+  if (!_weSegments[g]) _weSegments[g] = {};
+  const segs = _weSegments[g][attr];
+  if (!segs || !segs.length) return;
+  const last = segs[segs.length - 1];
+  if (last.from > 1) {
+    // Add an explicit lower segment [1, last.from-1] — the "extension" becomes editable
+    segs.push({ from: 1, to: last.from - 1, pts: 0 });
+  } else {
+    // Bottom already at 1 — split it at midpoint
+    const span = last.to - last.from;
+    if (span < 1) return;
+    const mid = last.from + Math.ceil(span / 2);
+    segs.push({ from: 1, to: mid - 1, pts: 0 });
+    last.from = mid;
+  }
+  _weSegments[g][attr] = weNormalizeSegs(segs);
+  weRenderAttrSegs(g, attr);
+}
+
+function weRemoveSeg(g, attr, idx) {
+  const segs = (_weSegments[g] || {})[attr] || [];
+  if (segs.length <= 1) return;
+  segs.splice(idx, 1);
+  _weSegments[g][attr] = weNormalizeSegs(segs);
+  weRenderAttrSegs(g, attr);
+}
+
+// ── Proficiency segment state ─────────────────────────────────────────────────
+// Same piecewise model as attributes, stored module-level since there's only one proficiency.
+let _weProfSegs = [];   // [{from, to, pts}, ...] sorted descending
+
+function weRenderProfSegs() {
+  const box = document.getElementById('we-prof-segbox');
+  if (!box) return;
+  const scale = parseFloat(box.dataset.scale) || 10;
+  box.innerHTML = weBuildSegRows('', '', _weProfSegs, scale, { isProficiency: true });
+}
+
+function weProfPtsChange(idx, val) {
+  if (_weProfSegs[idx] != null) _weProfSegs[idx].pts = parseFloat(val) || 0;
+  weRenderProfSegs();
+}
+
+function weProfBreakpointChange(idx, val) {
+  const segs = _weProfSegs;
+  const isLast = idx === segs.length - 1;
+  const lo = isLast ? 1 : (idx + 1 < segs.length ? segs[idx + 1].from + 1 : 1);
+  const hi = idx > 0 ? segs[idx - 1].from - 1 : 20;
+  const v  = Math.max(lo, Math.min(hi, parseInt(val) || lo));
+  segs[idx].from = v;
+  if (idx + 1 < segs.length) segs[idx + 1].to = v - 1;
+  weRenderProfSegs();
+}
+
+function weProfAddSeg() {
+  const segs = _weProfSegs;
+  if (!segs.length) return;
+  const last = segs[segs.length - 1];
+  if (last.from > 1) {
+    segs.push({ from: 1, to: last.from - 1, pts: 0 });
+  } else {
+    const span = last.to - last.from;
+    if (span < 1) return;
+    const mid = last.from + Math.ceil(span / 2);
+    segs.push({ from: 1, to: mid - 1, pts: 0 });
+    last.from = mid;
+  }
+  _weProfSegs = weNormalizeSegs(segs);
+  weRenderProfSegs();
+}
+
+function weProfRemoveSeg(idx) {
+  if (_weProfSegs.length <= 1) return;
+  _weProfSegs.splice(idx, 1);
+  _weProfSegs = weNormalizeSegs(_weProfSegs);
+  weRenderProfSegs();
+}
+
+// Set pts of segment idx so its slope = factor × slope of segment idx-1.
+// "slope" = pts per scale-unit per range-unit = pts / (scale × range).
+function weSlopeMultiply(g, attr, idx, factor) {
+  const segs = (_weSegments[g] || {})[attr] || [];
+  if (idx < 1 || idx >= segs.length) return;
+  const box = document.getElementById(`we-segbox-${g}-${attr}`);
+  const scale = box ? (parseFloat(box.dataset.scale) || 10) : 10;
+  const ref = segs[idx - 1];
+  const refRange = ref.to - ref.from;
+  if (refRange <= 0) return;
+  const refCoeff = ref.pts / (scale * refRange);
+  const thisRange = segs[idx].to - segs[idx].from;
+  if (thisRange <= 0) return;
+  segs[idx].pts = Math.round(refCoeff * factor * scale * thisRange * 100) / 100;
+  weRenderAttrSegs(g, attr);
+}
+
+function weProfSlopeMultiply(idx, factor) {
+  const segs = _weProfSegs;
+  if (idx < 1 || idx >= segs.length) return;
+  const box = document.getElementById('we-prof-segbox');
+  const scale = box ? (parseFloat(box.dataset.scale) || 10) : 10;
+  const ref = segs[idx - 1];
+  const refRange = ref.to - ref.from;
+  if (refRange <= 0) return;
+  const refCoeff = ref.pts / (scale * refRange);
+  const thisRange = segs[idx].to - segs[idx].from;
+  if (thisRange <= 0) return;
+  segs[idx].pts = Math.round(refCoeff * factor * scale * thisRange * 100) / 100;
+  weRenderProfSegs();
+}
+
+function openWeightEditor() {
+  const modal = $('weight-editor-modal');
+  if (!modal) return;
+
+  if (!META_PRESET) return;
+
+  // Reset editor state
+  _weSegments = {};
+
+  const raw          = META_PRESET.raw || {};
+  const posW         = raw.position_weights || {};
+  const groupScale   = raw.group_scale || {};
+  const profTest     = raw.proficiency_test || { points: 6, range: 5 };
+  const attrRanges   = raw.attr_test_ranges || {};
+  const attrFrom     = raw.attr_test_from  || {};
+  const baseline     = raw.baseline ?? 8;
+  const profBaseline = raw.proficiency_baseline ?? 20;
+  const defaultRange = 20 - baseline;
+
+  const profFrom = profTest.from ?? 15;
+  const profTo   = profTest.to   ?? (profFrom + (profTest.range ?? 5));
+
+  const GROUP_ORDER = ['GK','DC','FB','DM','MC','WM','AM','ST'];
+  const groups = GROUP_ORDER.filter(g => posW[g]);
+  if (!groups.length) return;
+  const firstGroup = groups[0];
+  _weActiveTab = firstGroup;
+
+  // ── Explanation ──
+  const scaleDesc = Object.entries(groupScale).map(([g,s]) => `${g}=${s}`).join(', ') || '10 (outfield), 1 (GK)';
+  const profRange = profTo - profFrom;
+  const cpOut = profRange > 0 ? (profTest.points / (10 * profRange)).toFixed(4) : '—';
+  const cpGk  = profRange > 0 ? (profTest.points / (1  * profRange)).toFixed(4) : '—';
+
+  const explanation = `<details style="margin:0;padding:12px 20px;background:#080e1a;border-bottom:1px solid #1e293b;font-size:12px;color:#64748b;flex-shrink:0;">
+    <summary style="cursor:pointer;font-weight:bold;color:#94a3b8;user-select:none;">ℹ️ How weights work (expand)</summary>
+    <div style="margin-top:10px;line-height:1.7;">
+      <p style="margin:0 0 8px;"><strong style="color:#e2e8f0;">PTS</strong> = points improvement measured by the FM-Arena testing method: raise one attribute across the specified range across <strong>10 test players</strong>, measure the points gained over a <strong>38-match season</strong>.</p>
+      <p style="margin:0 0 4px;"><strong style="color:#e2e8f0;">Piecewise segments:</strong> click <strong style="color:#7dd3fc;">+</strong> on any attribute to add a second segment below — the breakpoint is the FROM of the upper segment. Ceiling (20) and floor (1) are fixed.</p>
+      <code style="display:block;background:#0f172a;border:1px solid #1e293b;padding:8px 12px;border-radius:6px;color:#7dd3fc;font-size:11px;margin:6px 0 8px;line-height:1.8;">score = Σ_segments [ (attr clamped to seg) − (baseline clamped to seg) ] × (pts ÷ (scale × (TO−FROM)))<br>      + (prof − ${profBaseline}) × (profPts ÷ (scale × (profTO−profFROM)))</code>
+      <ul style="margin:4px 0 0;padding-left:18px;">
+        <li><strong style="color:#e2e8f0;">scale</strong> — ${scaleDesc}</li>
+        <li><strong style="color:#e2e8f0;">Negative PTS</strong> allowed (e.g. Injury Proneness)</li>
+        <li><strong style="color:#e2e8f0;">proficiency</strong> — Natural (${profBaseline}) = +0; penalty <strong>doubles below Accomplished (15)</strong></li>
+        <li>Current coeff_prof: <strong style="color:#34d399;">${cpOut}</strong> (outfield) / <strong style="color:#34d399;">${cpGk}</strong> (GK)</li>
+      </ul>
+    </div>
+  </details>`;
+
+  // ── Baseline explanation banner ──
+  const baselineBanner = `<div style="padding:7px 20px;background:#070d1a;border-bottom:1px solid #1e293b;font-size:11px;color:#64748b;flex-shrink:0;line-height:1.6;">
+    <span style="color:#94a3b8;font-weight:bold;">📐 Baseline: </span>
+    <strong style="color:#7dd3fc;">meta = 0</strong> → player with every attribute at <strong style="color:#e2e8f0;">${baseline}</strong>.
+    &nbsp;&nbsp;
+    <strong style="color:#34d399;">effective_meta = 0</strong> → same player at Natural proficiency (<strong style="color:#e2e8f0;">${profBaseline}</strong>).
+  </div>`;
+
+  // ── Tabs ──
+  const tabsHtml = groups.map(g =>
+    `<button class="we-tab-btn" data-g="${g}" onclick="weShowTab('${g}')"
+      style="padding:4px 11px;border-radius:5px;font-size:11px;font-weight:bold;cursor:pointer;border:1px solid #334155;transition:none;
+             background:${g===firstGroup?'#3b82f6':'#0f172a'};color:${g===firstGroup?'#fff':'#64748b'};border-color:${g===firstGroup?'#3b82f6':'#334155'};">${g}</button>`
+  ).join('');
+
+  // ── Attribute grids (flex-column, one per position group) ──
+  function buildGrid(g) {
+    const existingW = posW[g] || {};
+    const scale     = groupScale[g] ?? 10;
+    const sections  = g === 'GK' ? WE_GK_SECTIONS : WE_OUTFIELD_SECTIONS;
+    if (!_weSegments[g]) _weSegments[g] = {};
+
+    const colHdr = `<div style="display:flex;align-items:center;gap:6px;padding:0 0 4px;border-bottom:1px solid #1e293b;margin-bottom:4px;">
+      <span style="flex:0 0 130px;font-size:10px;color:#334155;font-weight:bold;">ATTRIBUTE</span>
+      <span style="font-size:10px;color:#334155;font-weight:bold;min-width:54px;text-align:right;">PTS</span>
+      <span style="font-size:10px;color:#334155;font-weight:bold;margin-left:4px;">FROM → TO</span>
+      <span style="font-size:10px;color:#334155;font-weight:bold;margin-left:auto;">COEFF</span>
+    </div>`;
+
+    let rows = '';
+    sections.forEach(sec => {
+      rows += `<div style="font-size:9px;font-weight:bold;color:${sec.color};text-transform:uppercase;letter-spacing:.07em;padding:8px 0 3px 0;border-bottom:1px solid #1e293b;">${sec.label}</div>`;
+      sec.attrs.forEach(attr => {
+        // Build initial segments from existing weight data
+        const existing = existingW[attr];
+        let segs;
+        if (Array.isArray(existing)) {
+          segs = weNormalizeSegs(existing.map(s => ({ from: s.from ?? 1, to: s.to ?? 20, pts: s.pts ?? 0 })));
+        } else {
+          const pts   = (typeof existing === 'number') ? existing : 0;
+          const from  = attrFrom[attr] ?? baseline;
+          const rng   = attrRanges[attr] ?? defaultRange;
+          const to    = Math.min(20, from + rng);
+          segs = weNormalizeSegs([{ from, to, pts }]);
+        }
+        _weSegments[g][attr] = segs;
+        const segRowsHtml = weBuildSegRows(g, attr, segs, scale);
+
+        rows += `<div style="display:flex;align-items:flex-start;gap:6px;padding:3px 0 4px;border-bottom:1px solid #0c1829;">
+          <label style="flex:0 0 130px;font-size:12px;color:#cbd5e1;padding-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(attr)}">${escHtml(weAttrLabel(attr))}</label>
+          <div id="we-segbox-${g}-${attr}" data-scale="${scale}" style="flex:1;display:flex;flex-direction:column;gap:1px;">
+            ${segRowsHtml}
+          </div>
+          <button onclick="weAddSeg('${g}','${attr}')"
+            style="margin-top:4px;padding:1px 6px;background:none;border:1px solid #1e293b;color:#475569;border-radius:4px;font-size:12px;cursor:pointer;flex-shrink:0;" title="Add segment below">+</button>
+        </div>`;
+      });
+    });
+
+    return `<div class="we-grid" data-g="${g}"
+      style="display:${g===firstGroup?'flex':'none'};flex-direction:column;padding:10px 0;">
+      ${colHdr}${rows}
+    </div>`;
+  }
+
+  const gridsHtml = groups.map(g => buildGrid(g)).join('');
+
+  // ── Proficiency segment state init ──
+  // If preset has explicit segments use them; otherwise derive from scalar test range.
+  const firstScale = groupScale[groups[0]] ?? 10;
+  if (profTest.segments && profTest.segments.length) {
+    _weProfSegs = weNormalizeSegs(profTest.segments.map(s => ({ from: s.from ?? 1, to: s.to ?? 20, pts: s.pts ?? 0 })));
+  } else {
+    // Legacy single segment: show the actual tested range (profFrom → 20)
+    _weProfSegs = weNormalizeSegs([{ from: profFrom, to: 20, pts: profTest.points ?? 6 }]);
+  }
+  const profSegHtml = weBuildSegRows('', '', _weProfSegs, firstScale, { isProficiency: true });
+
+  // ── Proficiency row ──
+  const profRow = `<div style="padding:8px 20px;background:#0a1020;border-bottom:1px solid #1e293b;flex-shrink:0;font-size:12px;color:#64748b;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      <span style="font-weight:bold;color:#94a3b8;">Proficiency</span>
+      <span style="font-size:11px;color:#334155;">(Natural=20, Accomplished=15, Promising=10)</span>
+      <button onclick="weProfAddSeg()"
+        style="margin-left:auto;padding:1px 6px;background:none;border:1px solid #1e293b;color:#475569;border-radius:4px;font-size:12px;cursor:pointer;" title="Add proficiency segment">+</button>
+    </div>
+    <div id="we-prof-segbox" data-scale="${firstScale}" style="display:flex;flex-direction:column;gap:1px;padding-left:4px;">
+      ${profSegHtml}
+    </div>
+  </div>`;
+
+  // ── Full modal ──
+  modal.innerHTML = `<div style="background:#0f172a;width:100%;max-width:780px;max-height:90vh;border:1px solid #334155;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 25px 50px rgba(0,0,0,0.7);overflow:hidden;">
+
+    <div style="padding:14px 20px;background:#1e293b;border-bottom:1px solid #334155;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+      <h2 style="margin:0;font-size:15px;color:#fff;font-weight:bold;">⚙️ Meta Weight Editor — ${escHtml(META_PRESET.name || 'Direct')}</h2>
+      <button onclick="closeWeightEditor()" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;line-height:1;">✕</button>
+    </div>
+
+    ${baselineBanner}
+    ${explanation}
+
+    <div style="padding:10px 20px;background:#111827;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0;">
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">${tabsHtml}</div>
+      <button id="we-copy-btn" onclick="weCopyToOutfield()"
+        style="margin-left:auto;padding:3px 10px;background:#7c3aed;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer;display:${firstGroup==='GK'?'none':''};">
+        ↓ Copy to all outfield groups
+      </button>
+    </div>
+
+    ${profRow}
+
+    <div style="padding:0 20px;overflow-y:auto;flex-grow:1;">${gridsHtml}</div>
+
+    <div style="padding:12px 20px;background:#1e293b;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;">
+      <button onclick="weDownloadJson()" style="padding:6px 14px;background:#0f172a;color:#94a3b8;border:1px solid #334155;border-radius:6px;font-size:12px;cursor:pointer;">⬇ Download JSON</button>
+      <button onclick="weApply()" style="padding:6px 16px;background:#059669;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;">✓ Apply & Close</button>
+      <button onclick="closeWeightEditor()" style="padding:6px 14px;background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:6px;font-size:12px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>`;
+
+  modal.style.display = 'flex';
+}
+
+function closeWeightEditor() {
+  const modal = $('weight-editor-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function weShowTab(group) {
+  _weActiveTab = group;
+  document.querySelectorAll('.we-tab-btn').forEach(b => {
+    const active = b.dataset.g === group;
+    b.style.background   = active ? '#3b82f6' : '#0f172a';
+    b.style.color        = active ? '#fff'     : '#64748b';
+    b.style.borderColor  = active ? '#3b82f6'  : '#334155';
+  });
+  document.querySelectorAll('.we-grid').forEach(d => {
+    d.style.display = d.dataset.g === group ? 'flex' : 'none';
+  });
+  const copyBtn = $('we-copy-btn');
+  if (copyBtn) copyBtn.style.display = group === 'GK' ? 'none' : '';
+}
+
+function weBuildJson() {
+  const raw          = META_PRESET.raw || {};
+  const baseline     = raw.baseline ?? 8;
+  const defaultRange = 20 - baseline;
+  const posW = {}, newRanges = {}, newFrom = {};
+
+  // Read from _weSegments (editor source of truth)
+  for (const [g, gSegs] of Object.entries(_weSegments)) {
+    posW[g] = {};
+    for (const [attr, segs] of Object.entries(gSegs)) {
+      if (!segs || !segs.length) continue;
+      if (segs.length === 1) {
+        // Single segment → scalar weight (backward compatible)
+        const { from, to, pts } = segs[0];
+        if (pts !== 0) posW[g][attr] = pts;
+        const range = to - from;
+        if (range !== defaultRange) newRanges[attr] = range;
+        if (from !== baseline)      newFrom[attr]   = from;
+      } else {
+        // Multi-segment → array weight (only if at least one non-zero pts)
+        if (segs.some(s => s.pts !== 0)) {
+          posW[g][attr] = segs.map(({ from, to, pts }) => ({ from, to, pts }));
+        }
+      }
+    }
+  }
+
+  // Proficiency: serialize from _weProfSegs
+  let proficiencyTest;
+  if (_weProfSegs.length === 1) {
+    // Single segment → store in old scalar format (backward compat)
+    const { from, to, pts } = _weProfSegs[0];
+    const range = Math.max(1, to - from);
+    proficiencyTest = { points: pts, from, to, range };
+  } else {
+    // Multiple segments → store as segments array; also keep scalar fields for fallback readers
+    const top = _weProfSegs[0];
+    const range = Math.max(1, top.to - top.from);
+    proficiencyTest = {
+      points: top.pts, from: top.from, to: top.to, range,
+      segments: _weProfSegs.map(({ from, to, pts }) => ({ from, to, pts })),
+    };
+  }
+
+  const result = {
+    ...raw,
+    position_weights: posW,
+    proficiency_test: proficiencyTest,
+    name: (raw.name || 'Custom') + ' (edited)',
+  };
+  if (Object.keys(newRanges).length) result.attr_test_ranges = newRanges;
+  else delete result.attr_test_ranges;
+  if (Object.keys(newFrom).length) result.attr_test_from = newFrom;
+  else delete result.attr_test_from;
+  return result;
+}
+
+function weCopyToOutfield() {
+  const src = _weActiveTab;
+  if (!src || src === 'GK') return;
+  const srcSegs = _weSegments[src] || {};
+  ['DC','FB','DM','MC','WM','AM','ST'].filter(g => g !== src).forEach(g => {
+    if (!_weSegments[g]) _weSegments[g] = {};
+    for (const [attr, segs] of Object.entries(srcSegs)) {
+      _weSegments[g][attr] = segs.map(s => ({ ...s }));   // deep copy
+      weRenderAttrSegs(g, attr);
+    }
+  });
+  showToast('Weights copied to all outfield groups', 'check');
+}
+
+function weApply() {
+  loadAndApplyPreset(weBuildJson());
+  closeWeightEditor();
+}
+
+function weDownloadJson() {
+  const data = weBuildJson();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = (data.name || 'meta-preset').replace(/\s+/g, '_') + '.json';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// Async startup: try localStorage → fetch default_direct.json → BUILTIN_PRESET (already applied).
 (async () => {
   // 1. Restore last-used preset from localStorage
   try {
@@ -5261,23 +5943,26 @@ $('meta-preset-reset-btn').onclick = async () => {
     if (saved) {
       applyMetaPreset(JSON.parse(saved));
       updatePresetLabel();
+      populateMetaGroupSelect();
       // Players may already be rendered; re-render to pick up restored preset.
       if (state.players && state.players.length) renderTable();
       return;
     }
   } catch {}
-  // 2. Fetch the bundled default.json and apply it (upgrades hardcoded fallback in place)
+  // 2. Fetch the bundled default_direct.json and apply it (upgrades BUILTIN_PRESET in place)
   try {
-    const r = await fetch('/meta-presets/default.json');
+    const r = await fetch('/meta-presets/default_direct.json');
     if (r.ok) {
       applyMetaPreset(await r.json());
       updatePresetLabel();
-      // No re-render needed: default.json is identical to the hardcoded fallback.
+      populateMetaGroupSelect();
+      // No re-render needed: default_direct.json is identical to BUILTIN_PRESET.
       return;
     }
   } catch {}
-  // 3. Already running on hardcoded fallback — just update the label.
+  // 3. Already running on BUILTIN_PRESET — just update the label.
   updatePresetLabel();
+  populateMetaGroupSelect();
 })();
 
 // nieuwe data ophalen (trigger de plugin)
@@ -5315,7 +6000,7 @@ $('btn-fetch').onclick = async () => {
   } catch (e) {
     // Meestal: de lokale server is weg (achtergrondvenster → server afgesloten). Toon dat
     // duidelijk i.p.v. een raadselachtig "!"; herstart via het venster opnieuw openen.
-    console.error('Nieuwe data:', e);
+    console.error('btn-fetch:', e);
     b.className = 'scanning error';
     b.innerHTML = bannerMsg('warning', t('serverGone'));
     b.onclick = () => { b.className = 'hidden'; };
@@ -5367,20 +6052,11 @@ function setMode(mode) {
   if ($('tab-bestxi')) $('tab-bestxi').classList.toggle('active', isXi);
   if ($('tab-clubs')) $('tab-clubs').classList.toggle('active', isClubs);
 
-  $('fg-pitch').style.display = mode === 'staff' || isCustomView ? 'none' : '';
-  $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
-  buildGenderFilter();
-  $('fg-role').style.display = mode === 'staff' || isCustomView ? 'none' : '';
-  $('f-meta-row').style.display = mode === 'staff' ? 'none' : '';
-  $('f-metapa-row').style.display = mode === 'staff' ? 'none' : '';
-  $('fg-physical').style.display = mode === 'staff' ? 'none' : '';
-  $('f-wonderkid-row').style.display = mode === 'staff' ? 'none' : '';
-  renderDevSection();
   const isStaff = mode === 'staff';
-  $('fg-pitch').style.display = isStaff || isAn ? 'none' : '';
+  $('fg-pitch').style.display = isStaff || isCustomView ? 'none' : '';
   $('fg-staffrole').style.display = isStaff ? '' : 'none';
-  buildGenderFilter();   // spelers- en staflijst kunnen apart gemengd zijn
-  $('fg-role').style.display = isStaff || isAn ? 'none' : '';
+  $('fg-role').style.display = isStaff || isCustomView ? 'none' : '';
+  $('f-meta-group-row').style.display = isStaff ? 'none' : '';
   $('f-meta-row').style.display = isStaff ? 'none' : '';   // meta-score bestaat niet voor staf
   $('f-metapa-row').style.display = isStaff ? 'none' : '';
   // Staf heeft geen lengte, voet, PA-groei of speler-transferopties; die filters horen daar niet.
@@ -5390,7 +6066,8 @@ function setMode(mode) {
   $('f-fee-row').style.display = isStaff ? 'none' : '';
   $('f-interest-row').style.display = isStaff ? 'none' : '';
   $('f-tstatus-row').style.display = isStaff ? 'none' : '';
-  renderDevSection();   // historie wordt alleen voor spelers bijgehouden
+  buildGenderFilter();   // spelers- en staflijst kunnen apart gemengd zijn
+  renderDevSection();    // historie wordt alleen voor spelers bijgehouden
   renderIntakeBar();
 
   if (hiddenStatCol(state.sortKey)) { state.sortKey = mode === 'staff' ? 'wage' : 'ca'; state.sortDir = -1; }
