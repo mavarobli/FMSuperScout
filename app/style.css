@@ -746,6 +746,10 @@ path.dvl-v { stroke: var(--accent2); }
 .capa-ca { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #2f7fd4, var(--accent2)); border-radius: 4px; }
 .attr-row .v.grew { position: relative; }
 .attr-row .v.grew::after { content: '▲'; font-size: 8px; color: var(--accent); margin-left: 2px; vertical-align: top; }
+/* Meta-contribution indicator: (val − baseline) × coeff for the player's best position */
+.attr-contrib { flex: 0 0 auto; font-size: 0.72em; font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; opacity: 0.75; }
+.attr-contrib.pos { color: #46c46e; }
+.attr-contrib.neg { color: #e07070; }
 .potswitch { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; font-size: 12.5px; color: var(--text); cursor: pointer; }
 .potswitch.off { color: var(--muted); cursor: default; }
 .potswitch input { accent-color: var(--accent); }

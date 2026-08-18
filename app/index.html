@@ -21,8 +21,8 @@
       <svg class="star-ic" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55-4.76-4.64 6.58-.96z"/></svg>
       <span data-i18n="shortlist">Shortlist</span> <span id="sl-count">0</span></button>
     <button id="tab-analysis" class="tab" data-i18n="analysis">Analyse</button>
-    <button id="tab-bestxi" class="tab">Meilleur XI</button>
-    <button id="tab-clubs" class="tab">Clubs & Divisions</button>
+    <button id="tab-bestxi" class="tab" data-i18n="tabBestxi">Best XI</button>
+    <button id="tab-clubs" class="tab" data-i18n="tabClubs">Clubs & Divisions</button>
   </nav>
   <div id="club-badge" title="Klik = filter op jouw club"></div>
   <span id="update-pill" class="hidden"></span>
@@ -75,6 +75,7 @@
   <div class="set-row" style="gap:6px">
     <button id="meta-preset-load-btn" class="set-link" data-i18n="metaWeightsLoad" style="flex:1">Bestand laden…</button>
     <button id="meta-preset-reset-btn" class="set-link" data-i18n="metaWeightsReset" style="flex:1">Standaard herstellen</button>
+    <button id="meta-preset-edit-btn" class="set-link" style="flex:1">Edit weights</button>
   </div>
   <input type="file" id="meta-preset-file" accept=".json" style="display:none">
   <div class="set-div"></div>
@@ -110,6 +111,10 @@
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         <span data-i18n="presetSave">Huidige filters opslaan</span>
       </button>
+    </div>
+
+    <div class="fsection" id="f-meta-group-row">
+      <div class="frow"><span data-i18n="metaViewLabel">Show meta for position...</span><select id="f-meta-group"></select></div>
     </div>
 
     <div class="fsection" id="fg-pitch" data-sec="pitch">
@@ -324,6 +329,7 @@
 <div id="adv-modal" class="hidden"></div>
 <div id="compare-tray" class="hidden"></div>
 <div id="compare-modal" class="hidden"><div id="compare-inner"></div></div>
+<div id="weight-editor-modal" onclick="if(event.target.id==='weight-editor-modal')closeWeightEditor()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);z-index:10000;align-items:center;justify-content:center;padding:20px;"></div>
 <div id="toast" class="hidden"></div>
 <script src="nations.js"></script>
 <script src="app.js"></script>

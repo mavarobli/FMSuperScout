@@ -1,11 +1,15 @@
 {
   "_name": "FMSuperScout Direct (empirical, all positions unified)",
-  "_source": "Attribute testing on 38-match season distance — weight = Points improvement (attr 8→20, except JumpingReach 8→17).",
-  "_note": "No non-linearities. Proficiency is additive at weight 14.4 (attribute-like, not a multiplier). All outfield positions share one weight table; GK has its own.",
+  "_source": "Attribute testing on 38-match season distance — weight = Points improvement (attr 8→20, except JumpingReach 8→17). Proficiency: Natural(20) vs Accomplished(15) = +6 pts over 38 matches.",
+  "_note": "Points-contribution engine. score = Σ (attr−8) × (pts_test / (group_scale × test_range)) + (prof−20) × coeff_prof. Baseline 8, proficiency baseline 20 (Natural = no effect). Outfield scale=10, GK scale=1.",
 
   "name": "FMSuperScout Direct",
 
-  "proficiency_weight": 14.4,
+  "baseline": 8,
+  "proficiency_baseline": 20,
+  "group_scale": { "GK": 1, "DC": 10, "FB": 10, "DM": 10, "MC": 10, "WM": 10, "AM": 10, "ST": 10 },
+  "proficiency_test": { "points": 6, "range": 5 },
+  "attr_test_ranges": { "JumpingReach": 9 },
 
   "position_weights": {
     "GK": {
