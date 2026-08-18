@@ -1430,9 +1430,22 @@ function statusHtml(p) {
 const POS_ORDER = ['GK', 'DL', 'DC', 'DR', 'WBL', 'WBR', 'DM', 'ML', 'MC', 'MR', 'AML', 'AMC', 'AMR', 'ST'];
 const POS_RANK = Object.fromEntries(POS_ORDER.map((p, i) => [p, i]));
 function posRank(p) {
-  const arr = p.posArr || [];
-  if (!arr.length) return 99;
-  return Math.min(...arr.map(x => POS_RANK[x] ?? 98));   // rangschik op de meest verdedigende positie
+  const prof = p.posProficiency;
+  let positions;
+  if (prof && Object.keys(prof).length > 0) {
+    positions = Object.entries(prof)
+      .filter(([, v]) => v >= state.profThreshold)
+      .map(([pos]) => pos);
+    // Niets boven de drempel: val terug op de hoogst-getrainde positie
+    if (!positions.length) {
+      const best = Object.entries(prof).sort((a, b) => b[1] - a[1])[0];
+      positions = best ? [best[0]] : [];
+    }
+  } else {
+    positions = p.posArr || [];   // oude dump zonder proficiency-data
+  }
+  if (!positions.length) return 99;
+  return Math.min(...positions.map(x => POS_RANK[x] ?? 98));   // meest verdedigende gekwalificeerde positie
 }
 function isAttainable(p) {
   if (p.notForSale) return false;
