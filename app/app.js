@@ -1483,12 +1483,28 @@ const META_W = {
 // test grofweg een kwart van dat van veldspelers. Pressure is bij ons een
 // persoonlijkheidsveld (p.pressure), geen attrs-key; weightedMeta pakt hem daar.
 const META_GK_W = { Reflexes: 12.8, Agility: 8.0, Acceleration: 4.7, Pressure: 4.1, Pace: 3.5, AerialReach: 3.4 };
+
+// Attributen waarbij een HOGE waarde slecht is. Bij het gewogen gemiddelde wordt
+// (21 - waarde) gebruikt in plaats van de waarde zelf, zodat de schaal 1-20 intact
+// blijft: een 1 (beste) telt als 20, een 20 (slechtste) telt als 1.
+//
+// InjuryProneness en Dirtiness staan momenteel niet in META_W en tellen dus niet mee
+// in de meta-score. Deze set is alvast gedefinieerd zodat een toekomstige gewichtseditor
+// weet hoe hij ze moet behandelen.
+//
+// BELANGRIJK VOOR TOEKOMSTIGE BIJDRAGERS: voeg deze attributen NOOIT toe aan META_W met
+// een negatief gewicht. Negatieve gewichten breken de 1-20-schaal: de vloer zakt onder 0
+// en een speler met een slechte waarde (bijv. Dirtiness 20) wordt 20× harder gestraft dan
+// een speler met een goede waarde (Dirtiness 1) beloond wordt. Gebruik altijd een positief
+// gewicht in combinatie met de (21 - waarde)-inversie die META_ADVERSE bewaakt.
+const META_ADVERSE = new Set(['InjuryProneness', 'Dirtiness']);
+
 function weightedMeta(p, attrs) {
   const W = (p.posArr || []).includes('GK') ? META_GK_W : META_W;
   let sum = 0, w = 0;
   for (const k in W) {
     const v = k === 'Pressure' ? (p.pressure > 0 ? p.pressure : null) : attrs[k];
-    if (v != null) { sum += v * W[k]; w += W[k]; }
+    if (v != null) { sum += (META_ADVERSE.has(k) ? 21 - v : v) * W[k]; w += W[k]; }
   }
   return w ? sum / w : null;
 }
