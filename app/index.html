@@ -21,6 +21,8 @@
       <svg class="star-ic" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55-4.76-4.64 6.58-.96z"/></svg>
       <span data-i18n="shortlist">Shortlist</span> <span id="sl-count">0</span></button>
     <button id="tab-analysis" class="tab" data-i18n="analysis">Analyse</button>
+    <button id="tab-bestxi" class="tab">Meilleur XI</button>
+    <button id="tab-clubs" class="tab">Clubs & Divisions</button>
   </nav>
   <div id="club-badge" title="Klik = filter op jouw club"></div>
   <span id="update-pill" class="hidden"></span>
@@ -224,6 +226,8 @@
       </table>
     </div>
     <div id="analysis" class="hidden"></div>
+    <div id="bestxi" class="hidden"></div>
+    <div id="clubs-view" class="hidden" style="overflow-y: auto; height: 100%;"></div>
     <div id="empty-state">
       <div class="es-icon">
         <svg viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round">
@@ -257,6 +261,51 @@
 </div>
 
 <div id="donate-nudge" class="hidden"></div>
+<!-- Modale du Rapport Mercato avec Filtres Avancés -->
+<div id="mercatoModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: #0f172a; width: 100%; max-width: 1000px; height: 90vh; border: 1px solid #334155; border-radius: 16px; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden;">
+    
+    <div style="padding: 16px 20px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+      <h2 style="font-size: 18px; font-weight: bold; color: #fff; margin: 0;">Rapport Mercato & Cibles d'Amélioration</h2>
+      <button onclick="closeMercatoModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px 8px;">✕</button>
+    </div>
+
+    <div style="padding: 12px 20px; background: #1e293b/60; border-bottom: 1px solid #334155; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; flex-shrink: 0; font-size: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <span style="color: #94a3b8; font-size: 10px; font-weight: bold; text-transform: uppercase;">Intérêt Joueur min.</span>
+        <select id="mercato-filter-interest" onchange="openMercatoModal()" style="background: #0f172a; border: 1px solid #334155; color: #fff; padding: 4px 8px; border-radius: 6px;">
+          <option value="0">Tous (Pas de filtre)</option>
+          <option value="25">Faible / Fair (≥25)</option>
+          <option value="45">Redelijk / Fair (≥45)</option>
+          <option value="70">Fort / High (≥70)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <span style="color: #94a3b8; font-size: 10px; font-weight: bold; text-transform: uppercase;">Prix Max (€ / £)</span>
+        <input type="text" id="mercato-filter-price" placeholder="Ex: 20M" oninput="openMercatoModal()" style="background: #0f172a; border: 1px solid #334155; color: #fff; padding: 4px 8px; border-radius: 6px; width: 100px;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <span style="color: #94a3b8; font-size: 10px; font-weight: bold; text-transform: uppercase;">Uniquement Réalisable</span>
+        <label style="display: flex; align-items: center; gap: 6px; height: 26px; cursor: pointer; color: #e2e8f0; font-weight: bold;">
+          <input type="checkbox" id="mercato-filter-attainable" onchange="openMercatoModal()" style="width: 14px; height: 14px; accent-color: #059669;"> Liste/Libre/Fin contrat
+        </label>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <span style="color: #94a3b8; font-size: 10px; font-weight: bold; text-transform: uppercase;">Q/P Min</span>
+        <input type="number" id="mercato-filter-qp" placeholder="Ex: 0.5" step="0.1" oninput="openMercatoModal()" style="background: #0f172a; border: 1px solid #334155; color: #fff; padding: 4px 8px; border-radius: 6px; width: 80px;">
+      </div>
+    </div>
+
+    <div id="mercatoModalContent" style="padding: 20px; overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 12px;"></div>
+
+    <div style="padding: 12px 20px; background: #1e293b; border-top: 1px solid #334155; display: flex; justify-content: flex-end; flex-shrink: 0;">
+      <button onclick="closeMercatoModal()" style="background: #059669; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">Fermer</button>
+    </div>
+  </div>
+</div>
 <div id="preset-modal" class="hidden"></div>
 <div id="adv-modal" class="hidden"></div>
 <div id="compare-tray" class="hidden"></div>
