@@ -639,6 +639,8 @@ internal static class Dumper
         int lf = Attr(m, pl + (ulong)Fields.PLAO_ATTRS + Fields.FOOT_LEFT);
         int rf = Attr(m, pl + (ulong)Fields.PLAO_ATTRS + Fields.FOOT_RIGHT);
         e.Foot = (rf >= 14 && lf >= 14) ? "Beide" : (rf >= lf ? "Rechts" : "Links");
+        e.FootLeft  = lf;
+        e.FootRight = rf;
 
         // posities
         var pos = new List<(string k, int v)>();
@@ -647,10 +649,17 @@ internal static class Dumper
             int v = m.U8(pl + (ulong)Fields.PLAO_POSITIONS + (ulong)off);
             if (v >= 1) pos.Add((key, v));
         }
+        // Full list for scoring / Best XI — every position the player has trained in.
+        e.PosArr = pos.OrderByDescending(x => x.v).Select(x => x.k).ToList();
+        foreach (var (pk, pv) in pos) e.PosProficiency[pk] = pv;  // avoid net10 SDK ToDictionary overload conflict
+
+        // Display-only: Natural/Accomplished positions (original threshold filter).
         int top = pos.Count > 0 ? pos.Max(x => x.v) : 0;
-        e.PosArr = pos.Where(x => x.v >= System.Math.Max(15, top - 2)).OrderByDescending(x => x.v).Select(x => x.k).ToList();
-        if (e.PosArr.Count == 0 && pos.Count > 0)
-            e.PosArr = pos.OrderByDescending(x => x.v).Take(1).Select(x => x.k).ToList();
+        var dispPos = pos.Where(x => x.v >= System.Math.Max(15, top - 2))
+                         .OrderByDescending(x => x.v).Select(x => x.k).ToList();
+        if (dispPos.Count == 0 && pos.Count > 0)
+            dispPos = pos.OrderByDescending(x => x.v).Take(1).Select(x => x.k).ToList();
+        e.DisplayPos = string.Join(", ", dispPos);
 
         // Marktwaarde: 0x234 is FM's echte transferwaarde (geverifieerd via offset-discovery
         // tegen in-game bedragen); 0x238 is de vraagprijs (meestal niet ingesteld).
@@ -1056,10 +1065,19 @@ internal static class Dumper
         j.Prop("expires", p.Expires);
         if (isPlayer)
         {
-            j.Prop("pos", string.Join(", ", p.PosArr));
+            j.Prop("pos", p.DisplayPos);
             j.Key("posArr"); j.BeginArr(); foreach (var x in p.PosArr) j.Val(x); j.EndArr();
+            if (p.PosProficiency.Count > 0)
+            {
+                j.Key("posProficiency"); j.BeginObj();
+                foreach (var kv in p.PosProficiency.OrderByDescending(kv => kv.Value))
+                    j.Prop(kv.Key, (long)kv.Value);
+                j.EndObj();
+            }
             if (p.TeamType >= 0) j.Prop("teamType", p.TeamType);   // 0=1e, ~3=reserves, ≥10=jeugd
             j.Prop("foot", p.Foot);
+            j.Prop("footLeft",  p.FootLeft);
+            j.Prop("footRight", p.FootRight);
             if (p.Height > 0) j.Prop("height", p.Height);
             Money(j, "value", p.Value);
             // Vraagprijs = waardeveld. Een los opgeslagen "echte vraagprijs" bestaat niet:
@@ -1214,7 +1232,11 @@ internal sealed class Person
     public ushort Pa;
     public int Height;
     public string Foot;
+    public int FootLeft;   // raw 1-20 value; FootRight ≥ FootLeft → right-footed
+    public int FootRight;  // raw 1-20 value; ≥14 both → two-footed
     public List<string> PosArr = new();
+    public Dictionary<string, int> PosProficiency = new();  // position → proficiency (1-20), all trained positions
+    public string DisplayPos = "";                            // Natural/Accomplished only, for UI display
     public long Value;
     public long GuideValue;
     public long Wage;
