@@ -138,3 +138,16 @@ test('roleScore: betere attributen => hogere rolscore', () => {
   const sStrong = M.roleScore(strong, role);
   assert.ok(sStrong >= sWeak, `sterker profiel moet minstens even hoog scoren (${sStrong} vs ${sWeak})`);
 });
+
+test('advValue & advLabel: reads staff attributes for staff members', () => {
+  const staffMember = { id: 1, name: 'Test Scout', staffAttrs: { Aanvallen: 16, Oordeel_vermogen: 18 } };
+  assert.equal(M.advValue(staffMember, 'Oordeel_vermogen'), 18);
+  assert.equal(M.advValue(staffMember, 'Aanvallen'), 16);
+  assert.equal(M.advValue(staffMember, 'UnknownAttr'), null);
+
+  M.state.lang = 'en';
+  assert.equal(M.advLabel('Oordeel_vermogen'), 'Judging Player Ability');
+  M.state.lang = 'nl';
+  assert.equal(M.advLabel('Oordeel_vermogen'), 'Oordeel vermogen');
+});
+

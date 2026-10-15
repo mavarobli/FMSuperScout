@@ -20,6 +20,7 @@ function assertSameKeys(name, ref, other, lang) {
 for (const lang of LANGS) {
   test(`I18N.${lang}: zelfde sleutels als en`, () => assertSameKeys('I18N', M.I18N.en, M.I18N[lang], lang));
   test(`ATTR_LABEL.${lang}: zelfde sleutels als en`, () => assertSameKeys('ATTR_LABEL', M.ATTR_LABEL.en, M.ATTR_LABEL[lang], lang));
+  test(`STAFF_ATTR_LABEL.${lang}: same keys as en`, () => assertSameKeys('STAFF_ATTR_LABEL', M.STAFF_ATTR_LABEL.en, M.STAFF_ATTR_LABEL[lang], lang));
   test(`ROLE_LABEL.${lang}: zelfde sleutels als en`, () => assertSameKeys('ROLE_LABEL', M.ROLE_LABEL.en, M.ROLE_LABEL[lang], lang));
   test(`CARDL.${lang}: zelfde sleutels als en`, () => assertSameKeys('CARDL', M.CARDL.en, M.CARDL[lang], lang));
   test(`JOB_LABEL.${lang}: zelfde sleutels als en`, () => assertSameKeys('JOB_LABEL', M.JOB_LABEL.en, M.JOB_LABEL[lang], lang));
@@ -68,8 +69,24 @@ test('fmtWage: periode-omrekening vanaf weekloon', () => {
   M.state.wagePer = 'w';
 });
 
+test('staffAttrName: translates staff attributes per language', () => {
+  M.state.lang = 'en';
+  assert.equal(M.staffAttrName('Aanvallen'), 'Attacking');
+  assert.equal(M.staffAttrName('Oordeel_vermogen'), 'Judging Player Ability');
+  M.state.lang = 'de';
+  assert.equal(M.staffAttrName('Aanvallen'), 'Angriffsspiel');
+  assert.equal(M.staffAttrName('Tactische_kennis'), 'Taktikkenntnisse');
+  M.state.lang = 'fr';
+  assert.equal(M.staffAttrName('Fysiotherapie'), 'Kinésithérapie');
+  M.state.lang = 'nl';
+  assert.equal(M.staffAttrName('Oordeel_potentie'), 'Oordeel potentie');
+});
+
 test('i18n: geen lege vertaalwaarden', () => {
-  for (const lang of ['en', ...LANGS])
+  for (const lang of ['en', ...LANGS]) {
     for (const [k, v] of Object.entries(M.I18N[lang]))
       assert.ok(typeof v === 'string' && v.length > 0, `I18N.${lang}.${k} is leeg`);
+    for (const [k, v] of Object.entries(M.STAFF_ATTR_LABEL[lang]))
+      assert.ok(typeof v === 'string' && v.length > 0, `STAFF_ATTR_LABEL.${lang}.${k} is leeg`);
+  }
 });
