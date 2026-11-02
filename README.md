@@ -118,7 +118,8 @@ may use it).
 ### Mac
 
 FMSuperScout for Mac works with the **Steam version of FM27** on macOS 13 or newer, on Apple
-Silicon and Intel Macs (Intel is built but not yet tested; reports welcome).
+Silicon and Intel Macs. It is new and has only been tested on one M1 Mac so far (Intel not at
+all), so reports, good or bad, are very welcome.
 
 1. Download **[FMSuperScout-Mac.dmg](https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Mac.dmg)**,
    open it and drag FMSuperScout to Applications.

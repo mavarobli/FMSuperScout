@@ -2,6 +2,9 @@
 
 **FMSuperScout now runs on the Mac.** Football Manager 27 (Steam), Apple Silicon and Intel.
 
+Honest warning: the Mac version has been tested on exactly one Mac (an M1). It works there,
+but expect rough edges. If something breaks, an issue with your `mac.log` helps a lot.
+
 ## Mac
 
 Download `FMSuperScout-Mac.dmg`, open it and drag FMSuperScout to Applications.
