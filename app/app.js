@@ -115,7 +115,12 @@ const I18N = {
     dumping: 'Spelersdata inlezen…', dumpReady: 'Nieuwe data klaar, klik om te laden',
     dumpLoaded: 'Nieuwe data geladen',
     dumpError: 'Uitlezen mislukt', fmNotRunning: 'Start eerst Football Manager en laad je save.',
-    fmNoModule: 'Football Manager draait zonder FMSuperScout. Sluit FM en start het opnieuw via FMSuperScout.command (niet via Steam).',
+    fmNoModule: 'Football Manager draait zonder FMSuperScout. Sla je spel op, sluit FM en start het opnieuw met deze knop.',
+    macStartHint: 'Start Football Manager via FMSuperScout om nieuwe data te kunnen ophalen.',
+    startFm: 'Start Football Manager', fmStarting: 'Football Manager wordt gestart (eerst Steam, als dat nog dicht is)…',
+    fmStarted: 'Football Manager start op. Laad je save en haal dan nieuwe data op.',
+    fmNotFoundMac: 'Football Manager 27 niet gevonden. Op de Mac werkt FMSuperScout voorlopig alleen met de Steam-versie.',
+    fmStartFail: 'Football Manager starten lukte niet ({e}).',
     dumpIncomplete: 'De dump is onvolledig (FM was er waarschijnlijk nog mee bezig). Probeer het zo opnieuw.',
     reqNoPickup: 'Het verzoek wordt niet opgepikt. Is je save geladen? Probeer F9 in de game, of herstart FMSuperScout.',
     reqNoPickupMore: 'Blijft dit terugkomen? Lees de fix',
@@ -247,7 +252,12 @@ const I18N = {
     dumping: 'Reading player data…', dumpReady: 'New data ready, click to load',
     dumpLoaded: 'New data loaded',
     dumpError: 'Read failed', fmNotRunning: 'Start Football Manager and load your save first.',
-    fmNoModule: 'Football Manager is running without FMSuperScout. Quit FM and start it again with FMSuperScout.command (not from Steam).',
+    fmNoModule: 'Football Manager is running without FMSuperScout. Save your game, quit FM and start it again with this button.',
+    macStartHint: 'Start Football Manager through FMSuperScout to be able to fetch new data.',
+    startFm: 'Start Football Manager', fmStarting: 'Starting Football Manager (and Steam first, if it is closed)…',
+    fmStarted: 'Football Manager is starting. Load your save, then fetch new data.',
+    fmNotFoundMac: 'Football Manager 27 not found. On the Mac, FMSuperScout currently works with the Steam version only.',
+    fmStartFail: 'Could not start Football Manager ({e}).',
     dumpIncomplete: 'The dump is incomplete (FM was probably still writing it). Try again in a moment.',
     reqNoPickup: 'The request is not being picked up. Is your save loaded? Try F9 in the game, or restart FMSuperScout.',
     reqNoPickupMore: 'Keeps coming back? Read the fix',
@@ -379,7 +389,12 @@ const I18N = {
     dumping: 'Lecture des données…', dumpReady: 'Nouvelles données prêtes, cliquez pour charger',
     dumpLoaded: 'Nouvelles données chargées',
     dumpError: 'Échec de la lecture', fmNotRunning: 'Lancez d\'abord Football Manager et chargez votre sauvegarde.',
-    fmNoModule: 'Football Manager tourne sans FMSuperScout. Quittez FM et relancez-le avec FMSuperScout.command (pas depuis Steam).',
+    fmNoModule: 'Football Manager tourne sans FMSuperScout. Sauvegardez, quittez FM et relancez-le avec ce bouton.',
+    macStartHint: 'Lancez Football Manager via FMSuperScout pour pouvoir récupérer de nouvelles données.',
+    startFm: 'Lancer Football Manager', fmStarting: 'Lancement de Football Manager (et d\'abord de Steam, s\'il est fermé)…',
+    fmStarted: 'Football Manager démarre. Chargez votre sauvegarde, puis récupérez de nouvelles données.',
+    fmNotFoundMac: 'Football Manager 27 introuvable. Sur Mac, FMSuperScout ne fonctionne pour l\'instant qu\'avec la version Steam.',
+    fmStartFail: 'Impossible de lancer Football Manager ({e}).',
     dumpIncomplete: 'Le dump est incomplet (FM était sans doute encore occupé). Réessayez dans un instant.',
     reqNoPickup: 'La demande n\'est pas prise en compte. Sauvegarde chargée ? Essayez F9 dans le jeu, ou relancez FMSuperScout.',
     reqNoPickupMore: 'Ça revient sans cesse ? Lisez le correctif',
@@ -511,7 +526,12 @@ const I18N = {
     dumping: 'Spielerdaten werden gelesen…', dumpReady: 'Neue Daten bereit, zum Laden klicken',
     dumpLoaded: 'Neue Daten geladen',
     dumpError: 'Auslesen fehlgeschlagen', fmNotRunning: 'Starte zuerst Football Manager und lade deinen Spielstand.',
-    fmNoModule: 'Football Manager läuft ohne FMSuperScout. Beende FM und starte es erneut über FMSuperScout.command (nicht über Steam).',
+    fmNoModule: 'Football Manager läuft ohne FMSuperScout. Speichere, beende FM und starte es mit dieser Schaltfläche neu.',
+    macStartHint: 'Starte Football Manager über FMSuperScout, um neue Daten abrufen zu können.',
+    startFm: 'Football Manager starten', fmStarting: 'Football Manager wird gestartet (zuerst Steam, falls geschlossen)…',
+    fmStarted: 'Football Manager startet. Lade deinen Spielstand und rufe dann neue Daten ab.',
+    fmNotFoundMac: 'Football Manager 27 nicht gefunden. Auf dem Mac funktioniert FMSuperScout vorerst nur mit der Steam-Version.',
+    fmStartFail: 'Football Manager konnte nicht gestartet werden ({e}).',
     dumpIncomplete: 'Der Dump ist unvollständig (FM war vermutlich noch beschäftigt). Versuche es gleich noch einmal.',
     reqNoPickup: 'Die Anfrage wird nicht angenommen. Spielstand geladen? Versuche F9 im Spiel oder starte FMSuperScout neu.',
     reqNoPickupMore: 'Kommt das immer wieder? Lies den Fix',
@@ -4341,9 +4361,10 @@ $('btn-fetch').onclick = async () => {
   const b = $('banner');
   try {
     const st = await (await fetch('/api/fmstatus')).json();
+    if (!st.running && isMac) { showMacFmBanner('start'); return; }
     if (!st.running) { b.className = 'scanning error'; b.innerHTML = bannerMsg('warning', t('fmNotRunning')); b.onclick = null; return; }
     // Mac: FM via Steam gestart heeft de module niet; dan wordt het verzoek nooit opgepikt.
-    if (st.module === false) { b.className = 'scanning error'; b.innerHTML = bannerMsg('warning', t('fmNoModule')); b.onclick = null; return; }
+    if (st.module === false) { showMacFmBanner('nomodule'); return; }
     await fetch('/api/refresh', { method: 'POST' });
     fetchPending = true; fetchBaseDumpTime = lastDumpTime;
     b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('reqSent')); b.onclick = null;
@@ -4559,6 +4580,50 @@ async function initHeartbeat() {
   } catch { /* server weg */ }
 }
 initHeartbeat();
+
+// ---------- Mac: Football Manager starten via FMSuperScout ----------
+// Op de Mac leest FMSuperScout alleen als FM via FMSuperScout is gestart (de module laadt
+// mee bij het opstarten; zie docs/macos.md). Daarom een startknop in de banner.
+let isMac = false;
+function showMacFmBanner(kind) {   // 'start' = FM draait niet; 'nomodule' = FM draait zonder module
+  const b = $('banner');
+  b.className = kind === 'start' ? 'scanning' : 'scanning error';
+  b.innerHTML = bannerMsg(kind === 'start' ? 'ball' : 'warning', t(kind === 'start' ? 'macStartHint' : 'fmNoModule'))
+    + ` <button class="bn-act" id="btn-start-fm">${escHtml(t('startFm'))}</button>`;
+  b.onclick = null;
+  $('btn-start-fm').onclick = e => { e.stopPropagation(); startFm(); };
+}
+async function startFm() {
+  const b = $('banner');
+  b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('fmStarting')); b.onclick = null;
+  try {
+    const r = await (await fetch('/api/start-fm', { method: 'POST' })).json();
+    if (r.ok) {
+      b.className = 'done'; b.innerHTML = bannerMsg('check', t('fmStarted'));
+      b.onclick = () => { b.className = 'hidden'; };
+      setTimeout(() => { if (b.className === 'done') b.className = 'hidden'; }, 20000);
+    } else if (r.reason === 'running') showMacFmBanner('nomodule');
+    else {
+      b.className = 'scanning error';
+      b.innerHTML = bannerMsg('warning', r.reason === 'notfound' ? t('fmNotFoundMac') : tf('fmStartFail', { e: r.error || r.reason }));
+      b.onclick = () => { b.className = 'hidden'; };
+    }
+  } catch (e) {
+    b.className = 'scanning error'; b.innerHTML = bannerMsg('warning', tf('fmStartFail', { e: String(e.message || e) }));
+  }
+}
+async function initMac() {
+  try {
+    const st = await (await fetch('/api/status')).json();
+    if (st.platform !== 'darwin') return;
+    isMac = true;
+    document.body.classList.add('is-mac');
+    const fm = await (await fetch('/api/fmstatus')).json();
+    if (!fm.running) showMacFmBanner('start');
+    else if (fm.module === false) showMacFmBanner('nomodule');
+  } catch { /* server weg */ }
+}
+initMac();
 
 buildPitch();
 applyLang();

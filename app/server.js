@@ -70,6 +70,53 @@ function startScanWatcher() {
   } catch (e) { console.error('Scanner-wachter start niet:', e.message); }
 }
 
+// ---------- Football Manager starten (Mac) ----------
+// Op de Mac leest FMSuperScout ín FM: de lader (mac/loader) moet meeladen bij het starten,
+// via DYLD_INSERT_LIBRARIES. Dat kan alleen als wíj FM starten (Steam geeft zo'n instelling op
+// de Mac niet door). Node zelf is geen door SIP beschermd programma, dus de variabele komt aan.
+// De Mac-app geeft het pad van zijn lader mee (FMSS_LOADER); vanuit de broncode ligt hij naast app/.
+const FM27_APPID = '4530370';
+const MAC_LOADER = process.env.FMSS_LOADER || path.join(APP_DIR, '..', 'fmss_loader.dylib');
+const pexec = (cmd, args) => new Promise(r => execFile(cmd, args, (err, out) => r(err ? '' : String(out))));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let startingFm = null;   // lopende startpoging
+
+// fm.app in de standaard-Steambibliotheek of een andere Steambibliotheek, anders via Spotlight.
+async function findFmApp() {
+  const steam = path.join(os.homedir(), 'Library', 'Application Support', 'Steam');
+  const libs = [steam];
+  try {
+    const vdf = fs.readFileSync(path.join(steam, 'steamapps', 'libraryfolders.vdf'), 'utf8');
+    for (const m of vdf.matchAll(/"path"\s+"([^"]+)"/g)) libs.push(m[1]);
+  } catch { /* geen extra bibliotheken */ }
+  for (const lib of libs) {
+    const app = path.join(lib, 'steamapps', 'common', 'Football Manager 27', 'fm.app');
+    if (fs.existsSync(app)) return app;
+  }
+  const found = (await pexec('mdfind', ["kMDItemCFBundleIdentifier == 'com.SportsInteractive.FootballManager27'"])).split('\n')[0].trim();
+  return found || null;
+}
+
+async function startFmMac() {
+  if ((await pexec('pgrep', ['-x', 'Football Manager 27'])).trim()) return { ok: false, reason: 'running' };
+  if (!fs.existsSync(MAC_LOADER)) return { ok: false, reason: 'noloader' };
+  const app = await findFmApp();
+  if (!app) return { ok: false, reason: 'notfound' };
+  // Steam moet draaien (en ingelogd zijn), anders weigert FM te starten of start het
+  // zichzelf opnieuw via Steam, zonder module.
+  if (!(await pexec('pgrep', ['-x', 'steam_osx'])).trim()) {
+    spawn('open', ['-g', '-a', 'Steam'], { detached: true, stdio: 'ignore' }).unref();
+    for (let i = 0; i < 60 && !(await pexec('pgrep', ['-x', 'steam_osx'])).trim(); i++) await sleep(1000);
+    await sleep(8000);
+  }
+  const exe = path.join(app, 'Contents', 'MacOS', 'Football Manager 27');
+  spawn(exe, [], {
+    detached: true, stdio: 'ignore',
+    env: { ...process.env, SteamAppId: FM27_APPID, SteamGameId: FM27_APPID, DYLD_INSERT_LIBRARIES: MAC_LOADER },
+  }).unref();
+  return { ok: true };
+}
+
 // ---------- zelf-update ----------
 // POST /api/update-install downloadt de nieuwste Setup.exe uit onze GitHub-release,
 // verifieert de SHA-256 tegen het .sha256-asset uit dezelfde release en start dan de
@@ -424,6 +471,16 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ running }));
     });
+    return;
+  }
+
+  if (url.pathname === '/api/start-fm' && req.method === 'POST') {
+    // Mac: FM starten mét de FMSuperScout-module. Moet Steam eerst nog opstarten, dan duurt
+    // het antwoord ruim een minuut; de app toont zolang een melding.
+    const reply = (code, o) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+    if (!IS_MAC) return reply(404, { ok: false, reason: 'platform' });
+    startingFm = startingFm || startFmMac().finally(() => { startingFm = null; });   // dubbelklik = één FM
+    startingFm.then(r => reply(200, r), e => reply(200, { ok: false, reason: 'error', error: String(e.message || e) }));
     return;
   }
 
