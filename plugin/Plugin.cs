@@ -12,7 +12,7 @@ public class Plugin : BasePlugin
 {
     public const string Id = "com.mavarobli.fmsuperscout";
     public const string Name = "FMSuperScout";
-    public const string Version = "0.1.46";
+    public const string Version = "0.2.0";   // 0.2: gedeelde scan-kern met de scanner (mutex, layouts)
 
     internal static new ManualLogSource Log;
 
@@ -26,6 +26,11 @@ public class Plugin : BasePlugin
     public override void Load()
     {
         Log = base.Log;
+        Host.Kind = "plugin";
+        Host.Version = Version;
+        Host.Info = Log.LogInfo;
+        Host.Warn = Log.LogWarning;
+        Host.Error = Log.LogError;
         ClassInjector.RegisterTypeInIl2Cpp<HotkeyBehaviour>();
 
         var go = new GameObject("FMSuperScout");
@@ -94,7 +99,11 @@ public class Plugin : BasePlugin
         // IL2CPP-GC verplaatst objecten niet, dus de game bevriest niet tijdens het dumpen.
         System.Threading.Tasks.Task.Run(() =>
         {
-            try { Dumper.DumpAll(); }
+            try
+            {
+                if (!Dumper.TryDump(GameProcess.Current()))
+                    Log.LogInfo("Er loopt al een dump (externe scanner) — deze aanvraag overgeslagen.");
+            }
             catch (System.Exception e)
             {
                 Log.LogError($"Dump mislukt: {e}");

@@ -4,7 +4,7 @@
 
 <h1 align="center">FMSuperScout</h1>
 
-<p align="center">A fast, open source scouting tool for <strong>Football Manager 26</strong> (Windows).</p>
+<p align="center">A fast, open source scouting tool for <strong>Football Manager 27</strong> and <strong>26</strong> (Windows).</p>
 
 <p align="center">
   <a href="https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Setup.exe"><strong>Download the installer</strong></a>
@@ -16,16 +16,16 @@
 
 ---
 
-Press **F9** in your save and the full loaded database, 45,000+ players and staff, is pulled out
-of memory in about 10 seconds. Including what FM normally hides: **CA and PA**, hidden personality
+Press **F9** in your save and the full loaded database, 60,000+ players and staff, is pulled out
+of memory in about 6 seconds. Including what FM normally hides: **CA and PA**, hidden personality
 attributes and FM's **real transfer value**. After that everything is instant. Monster saves work
 too: 635k people across 100+ leagues loads in about 17 seconds.
 
-Two parts: a small **BepInEx plugin** that reads the database from inside the game, and a **local
-web app** where you search, filter and compare. No internet, no accounts, no ads, nothing leaves
-your PC.
+Two parts: a small **scanner** that reads the game's database from memory, and a **local web app**
+where you search, filter and compare. Nothing is installed into your game folder, no mod loader,
+no internet, no accounts, no ads, nothing leaves your PC.
 
-> Single-player use only. The plugin **only reads** memory, it never writes to the game.
+> Single-player use only. The scanner **only reads** memory, it never writes to the game.
 
 <p align="center">
   <img src="docs/img/players.jpg" alt="Player list sorted by the growth column, with the development and physical filters in the sidebar" width="90%">
@@ -95,27 +95,24 @@ Wonderkids get a gold card. Built for showing off that one insane regen.
 
 ## Install (end users)
 
-One installer does everything: the viewer app, the BepInEx mod layer **and** the in-game plugin.
-No coding needed, nothing else to download.
+One installer: the viewer app plus the scanner. No coding, nothing else to download, and nothing
+is added to your game folder.
 
 1. Download **[FMSuperScout-Setup.exe](https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Setup.exe)**
    (or pick a version from the [Releases](https://github.com/mavarobli/FMSuperScout/releases) page).
 2. Windows SmartScreen may warn about an unknown publisher, since the installer isn't code-signed.
    Click **More info → Run anyway**. Want to verify first? Check the file's SHA-256 against the
    release notes: `Get-FileHash .\FMSuperScout-Setup.exe -Algorithm SHA256`.
-3. Run it. The wizard finds your FM26 folder automatically (Steam incl. extra libraries, Epic and
-   Xbox/Game Pass in beta) and installs everything. Already using BepInEx for another mod? It is
-   left untouched; only the plugin DLL is added.
-4. Start FM26. **The first launch takes 1-3 minutes longer** and shows a black console window.
-   That's normal, the mod layer is generating its bindings. Your antivirus may ask about BepInEx:
-   that's the standard FM26 mod loader, allow it.
-5. Load your save, press **F9**, and open **FMSuperScout** from the Start menu.
+3. Run it.
+4. Start FM27 (or FM26) and load your save.
+5. Open **FMSuperScout** from the Start menu and click **New data**, or press **F9** in the game.
 
-To remove it: *Apps and features* → FMSuperScout. That removes the viewer and the plugin DLL;
-BepInEx stays (other mods may use it).
+To remove it: *Apps and features* → FMSuperScout. Coming from 1.5.0 or older? The old BepInEx
+plugin is no longer needed; uninstalling removes the plugin DLL, BepInEx itself stays (other mods
+may use it).
 
-Something not working (no players loaded, no console window)? See
-[TROUBLESHOOTING.md](TROUBLESHOOTING.md), or use **Report a problem** in the app's settings menu.
+Something not working? See [TROUBLESHOOTING.md](TROUBLESHOOTING.md), or use **Report a problem**
+in the app's settings menu.
 
 ## Run from source (developers)
 
@@ -126,8 +123,16 @@ node app/server.js       # then open http://localhost:8765
 npm test                 # run the model tests (zero dependency, node:test)
 ```
 
-Or double-click `Start FMSuperScout.cmd`. To build the standalone installer yourself (requires
-Inno Setup 6 and a local FM26 install with BepInEx as the payload source):
+Or double-click `Start FMSuperScout.cmd`. The scanner is C# (.NET 8) and shares its scan core
+(`core/`) with the legacy FM26 BepInEx plugin (`plugin/`):
+
+```bash
+dotnet build scanner -c Release        # dev build, picked up by app/server.js automatically
+dotnet publish scanner -c Release      # self-contained single exe -> scanner/dist/
+scanner/dist/FMSuperScout.Scanner.exe scan   # one dump of the running fm.exe
+```
+
+To build the standalone installer yourself (requires the .NET 8 SDK and Inno Setup 6):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File installer/build-exe.ps1
@@ -136,29 +141,18 @@ powershell -ExecutionPolicy Bypass -File installer/build-exe.ps1
 
 A viewer-only zip package is also available via `installer/build-package.ps1`.
 
-The plugin is C# (BepInEx 6, IL2CPP). It builds with a standard .NET SDK:
-
-```bash
-dotnet build plugin/FMSuperScout.csproj -c Release
-```
-
-Install the built DLL by copying `plugin/bin/Release/FMSuperScout.dll` to
-`<FM26>\BepInEx\plugins\` while the game is closed.
-
 ## Getting data out of Football Manager
 
-The app reads whatever the FMSuperScout plugin last dumped from your **active save**:
+The app reads whatever the scanner last dumped from your **active save**:
 
-1. Start FM26 and load your save.
-2. Press **F9** in-game (or click **⬇ New data** in the app).
+1. Start Football Manager and load your save.
+2. Press **F9** in-game, or click **⬇ New data** in the app.
 3. The data loads by itself as soon as the dump is ready. If a read fails, the app shows what
    went wrong instead of waiting forever.
 
-Data lives in `%LOCALAPPDATA%\FMSuperScout\` (`dump*.json`, `status.json`, `diagnostics.txt`).
-
-The setup exe installs the plugin for you. For development, `Installeer plugin.cmd` copies a
-freshly built DLL into the game folder. BepInEx only *adds* files to the FM folder, so it is
-fully reversible (or use Steam, Verify integrity of game files).
+F9 is picked up by a small watcher that starts with the app and stays active while Football
+Manager runs, also after you close the app. Data lives in `%LOCALAPPDATA%\FMSuperScout\`
+(`dump*.json`, `status.json`, `diagnostics.txt`, `scanner.log`).
 
 ## Accuracy
 
@@ -190,14 +184,16 @@ by the model tests in [`test/`](test/).
 | Path | Contents |
 |---|---|
 | `app/` | Local web app (Node, zero dependencies) |
-| `plugin/` | C# source of the BepInEx plugin |
+| `core/` | Shared C# scan core: memory reader, dumper, per-version memory layouts |
+| `scanner/` | External scanner (reads `fm.exe` from the outside; FM27 and FM26) |
+| `plugin/` | Legacy FM26 BepInEx plugin host (same core) |
 | `installer/` | Icon generator, launcher, PowerShell installer, package builder |
 | `test/` | Zero-dependency model tests (`npm test`) |
 | `docs/` | Value model, .fmf format, release notes and backlog |
 
 ## Where this fits
 
-FM26 has a healthy set of tools that read hidden data from memory, several of them very good and
+FM has a healthy set of tools that read hidden data from memory, several of them very good and
 several of them free. If you want to *edit* your save, want deep match statistics with xG and
 per-90s, or want an overlay inside the game itself, other tools do those things well and this one
 does not.

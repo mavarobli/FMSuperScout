@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Externe scanner: leest een draaiend fm.exe van buitenaf (ReadProcessMemory, alleen lezen).
+    Zelfde scan-kern als de BepInEx-plugin (../core), maar zonder mod-laag in de gamemap:
+    werkt op elke FM-versie waarvoor core/Fields.cs een layout heeft (FM26, FM27).
+
+    Release (zelfstandig, geen .NET-installatie nodig bij de gebruiker):
+      dotnet publish scanner -c Release
+      → scanner/dist/FMSuperScout.Scanner.exe
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <AssemblyName>FMSuperScout.Scanner</AssemblyName>
+    <RootNamespace>FMSuperScout</RootNamespace>
+    <Version>1.6.0</Version>
+    <Product>FMSuperScout</Product>
+    <Description>FMSuperScout scanner - reads Football Manager's database (read-only)</Description>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>..\installer\icon.ico</ApplicationIcon>
+    <DebugType>none</DebugType>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Grote scans: concurrent GC uit, workstation-GC — de scan is zelf al parallel. -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishDir>$(MSBuildThisFileDirectory)dist\</PublishDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\core\*.cs" />
+  </ItemGroup>
+
+</Project>

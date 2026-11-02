@@ -1,8 +1,8 @@
 {
   "name": "fmsuperscout",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
-  "description": "Local scouting viewer for Football Manager 26 (zero dependencies).",
+  "description": "Local scouting viewer for Football Manager 27 and 26 (zero dependencies).",
   "scripts": {
     "start": "node app/server.js",
     "test": "node --test test/*.test.js"

@@ -1,5 +1,5 @@
 // FMSuperScout — lokale server (geen dependencies nodig)
-// Serveert de web-app en de meest recente data-dump van de BepInEx-plugin.
+// Serveert de web-app en de meest recente data-dump (externe scanner of BepInEx-plugin).
 'use strict';
 
 const http = require('http');
@@ -41,6 +41,31 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
 };
+
+// ---------- externe scanner ----------
+// De scanner leest fm.exe van buitenaf (FM27, en FM26 ook zonder plugin). Zijn wachter
+// start mee met deze server: F9 in FM en "Nieuwe data" (request.flag) starten een scan.
+// Losgekoppeld (detached): hij blijft na het sluiten van de app actief zolang FM draait,
+// en stopt zelf zodra app én FM weg zijn (--parent). Is er al een wachter, dan stopt de
+// nieuwe direct (één tegelijk). Geen scanner gevonden: een FM26-plugin werkt nog steeds.
+// Geïnstalleerd staat hij naast node.exe; in de broncode kan zowel een publish- als een
+// build-versie bestaan: dan de nieuwste, anders draait de wachter stilletjes oude code.
+const SCANNER = process.env.FMSS_SCANNER || [
+  path.join(APP_DIR, '..', 'FMSuperScout.Scanner.exe'),                          // geïnstalleerd
+  path.join(APP_DIR, '..', 'scanner', 'dist', 'FMSuperScout.Scanner.exe'),        // dotnet publish
+  path.join(APP_DIR, '..', 'scanner', 'bin', 'Release', 'net8.0-windows', 'FMSuperScout.Scanner.exe'),
+].map(p => { try { return { p, t: fs.statSync(p).mtimeMs }; } catch { return null; } })
+  .filter(Boolean).sort((a, b) => b.t - a.t).map(x => x.p)[0] || null;
+
+function startScanWatcher() {
+  if (!SCANNER) return;
+  try {
+    const child = spawn(SCANNER, ['watch', '--parent', String(process.pid)], { stdio: 'ignore', windowsHide: true, detached: true });
+    child.on('error', e => console.error('Scanner-wachter start niet:', e.message));
+    child.unref();
+    console.log(`Scanner-wachter: ${SCANNER}`);
+  } catch (e) { console.error('Scanner-wachter start niet:', e.message); }
+}
 
 // ---------- zelf-update ----------
 // POST /api/update-install downloadt de nieuwste Setup.exe uit onze GitHub-release,
@@ -291,6 +316,7 @@ const server = http.createServer((req, res) => {
       dumpTime: dump ? dump.mtime : null,
       dumpSize: dump ? dump.size : null,   // uit latestDump: geen losse stat die kan racen met een F9-herschrijf
       appMode: APP_MODE,
+      scanner: !!SCANNER,
       plugin,
     }));
     return;
@@ -371,8 +397,8 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/fmstatus') {   // zie checkSetup hieronder voor de installatiestaat
-    // Draait Football Manager? (De plugin leeft in fm.exe, dus zonder draaiende game
-    // wordt een data-verzoek nooit opgepikt.)
+    // Draait Football Manager? Zonder draaiende game valt er niets te scannen (scanner)
+    // en wordt een data-verzoek nooit opgepikt (plugin).
     execFile('tasklist', ['/FI', 'IMAGENAME eq fm.exe', '/NH'], { windowsHide: true }, (err, out) => {
       const running = !err && /fm\.exe/i.test(out || '');
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -393,7 +419,10 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/refresh' && req.method === 'POST') {
-    // Schrijf een trigger-bestand; de plugin pollt hierop en start een dump.
+    // Schrijf een trigger-bestand; de scanner-wachter (of de plugin in fm.exe) pollt hierop
+    // en start een dump. Eerst de wachter (opnieuw) starten: is hij intussen gestopt of
+    // gecrasht, dan herstelt dit hem; draait hij al, dan stopt de nieuwe meteen.
+    startScanWatcher();
     try {
       fs.mkdirSync(DATA_DIR, { recursive: true });
       fs.writeFileSync(path.join(DATA_DIR, 'request.flag'), String(Date.now()));
@@ -475,7 +504,7 @@ const server = http.createServer((req, res) => {
     const dump = latestDump();
     if (!dump) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Nog geen dump gevonden. Druk in FM26 op de dump-hotkey (F9).' }));
+      res.end(JSON.stringify({ error: 'Nog geen dump gevonden. Laad je save in Football Manager en druk op F9.' }));
       return;
     }
     res.writeHead(200, {
@@ -543,5 +572,6 @@ server.on('error', err => {
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`FMSuperScout draait op ${URL_LOCAL}`);
   console.log(`Data-map: ${DATA_DIR}`);
+  startScanWatcher();
   if (APP_MODE) openApp();
 });

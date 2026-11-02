@@ -22,7 +22,8 @@ const state = {
   shortlist: new Set(jread('fmss_shortlist', [])),
   colCfg: jread('fmss_cols', {}),  // per modus: {order:[], hidden:[]}
   colW: jread('fmss_colw', {}),    // per modus: {kolomkey: breedte px}
-  advF: jread('fmss_adv', []),     // attribuutfilter-regels [{k,min,max}]
+  advF: jread('fmss_adv', []),     // attribuutfilter-regels [{k,min,max}] van de huidige modus
+  advStaff: jread('fmss_adv_staff', []),   // idem voor de stafmodus (eigen attributen)
   hist: null,        // {dates, refIdx, map: Map<uid,[caRef,paRef,firstIdx]>} uit /api/history/deltas
   histPeriod: localStorage.getItem('fmss_histperiod') || 'y1',
 };
@@ -40,7 +41,7 @@ try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.r
 // $: xe.com-koers uit diezelfde periode; verifieer tegen FM's eigen USD-weergave.
 const CUR_RATE = { '£': 1, '€': 1.16, '$': 1.35 };
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -60,9 +61,10 @@ const I18N = {
     alreadyDonated: 'Al gedoneerd?', neverAsk: 'Vraag het niet meer',
     supporterThanks: 'Dank je wel! Je hoort er niets meer over.',
     donateCta: '☕ Trakteer', donateLater: 'Later',
+    spTitle: 'Steun FMSuperScout', spIntro: 'FMSuperScout is gratis, open source en zonder advertenties. Vind je het handig? Zo kun je helpen:', spKofi: 'Trakteer op een koffie', spKofiSub: 'Via Ko-fi, elk bedrag is welkom', spStar: 'Geef een ster op GitHub', spStarSub: 'Gratis, en helpt anderen de tool te vinden', spShare: 'Deel met een vriend', spShareSub: 'Kopieert de downloadlink', spCopied: 'Downloadlink gekopieerd', spThanks: 'Je bent supporter. Bedankt!',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon',
-    esSetupTitle: 'Start Football Manager 26 eerst een keer',
+    esSetupTitle: 'Start Football Manager eerst een keer',
     esSetupBody: 'De eerste start na de installatie duurt 1 tot 3 minuten langer en toont een zwart consolevenster. Dat hoort zo: de mod-laag bouwt eenmalig zijn bestanden. Laat het venster open staan, ook als FM lijkt te hangen.',
     esSetupHint: 'Daarna laad je je save en druk je op F9. De volgende keren start FM gewoon weer normaal.',
     devDeltaHint: 'Verandering over de getoonde periode: de laatste meting min de eerste. Groen is vooruitgang, rood achteruitgang.',
@@ -112,16 +114,19 @@ const I18N = {
     reqSent: 'Spelersdata inlezen…',
     dumping: 'Spelersdata inlezen…', dumpReady: 'Nieuwe data klaar, klik om te laden',
     dumpLoaded: 'Nieuwe data geladen',
-    dumpError: 'Uitlezen mislukt', fmNotRunning: 'Start eerst Football Manager 26 en laad je save.',
-    dumpIncomplete: 'De dump is onvolledig (FM26 was er waarschijnlijk nog mee bezig). Probeer het zo opnieuw.',
-    reqNoPickup: 'FM26 pikt het verzoek niet op. Is je save geladen? Probeer anders F9 in de game, of herstart FM26.',
+    dumpError: 'Uitlezen mislukt', fmNotRunning: 'Start eerst Football Manager en laad je save.',
+    dumpIncomplete: 'De dump is onvolledig (FM was er waarschijnlijk nog mee bezig). Probeer het zo opnieuw.',
+    reqNoPickup: 'Het verzoek wordt niet opgepikt. Is je save geladen? Probeer F9 in de game, of herstart FMSuperScout.',
     reqNoPickupMore: 'Blijft dit terugkomen? Lees de fix',
-    scanStalled: 'De scan lijkt gestopt (is FM26 afgesloten of gecrasht?). Herstart FM26 en probeer opnieuw.',
+    scanStalled: 'De scan lijkt gestopt (is FM afgesloten of gecrasht?). Herstart FM en probeer opnieuw.',
     serverGone: 'Geen verbinding met de lokale server. Sluit dit venster en start FMSuperScout opnieuw.',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_loan: 'te huur', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
+    sg_coaching: 'Training', sg_mental: 'Mentaal', sg_knowledge: 'Kennis', sg_medical: 'Medisch & data',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
     staffAttrs: 'Staf-attributen',
+    posAccomplished: 'bedreven (geen natuurlijke positie)',
+    quickFilters: 'Snelfilters', qfWonderkid: 'Wonderkids', qfExpiring: 'Einde contract', qfSale: 'Te koop', activeCount: 'Actief · {n}', noActiveFilters: 'Geen filters actief. Kies een snelfilter, tik posities aan op het veld of open een sectie.', resultsOf: 'van {total} {what}', railOpen: 'Filters tonen',
     clearAll: 'alles wissen', chipSearch: 'Zoek',
     loading: 'Data laden…',
     parsing: 'Data verwerken…',
@@ -129,11 +134,11 @@ const I18N = {
     esErrBig: 'Er staat wél een dump op schijf, maar de app kon hem niet inlezen. Dit gebeurt vooral bij een heel grote save (veel competities geladen tegelijk). Meld het met de knop hieronder, dan kijken we ernaar.',
     esErrSize: 'Dump op schijf: {mb} MB',
     esErrReload: 'Opnieuw proberen',
-    esErrCrash: 'De vorige laadpoging is vastgelopen, waarschijnlijk door te weinig vrij geheugen. Tip: sluit FM26 (de dump staat al op schijf, de game is niet nodig om te kijken) en klik daarna op Opnieuw proberen.',
-    step1: 'Start <b>FM26</b> en laad je save',
+    esErrCrash: 'De vorige laadpoging is vastgelopen, waarschijnlijk door te weinig vrij geheugen. Tip: sluit FM (de dump staat al op schijf, de game is niet nodig om te kijken) en klik daarna op Opnieuw proberen.',
+    step1: 'Start <b>FM</b> en laad je save',
     step2: 'Druk in de game op <kbd>F9</kbd>, of klik hier op <b>Nieuwe data</b>',
     step3: 'De data laadt vanzelf zodra de dump klaar is',
-    playersWord: 'spelers', staffWord: 'staf', clickClubFilter: 'Klik = filter op jouw club', repWord: 'reputatie',
+    playersWord: 'spelers', staffWord: 'staf', clickClubFilter: 'Klik = filter op jouw club', mgrPick: 'Netwerk-save: welke manager ben jij?', repWord: 'reputatie',
     roleFit: 'Tactische rol', roleColHdr: 'Rol', roleAny: 'Geen rol gekozen', bestRoles: 'Beste rollen',
     compare: 'Vergelijk', comparing: 'Vergelijken', addCompare: 'Vergelijk', compareFull: 'Max. 3 spelers',
     cmpTitle: 'Spelervergelijking', cmpValue: 'Waarde', cmpTopRole: 'Beste rol',
@@ -170,7 +175,7 @@ const I18N = {
     metaHint: 'Gewogen gemiddelde (1-20) van de attributen die volgens FM-Arena\'s match-engine-tests wedstrijden winnen; Snelheid en Versnelling tellen veruit het zwaarst. Keepers: eigen weging uit de keeperstest (Reflexen, Behendigheid).\n\n15+ elite, 13-15 sterk, 11-13 degelijk. Bij gelijke CA presteert de hoogste Meta meestal beter.',
     metaPaHint: 'Dezelfde meta-weging, toegepast op de attributen die hij op zijn potentieel (PA) naar verwachting haalt. Projectie volgt het groeiprofiel van zijn positiegroep; fysieke groei stopt na 23.\n\nUitontwikkeld = gelijk aan Meta. Sorteer hierop voor de meta-toppers van morgen.',
     verWarn: 'FM-versie {v} gedetecteerd; de uitlezing is geijkt op {s}.x. Data mogelijk onbetrouwbaar tot een update van FMSuperScout.',
-    verWarnOldDump: 'Deze data komt van een oudere FMSuperScout-plugin. Alles werkt, maar haal verse data op (F9 in FM26 met je save geladen) voor het beste resultaat.',
+    verWarnOldDump: 'Deze data komt van een oudere FMSuperScout-plugin. Alles werkt, maar haal verse data op (F9 in FM met je save geladen) voor het beste resultaat.',
   },
   en: {
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
@@ -187,9 +192,10 @@ const I18N = {
     alreadyDonated: 'Already donated?', neverAsk: 'Don\'t ask again',
     supporterThanks: 'Thank you! You won\'t hear about this again.',
     donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
+    spTitle: 'Support FMSuperScout', spIntro: 'FMSuperScout is free, open source and ad-free. Find it useful? Here is how you can help:', spKofi: 'Buy me a coffee', spKofiSub: 'Through Ko-fi, any amount is welcome', spStar: 'Star it on GitHub', spStarSub: 'Free, and helps others find the tool', spShare: 'Share with a friend', spShareSub: 'Copies the download link', spCopied: 'Download link copied', spThanks: 'You are a supporter. Thank you!',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage',
-    esSetupTitle: 'Start Football Manager 26 once first',
+    esSetupTitle: 'Start Football Manager once first',
     esSetupBody: 'The first launch after installing takes 1 to 3 minutes longer and shows a black console window. That is normal: the mod layer builds its files once. Leave the window open, even if FM looks stuck.',
     esSetupHint: 'After that, load your save and press F9. Later launches are back to normal speed.',
     devDeltaHint: 'Change over the period shown: the last reading minus the first. Green is progress, red is decline.',
@@ -239,16 +245,19 @@ const I18N = {
     reqSent: 'Reading player data…',
     dumping: 'Reading player data…', dumpReady: 'New data ready, click to load',
     dumpLoaded: 'New data loaded',
-    dumpError: 'Read failed', fmNotRunning: 'Start Football Manager 26 and load your save first.',
-    dumpIncomplete: 'The dump is incomplete (FM26 was probably still writing it). Try again in a moment.',
-    reqNoPickup: 'FM26 is not picking up the request. Is your save loaded? Try F9 in the game, or restart FM26.',
+    dumpError: 'Read failed', fmNotRunning: 'Start Football Manager and load your save first.',
+    dumpIncomplete: 'The dump is incomplete (FM was probably still writing it). Try again in a moment.',
+    reqNoPickup: 'The request is not being picked up. Is your save loaded? Try F9 in the game, or restart FMSuperScout.',
     reqNoPickupMore: 'Keeps coming back? Read the fix',
-    scanStalled: 'The scan appears to have stopped (was FM26 closed, or did it crash?). Restart FM26 and try again.',
+    scanStalled: 'The scan appears to have stopped (was FM closed, or did it crash?). Restart FM and try again.',
     serverGone: 'Lost connection to the local server. Close this window and start FMSuperScout again.',
     tag_free: 'free', tag_listed: 'listed', tag_loan: 'for loan', tag_rel: 'released', tag_nfs: 'not for sale',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
+    sg_coaching: 'Coaching', sg_mental: 'Mental', sg_knowledge: 'Knowledge', sg_medical: 'Medical & data',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
     staffAttrs: 'Staff attributes',
+    posAccomplished: 'accomplished (not a natural position)',
+    quickFilters: 'Quick filters', qfWonderkid: 'Wonderkids', qfExpiring: 'Contract ending', qfSale: 'For sale', activeCount: 'Active · {n}', noActiveFilters: 'No filters active. Pick a quick filter, tap positions on the pitch or open a section.', resultsOf: 'of {total} {what}', railOpen: 'Show filters',
     clearAll: 'clear all', chipSearch: 'Search',
     loading: 'Loading data…',
     parsing: 'Processing data…',
@@ -256,11 +265,11 @@ const I18N = {
     esErrBig: 'There is a dump on disk, but the app could not read it. This mostly happens with a very large save (many leagues loaded at once). Report it with the button below and we will look into it.',
     esErrSize: 'Dump on disk: {mb} MB',
     esErrReload: 'Try again',
-    esErrCrash: 'The previous load attempt crashed, most likely because the system ran out of free memory. Tip: close FM26 (the dump is already on disk, the game is not needed for viewing), then click Try again.',
-    step1: 'Start <b>FM26</b> and load your save',
+    esErrCrash: 'The previous load attempt crashed, most likely because the system ran out of free memory. Tip: close FM (the dump is already on disk, the game is not needed for viewing), then click Try again.',
+    step1: 'Start <b>FM</b> and load your save',
     step2: 'Press <kbd>F9</kbd> in-game, or click <b>New data</b> here',
     step3: 'The data loads automatically once the dump is ready',
-    playersWord: 'players', staffWord: 'staff', clickClubFilter: 'Click = filter on your club', repWord: 'reputation',
+    playersWord: 'players', staffWord: 'staff', clickClubFilter: 'Click = filter on your club', mgrPick: 'Network save: which manager are you?', repWord: 'reputation',
     roleFit: 'Tactical role', roleColHdr: 'Role', roleAny: 'No role selected', bestRoles: 'Best roles',
     compare: 'Compare', comparing: 'Comparing', addCompare: 'Compare', compareFull: 'Max. 3 players',
     cmpTitle: 'Player comparison', cmpValue: 'Value', cmpTopRole: 'Best role',
@@ -297,7 +306,7 @@ const I18N = {
     metaHint: 'Weighted average (1-20) of the attributes that win matches according to FM-Arena\'s match-engine tests; Pace and Acceleration count heaviest by far. Goalkeepers: own weighting from the keeper test (Reflexes, Agility).\n\n15+ elite, 13-15 strong, 11-13 decent. At equal CA the higher Meta usually performs better.',
     metaPaHint: 'The same meta weighting, applied to the attributes he is expected to reach at his potential (PA). The projection follows his position group\'s growth profile; physical growth stops after 23.\n\nFully developed = same as Meta. Sort on this for tomorrow\'s meta stars.',
     verWarn: 'FM version {v} detected; memory reading is calibrated for {s}.x. Data may be unreliable until FMSuperScout is updated.',
-    verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM26 with your save loaded) for the best results.',
+    verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM with your save loaded) for the best results.',
   },
   fr: {
     players: 'Joueurs', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Nom ou club…',
@@ -314,9 +323,10 @@ const I18N = {
     alreadyDonated: 'Déjà donné ?', neverAsk: 'Ne plus demander',
     supporterThanks: 'Merci ! Vous n\'en entendrez plus parler.',
     donateCta: '☕ Offrir un café', donateLater: 'Plus tard',
+    spTitle: 'Soutenir FMSuperScout', spIntro: 'FMSuperScout est gratuit, open source et sans publicité. Il vous est utile ? Voici comment aider :', spKofi: 'Offrir un café', spKofiSub: 'Via Ko-fi, tout montant est bienvenu', spStar: 'Mettre une étoile sur GitHub', spStarSub: 'Gratuit, et aide d\'autres joueurs à le trouver', spShare: 'Partager avec un ami', spShareSub: 'Copie le lien de téléchargement', spCopied: 'Lien de téléchargement copié', spThanks: 'Vous êtes supporter. Merci !',
     position: 'Poste', clear: 'effacer', staffrole: 'Rôle du staff', quality: 'Qualité et âge',
     age: 'Âge', financial: 'Finances', maxvalue: 'Valeur max.', maxfee: 'Prix demandé max.', maxwage: 'Salaire max.',
-    esSetupTitle: 'Lancez d\'abord Football Manager 26 une fois',
+    esSetupTitle: 'Lancez d\'abord Football Manager une fois',
     esSetupBody: 'Le premier lancement après l\'installation prend 1 à 3 minutes de plus et affiche une console noire. C\'est normal : la couche de mods génère ses fichiers une seule fois. Laissez la fenêtre ouverte, même si FM semble figé.',
     esSetupHint: 'Ensuite chargez votre sauvegarde et appuyez sur F9. Les lancements suivants seront normaux.',
     devDeltaHint: 'Évolution sur la période affichée : dernière mesure moins la première. Vert = progrès, rouge = recul.',
@@ -366,16 +376,19 @@ const I18N = {
     reqSent: 'Lecture des données…',
     dumping: 'Lecture des données…', dumpReady: 'Nouvelles données prêtes, cliquez pour charger',
     dumpLoaded: 'Nouvelles données chargées',
-    dumpError: 'Échec de la lecture', fmNotRunning: 'Lancez d\'abord Football Manager 26 et chargez votre sauvegarde.',
-    dumpIncomplete: 'Le dump est incomplet (FM26 était sans doute encore occupé). Réessayez dans un instant.',
-    reqNoPickup: 'FM26 ne reçoit pas la demande. Sauvegarde chargée ? Essayez F9 dans le jeu, ou relancez FM26.',
+    dumpError: 'Échec de la lecture', fmNotRunning: 'Lancez d\'abord Football Manager et chargez votre sauvegarde.',
+    dumpIncomplete: 'Le dump est incomplet (FM était sans doute encore occupé). Réessayez dans un instant.',
+    reqNoPickup: 'La demande n\'est pas prise en compte. Sauvegarde chargée ? Essayez F9 dans le jeu, ou relancez FMSuperScout.',
     reqNoPickupMore: 'Ça revient sans cesse ? Lisez le correctif',
-    scanStalled: 'Le scan semble arrêté (FM26 fermé ou planté ?). Relancez FM26 et réessayez.',
+    scanStalled: 'Le scan semble arrêté (FM fermé ou planté ?). Relancez FM et réessayez.',
     serverGone: 'Pas de connexion au serveur local. Fermez cette fenêtre et relancez FMSuperScout.',
     tag_free: 'libre', tag_listed: 'transférable', tag_loan: 'à prêter', tag_rel: 'libéré', tag_nfs: 'pas à vendre',
     colHint: 'Glissez pour déplacer · clic droit pour les colonnes', colsTitle: 'Colonnes affichées', colsReset: 'Rétablir par défaut',
+    sg_coaching: 'Entraînement', sg_mental: 'Mental', sg_knowledge: 'Connaissances', sg_medical: 'Médical & données',
     g_technical: 'Technique', g_setpieces: 'Coups de pied arrêtés', g_mental: 'Mental', g_physical: 'Physique', g_goalkeeping: 'Gardien',
     staffAttrs: 'Attributs du staff',
+    posAccomplished: 'compétent (pas un poste naturel)',
+    quickFilters: 'Filtres rapides', qfWonderkid: 'Pépites', qfExpiring: 'Fin de contrat', qfSale: 'À vendre', activeCount: 'Actifs · {n}', noActiveFilters: 'Aucun filtre actif. Choisissez un filtre rapide, touchez des postes sur le terrain ou ouvrez une section.', resultsOf: 'sur {total} {what}', railOpen: 'Afficher les filtres',
     clearAll: 'tout effacer', chipSearch: 'Rechercher',
     loading: 'Chargement…',
     parsing: 'Traitement…',
@@ -383,11 +396,11 @@ const I18N = {
     esErrBig: 'Un dump existe sur le disque, mais l\'app n\'a pas pu le lire. Cela arrive surtout avec une très grosse sauvegarde (beaucoup de championnats chargés). Signalez-le avec le bouton ci-dessous.',
     esErrSize: 'Dump sur disque : {mb} Mo',
     esErrReload: 'Réessayer',
-    esErrCrash: 'Le chargement précédent a échoué, probablement par manque de mémoire. Astuce : fermez FM26 (le dump est déjà sur le disque) puis cliquez sur Réessayer.',
-    step1: 'Lancez <b>FM26</b> et chargez votre sauvegarde',
+    esErrCrash: 'Le chargement précédent a échoué, probablement par manque de mémoire. Astuce : fermez FM (le dump est déjà sur le disque) puis cliquez sur Réessayer.',
+    step1: 'Lancez <b>FM</b> et chargez votre sauvegarde',
     step2: 'Appuyez sur <kbd>F9</kbd> dans le jeu, ou cliquez ici sur <b>Nouvelles données</b>',
     step3: 'Les données se chargent dès que le dump est prêt',
-    playersWord: 'joueurs', staffWord: 'staff', clickClubFilter: 'Clic = filtrer sur votre club', repWord: 'réputation',
+    playersWord: 'joueurs', staffWord: 'staff', clickClubFilter: 'Clic = filtrer sur votre club', mgrPick: 'Partie en réseau : quel manager êtes-vous ?', repWord: 'réputation',
     roleFit: 'Rôle tactique', roleColHdr: 'Rôle', roleAny: 'Aucun rôle choisi', bestRoles: 'Meilleurs rôles',
     compare: 'Comparer', comparing: 'Comparaison', addCompare: 'Comparer', compareFull: '3 joueurs max.',
     cmpTitle: 'Comparaison de joueurs', cmpValue: 'Valeur', cmpTopRole: 'Meilleur rôle',
@@ -424,7 +437,7 @@ const I18N = {
     metaHint: 'Moyenne pondérée (1-20) des attributs qui gagnent des matchs selon les tests du moteur de FM-Arena ; Vitesse et Accélération pèsent de loin le plus lourd. Gardiens : pondération propre issue du test des gardiens (Réflexes, Agilité).\n\n15+ élite, 13-15 fort, 11-13 correct. À CA égale, le Méta le plus haut performe en général mieux.',
     metaPaHint: 'La même pondération méta, appliquée aux attributs qu\'il devrait atteindre à son potentiel (PA). La projection suit le profil de progression de son groupe de postes ; le physique cesse de progresser après 23 ans.\n\nJoueur abouti = identique au Méta. Triez dessus pour trouver les stars méta de demain.',
     verWarn: 'Version FM {v} détectée ; la lecture est calibrée pour {s}.x. Données possiblement peu fiables avant une mise à jour de FMSuperScout.',
-    verWarnOldDump: 'Ces données viennent d\'un plugin FMSuperScout plus ancien. Tout fonctionne, mais rechargez des données fraîches (F9 dans FM26, sauvegarde chargée) pour un meilleur résultat.',
+    verWarnOldDump: 'Ces données viennent d\'un plugin FMSuperScout plus ancien. Tout fonctionne, mais rechargez des données fraîches (F9 dans FM, sauvegarde chargée) pour un meilleur résultat.',
   },
   de: {
     players: 'Spieler', staff: 'Mitarbeiter', shortlist: 'Shortlist', searchph: 'Name oder Verein…',
@@ -441,9 +454,10 @@ const I18N = {
     alreadyDonated: 'Schon gespendet?', neverAsk: 'Nicht mehr fragen',
     supporterThanks: 'Danke! Du hörst nichts mehr davon.',
     donateCta: '☕ Kaffee spendieren', donateLater: 'Später',
+    spTitle: 'FMSuperScout unterstützen', spIntro: 'FMSuperScout ist kostenlos, Open Source und werbefrei. Nützlich? So kannst du helfen:', spKofi: 'Einen Kaffee spendieren', spKofiSub: 'Über Ko-fi, jeder Betrag ist willkommen', spStar: 'Auf GitHub einen Stern geben', spStarSub: 'Kostenlos, und hilft anderen, das Tool zu finden', spShare: 'Mit Freunden teilen', spShareSub: 'Kopiert den Download-Link', spCopied: 'Download-Link kopiert', spThanks: 'Du bist Unterstützer. Danke!',
     position: 'Position', clear: 'leeren', staffrole: 'Mitarbeiterrolle', quality: 'Qualität & Alter',
     age: 'Alter', financial: 'Finanzen', maxvalue: 'Max. Wert', maxfee: 'Max. Forderung', maxwage: 'Max. Gehalt',
-    esSetupTitle: 'Starte Football Manager 26 zuerst einmal',
+    esSetupTitle: 'Starte Football Manager zuerst einmal',
     esSetupBody: 'Der erste Start nach der Installation dauert 1 bis 3 Minuten länger und zeigt ein schwarzes Konsolenfenster. Das ist normal: Die Mod-Ebene erzeugt einmalig ihre Dateien. Fenster offen lassen, auch wenn FM zu hängen scheint.',
     esSetupHint: 'Danach Spielstand laden und F9 drücken. Die nächsten Starts laufen wieder normal.',
     devDeltaHint: 'Veränderung im angezeigten Zeitraum: letzte Messung minus erste. Grün = Fortschritt, Rot = Rückschritt.',
@@ -493,16 +507,19 @@ const I18N = {
     reqSent: 'Spielerdaten werden gelesen…',
     dumping: 'Spielerdaten werden gelesen…', dumpReady: 'Neue Daten bereit, zum Laden klicken',
     dumpLoaded: 'Neue Daten geladen',
-    dumpError: 'Auslesen fehlgeschlagen', fmNotRunning: 'Starte zuerst Football Manager 26 und lade deinen Spielstand.',
-    dumpIncomplete: 'Der Dump ist unvollständig (FM26 war vermutlich noch beschäftigt). Versuche es gleich noch einmal.',
-    reqNoPickup: 'FM26 nimmt die Anfrage nicht an. Spielstand geladen? Versuche F9 im Spiel oder starte FM26 neu.',
+    dumpError: 'Auslesen fehlgeschlagen', fmNotRunning: 'Starte zuerst Football Manager und lade deinen Spielstand.',
+    dumpIncomplete: 'Der Dump ist unvollständig (FM war vermutlich noch beschäftigt). Versuche es gleich noch einmal.',
+    reqNoPickup: 'Die Anfrage wird nicht angenommen. Spielstand geladen? Versuche F9 im Spiel oder starte FMSuperScout neu.',
     reqNoPickupMore: 'Kommt das immer wieder? Lies den Fix',
-    scanStalled: 'Der Scan scheint gestoppt (FM26 beendet oder abgestürzt?). Starte FM26 neu und versuche es erneut.',
+    scanStalled: 'Der Scan scheint gestoppt (FM beendet oder abgestürzt?). Starte FM neu und versuche es erneut.',
     serverGone: 'Keine Verbindung zum lokalen Server. Schließe dieses Fenster und starte FMSuperScout neu.',
     tag_free: 'vereinslos', tag_listed: 'Transferliste', tag_loan: 'zu verleihen', tag_rel: 'freigestellt', tag_nfs: 'unverkäuflich',
     colHint: 'Ziehen zum Verschieben · Rechtsklick für Spalten', colsTitle: 'Spalten anzeigen', colsReset: 'Standard wiederherstellen',
+    sg_coaching: 'Training', sg_mental: 'Mental', sg_knowledge: 'Wissen', sg_medical: 'Medizin & Daten',
     g_technical: 'Technik', g_setpieces: 'Standards', g_mental: 'Mental', g_physical: 'Physis', g_goalkeeping: 'Torwart',
     staffAttrs: 'Mitarbeiter-Attribute',
+    posAccomplished: 'erfahren (keine natürliche Position)',
+    quickFilters: 'Schnellfilter', qfWonderkid: 'Wunderkinder', qfExpiring: 'Vertragsende', qfSale: 'Zu verkaufen', activeCount: 'Aktiv · {n}', noActiveFilters: 'Keine Filter aktiv. Wähle einen Schnellfilter, tippe Positionen auf dem Feld an oder öffne einen Abschnitt.', resultsOf: 'von {total} {what}', railOpen: 'Filter anzeigen',
     clearAll: 'alles leeren', chipSearch: 'Suchen',
     loading: 'Daten werden geladen…',
     parsing: 'Daten werden verarbeitet…',
@@ -510,11 +527,11 @@ const I18N = {
     esErrBig: 'Auf der Festplatte liegt ein Dump, aber die App konnte ihn nicht lesen. Das passiert vor allem bei sehr großen Spielständen (viele Ligen gleichzeitig geladen). Melde es mit dem Button unten.',
     esErrSize: 'Dump auf Festplatte: {mb} MB',
     esErrReload: 'Erneut versuchen',
-    esErrCrash: 'Der letzte Ladeversuch ist hängen geblieben, vermutlich wegen zu wenig freiem Speicher. Tipp: Schließe FM26 (der Dump liegt schon auf der Festplatte) und klicke dann auf Erneut versuchen.',
-    step1: 'Starte <b>FM26</b> und lade deinen Spielstand',
+    esErrCrash: 'Der letzte Ladeversuch ist hängen geblieben, vermutlich wegen zu wenig freiem Speicher. Tipp: Schließe FM (der Dump liegt schon auf der Festplatte) und klicke dann auf Erneut versuchen.',
+    step1: 'Starte <b>FM</b> und lade deinen Spielstand',
     step2: 'Drücke im Spiel <kbd>F9</kbd> oder klicke hier auf <b>Neue Daten</b>',
     step3: 'Die Daten laden automatisch, sobald der Dump fertig ist',
-    playersWord: 'Spieler', staffWord: 'Mitarbeiter', clickClubFilter: 'Klick = nach deinem Verein filtern', repWord: 'Reputation',
+    playersWord: 'Spieler', staffWord: 'Mitarbeiter', clickClubFilter: 'Klick = nach deinem Verein filtern', mgrPick: 'Netzwerkspiel: Welcher Manager bist du?', repWord: 'Reputation',
     roleFit: 'Taktische Rolle', roleColHdr: 'Rolle', roleAny: 'Keine Rolle gewählt', bestRoles: 'Beste Rollen',
     compare: 'Vergleichen', comparing: 'Vergleich', addCompare: 'Vergleichen', compareFull: 'Max. 3 Spieler',
     cmpTitle: 'Spielervergleich', cmpValue: 'Wert', cmpTopRole: 'Beste Rolle',
@@ -551,7 +568,7 @@ const I18N = {
     metaHint: 'Gewichteter Durchschnitt (1-20) der Attribute, die laut FM-Arenas Match-Engine-Tests Spiele gewinnen; Schnelligkeit und Antritt zählen mit Abstand am meisten. Torhüter: eigene Gewichtung aus dem Torwart-Test (Reflexe, Beweglichkeit).\n\n15+ Elite, 13-15 stark, 11-13 solide. Bei gleicher CA spielt der höhere Meta meist besser.',
     metaPaHint: 'Dieselbe Meta-Gewichtung, angewandt auf die Attribute, die er an seinem Potenzial (PA) voraussichtlich erreicht. Die Projektion folgt dem Wachstumsprofil seiner Positionsgruppe; Physis wächst nach 23 nicht mehr.\n\nAusentwickelt = gleich Meta. Sortiere danach für die Meta-Stars von morgen.',
     verWarn: 'FM-Version {v} erkannt; das Auslesen ist auf {s}.x geeicht. Daten bis zu einem FMSuperScout-Update möglicherweise unzuverlässig.',
-    verWarnOldDump: 'Diese Daten stammen von einem älteren FMSuperScout-Plugin. Alles funktioniert, aber hole frische Daten (F9 in FM26 mit geladenem Spielstand) für das beste Ergebnis.',
+    verWarnOldDump: 'Diese Daten stammen von einem älteren FMSuperScout-Plugin. Alles funktioniert, aber hole frische Daten (F9 in FM mit geladenem Spielstand) für das beste Ergebnis.',
   },
 };
 // Onbekende taalcode (oude versie in localStorage, gesynct profiel) mag de app niet
@@ -576,6 +593,9 @@ const ICON_PATHS = {
   arrowRight: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   card: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  star: '<path d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55-4.76-4.64 6.58-.96z"/>',
   // Voetbal: gevulde vijfhoek in het midden, vijf dunne naden naar de rand en korte
   // hints van de randvlakken. Bewust een eigen, dunne lijndikte (1.1): met dikke naden
   // leest dit als een stuurwiel in plaats van een bal (varianten vergeleken 26-07).
@@ -763,10 +783,20 @@ function renderDevSection() {
   $('f-hist-period').value = state.histPeriod;
 }
 
+// Carrière-sleutel voor de historie: de managernaam, vanaf FM27 met het spel erbij. Een
+// FM27-save met dezelfde managernaam mag nooit doorschrijven in de FM26-historie: speler-ID's
+// lopen over edities heen door, dus "groei" zou dan de FM26-stand met FM27 vergelijken.
+// FM26 houdt de kale naam, zodat bestaande historie gewoon blijft aansluiten.
+function histKey() {
+  const m = state.meta.manager || 'default';
+  const g = state.meta.game;
+  return g && g !== 'FM26' ? `${m} (${g})` : m;
+}
+
 async function loadHistDeltas() {
   state.hist = null;
   try {
-    const mgr = encodeURIComponent(state.meta.manager || 'default');
+    const mgr = encodeURIComponent(histKey());
     // Eerst alleen de datumlijst (kleine respons), want "sinds de vorige dump" heeft die
     // nodig om een peildatum te kunnen kiezen. Daarna pas de volle set ophalen.
     const probe = await fetch(`/api/history/deltas?manager=${mgr}`);
@@ -782,7 +812,7 @@ async function refreshHistDeltas() {
   const ref = histRefDate();
   if (!ref) return;
   try {
-    const mgr = encodeURIComponent(state.meta.manager || 'default');
+    const mgr = encodeURIComponent(histKey());
     const r = await fetch(`/api/history/deltas?manager=${mgr}&since=${ref}`);
     if (!r.ok) return;
     const j = await r.json();
@@ -976,7 +1006,7 @@ const PLAYER_COLS = [
   { key: 'sl', label: '★', star: true, w: 34 },
   { key: 'name', label: 'c_name', get: p => p.name, name: true, w: 180 },
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p), w: 50 },
-  { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => p.pos ? escHtml(p.pos) : '<span class="dim">–</span>', w: 95 },
+  { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => posHtml(p), w: 130 },
   { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
   { key: 'div', label: 'c_div', get: p => p.div || '', render: p => p.div ? escHtml(p.div) : '<span class="dim">–</span>', defHidden: true, w: 170 },
   { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
@@ -1254,6 +1284,16 @@ function statusHtml(p) {
   if (p.notForSale) h += `<span class="tag nfs">${t('tag_nfs')}</span>`;
   return h || '<span class="dim">–</span>';
 }
+// Natuurlijke posities. posArr bevat sinds scanner 1.6 ook bedreven nevenposities (15+);
+// posNat staat alleen in de dump als dat verschil er is. Oude dumps: posArr wás al natuurlijk.
+const natPos = p => p.posNat || p.posArr || [];
+// Positiekolom: natuurlijke posities gewoon, bedreven nevenposities gedimd erachter.
+function posHtml(p) {
+  const all = p.posArr || [];
+  if (!all.length) return p.pos ? escHtml(p.pos) : '<span class="dim">–</span>';
+  const nat = new Set(natPos(p));
+  return all.map(x => nat.has(x) ? escHtml(x) : `<span class="pos-acc" title="${escHtml(t('posAccomplished'))}">${escHtml(x)}</span>`).join(', ');
+}
 // Positievolgorde zoals in FM: van doel naar aanval (GK ... ST), niet alfabetisch.
 const POS_ORDER = ['GK', 'DL', 'DC', 'DR', 'WBL', 'WBR', 'DM', 'ML', 'MC', 'MR', 'AML', 'AMC', 'AMR', 'ST'];
 const POS_RANK = Object.fromEntries(POS_ORDER.map((p, i) => [p, i]));
@@ -1268,6 +1308,32 @@ function isAttainable(p) {
   return p.listed || p.setForRelease || isFree(p) || (m != null && m <= 12);
 }
 
+// ---------- stafattributen ----------
+// Sleutels zoals de scanner ze dumpt (core/Fields.cs StaffAttrs); labels per app-taal
+// volgens FM's eigen termen (issue #26, met dank aan MisterC72 voor PR #27).
+// Indeling en termen zoals FM27's stafprofiel (Training / Mentaal / Kennis, plus de tabs
+// Scouting en Medisch). Geverifieerd tegen Oscar Moens en Zeb Jacobs (Feyenoord; alle 19
+// waarden kloppen met FM's niveaus) en per functie: zie core/Fields.cs. Dump-sleutels uit
+// FM26-tijd: KV_distributie is Autoriteit; KV_vangen is een nog onbekende mentale waarde en
+// blijft verborgen.
+const STAFF_ATTR_GROUPS = [
+  ['sg_coaching', ['Aanvallen', 'Verdedigen', 'Fitheid', 'Balbezit', 'Technisch', 'Tactisch', 'Standaardsituaties', 'KV_reflexen', 'Jeugd']],
+  ['sg_mental', ['Aanpassingsvermogen', 'KV_distributie', 'Motiveren', 'Man-management', 'Vastberadenheid']],
+  ['sg_knowledge', ['Oordeel_staf', 'Onderhandelen', 'Oordeel_vermogen', 'Oordeel_potentie', 'Tactische_kennis']],
+  ['sg_medical', ['Fysiotherapie', 'Sportwetenschap', 'Data_analyse']],
+];
+const STAFF_ATTR_LABEL = {
+  nl: { Aanvallen: 'Aanvallend', Verdedigen: 'Verdedigend', Fitheid: 'Conditie', Balbezit: 'Balbezit', Technisch: 'Technisch', Tactisch: 'Tactisch', Standaardsituaties: 'Standaardsituaties', KV_reflexen: 'Keepen', Jeugd: 'Werken met jonge spelers', Aanpassingsvermogen: 'Aanpassingsvermogen', KV_distributie: 'Autoriteit', Motiveren: 'Motiveren', 'Man-management': 'People-management', Vastberadenheid: 'Vastberadenheid', Oordeel_staf: 'Bekwaamheid staf', Onderhandelen: 'Onderhandelen', Oordeel_vermogen: 'Spelerskwaliteiten beoordelen', Oordeel_potentie: 'Spelerspotentieel beoordelen', Tactische_kennis: 'Tactische kennis', Fysiotherapie: 'Fysiotherapie', Sportwetenschap: 'Sportwetenschap', Data_analyse: 'Gegevens analyseren' },
+  en: { Aanvallen: 'Attacking', Verdedigen: 'Defending', Fitheid: 'Fitness', Balbezit: 'Possession', Technisch: 'Technical', Tactisch: 'Tactical', Standaardsituaties: 'Set Pieces', KV_reflexen: 'Goalkeeping', Jeugd: 'Working with Youngsters', Aanpassingsvermogen: 'Adaptability', KV_distributie: 'Authority', Motiveren: 'Motivating', 'Man-management': 'Man Management', Vastberadenheid: 'Determination', Oordeel_staf: 'Judging Staff Ability', Onderhandelen: 'Negotiating', Oordeel_vermogen: 'Judging Player Ability', Oordeel_potentie: 'Judging Player Potential', Tactische_kennis: 'Tactical Knowledge', Fysiotherapie: 'Physiotherapy', Sportwetenschap: 'Sports Science', Data_analyse: 'Analysing Data' },
+  fr: { Aanvallen: 'Attaque', Verdedigen: 'Défense', Fitheid: 'Condition physique', Balbezit: 'Possession', Technisch: 'Technique', Tactisch: 'Tactique', Standaardsituaties: 'Coups de pied arrêtés', KV_reflexen: 'Gardiens', Jeugd: 'Travail avec les jeunes', Aanpassingsvermogen: 'Adaptabilité', KV_distributie: 'Autorité', Motiveren: 'Motivation', 'Man-management': 'Gestion humaine', Vastberadenheid: 'Détermination', Oordeel_staf: 'Évaluer le staff', Onderhandelen: 'Négociation', Oordeel_vermogen: 'Évaluer les capacités', Oordeel_potentie: 'Évaluer le potentiel', Tactische_kennis: 'Connaissances tactiques', Fysiotherapie: 'Kinésithérapie', Sportwetenschap: 'Sciences du sport', Data_analyse: 'Analyse de données' },
+  de: { Aanvallen: 'Angriff', Verdedigen: 'Abwehr', Fitheid: 'Fitness', Balbezit: 'Ballbesitz', Technisch: 'Technik', Tactisch: 'Taktik', Standaardsituaties: 'Standards', KV_reflexen: 'Torwarttraining', Jeugd: 'Arbeit mit Jugendlichen', Aanpassingsvermogen: 'Anpassungsfähigkeit', KV_distributie: 'Autorität', Motiveren: 'Motivieren', 'Man-management': 'Menschenführung', Vastberadenheid: 'Entschlossenheit', Oordeel_staf: 'Mitarbeiter beurteilen', Onderhandelen: 'Verhandeln', Oordeel_vermogen: 'Spielerstärke beurteilen', Oordeel_potentie: 'Spielerpotenzial beurteilen', Tactische_kennis: 'Taktikwissen', Fysiotherapie: 'Physiotherapie', Sportwetenschap: 'Sportwissenschaft', Data_analyse: 'Datenanalyse' },
+};
+const isStaffAttr = k => k in STAFF_ATTR_LABEL.en;
+// Dumps van vóór de scanner (plugin ≤ 0.1.46, geen meta.host) bewaarden "Jeugd" onterecht
+// gedeeld door 5 (0-4). Die waarde is niet te herstellen: dan tonen we hem niet.
+const staffAttrUsable = k => k !== 'Jeugd' || !!state.meta.host;
+const staffAttrName = k => ((STAFF_ATTR_LABEL[state.lang] || STAFF_ATTR_LABEL.en)[k] ?? k.replace(/_/g, ' '));
+
 // ---------- geavanceerd attribuutfilter ----------
 // Regels [{k, min, max}] over zichtbare attributen, verborgen kenmerken en persoonlijkheid,
 // EN-gecombineerd. Persoonlijkheid leeft op het speler-object zelf, de rest in p.attrs.
@@ -1275,11 +1341,20 @@ function isAttainable(p) {
 const ADV_HIDDEN_KEYS = ['Consistency', 'ImportantMatches', 'Versatility', 'InjuryProneness', 'Dirtiness'];
 const ADV_PERS_KEYS = ['ambition', 'professionalism', 'loyalty', 'pressure', 'temperament', 'sportsmanship', 'adaptability', 'controversy'];
 const advIsHidden = k => ADV_HIDDEN_KEYS.includes(k) || ADV_PERS_KEYS.includes(k);
-const advLabel = k => ADV_PERS_KEYS.includes(k) ? t(k) : ADV_HIDDEN_KEYS.includes(k) ? t('a_' + k) : attrName(k);
-const advValue = (p, k) => ADV_PERS_KEYS.includes(k) ? (p[k] || null) : (p.attrs ? p.attrs[k] : null);
-const activeAdvRules = () => state.advF.filter(r => r.k && (r.min || r.max) && !(state.hideCapa && advIsHidden(r.k)));
+const advLabel = k => isStaffAttr(k) ? staffAttrName(k) : ADV_PERS_KEYS.includes(k) ? t(k) : ADV_HIDDEN_KEYS.includes(k) ? t('a_' + k) : attrName(k);
+const advValue = (p, k) => isStaffAttr(k) ? (p.staffAttrs ? p.staffAttrs[k] : null)
+  : ADV_PERS_KEYS.includes(k) ? (p[k] || null) : (p.attrs ? p.attrs[k] : null);
+// Alleen regels van de soort die bij de modus hoort: een preset uit de spelersmodus mag de
+// staflijst niet leegfilteren, en andersom.
+const activeAdvRules = () => state.advF.filter(r => r.k && (r.min || r.max) && isStaffAttr(r.k) === (state.mode === 'staff')
+  && !(state.hideCapa && advIsHidden(r.k)));
 const advChipTxt = r => `${advLabel(r.k)} ${r.min && r.max ? r.min + '–' + r.max : r.min ? '≥ ' + r.min : '≤ ' + r.max}`;
-function saveAdv() { localStorage.setItem('fmss_adv', JSON.stringify(state.advF)); updateAdvBtn(); }
+// Spelers en staf hebben elk hun eigen regelset; state.advF is die van de huidige modus.
+function saveAdv() {
+  if (state.mode === 'staff') { state.advStaff = state.advF; localStorage.setItem('fmss_adv_staff', JSON.stringify(state.advF)); }
+  else localStorage.setItem('fmss_adv', JSON.stringify(state.advF));
+  updateAdvBtn();
+}
 // Alleen een teller op de knop; de regels zelf staan al in de chips boven de tabel
 // en in de popup, een derde lijst in de zijbalk was dubbelop.
 function updateAdvBtn() {
@@ -1294,9 +1369,12 @@ function advDialog() {
   // staan al onder Technisch), verborgen en persoonlijkheidsattributen.
   const gkOnly = ATTR_GROUPS_GK[0][1].filter(k => !ATTR_GROUPS_OUTFIELD.some(([, ks]) => ks.includes(k)));
   const catalog = [];
-  for (const [g, keys] of [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', gkOnly]])
+  if (state.mode === 'staff') {
+    for (const [g, keys] of STAFF_ATTR_GROUPS.map(([g, ks]) => [g, ks.filter(staffAttrUsable)]))
+      for (const k of [...keys].sort((a, b) => staffAttrName(a).localeCompare(staffAttrName(b), state.lang))) catalog.push({ k, label: staffAttrName(k), group: t(g) });
+  } else for (const [g, keys] of [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', gkOnly]])
     for (const k of sortByLabel(keys)) catalog.push({ k, label: attrName(k), group: t(g) });
-  if (!state.hideCapa) {
+  if (!state.hideCapa && state.mode !== 'staff') {
     const byT = (a, b) => a.localeCompare(b, state.lang);
     for (const k of [...ADV_HIDDEN_KEYS].sort((a, b) => byT(t('a_' + a), t('a_' + b)))) catalog.push({ k, label: t('a_' + k), group: t('hiddenTitle') });
     for (const k of [...ADV_PERS_KEYS].sort((a, b) => byT(t(a), t(b)))) catalog.push({ k, label: t(k), group: t('personaTitle') });
@@ -1432,10 +1510,10 @@ const roleName = id => (ROLE_LABEL[state.lang]?.[id] ?? ROLE_LABEL.en[id] ?? id)
 // NL-naamstring. Met het id vertalen we per app-taal; oude dumps of onbekende id's
 // vallen terug op de dumpstring, en het generieke "Staflid" krijgt zijn eigen sleutel.
 const JOB_LABEL = {
-  nl: { 1: 'Speler', 2: 'Coach', 3: 'Speler/Coach', 4: 'Voorzitter', 6: 'Directeur', 8: 'Algemeen directeur', 10: 'Technisch directeur', 12: 'Fysiotherapeut', 14: 'Scout', 16: 'Manager', 17: 'Speler/Manager', 20: 'Assistent-manager', 21: 'Speler/Assistent-manager', 22: 'Media-analist', 24: 'Algemeen manager', 26: 'Fitnesscoach', 27: 'Speler/Fitnesscoach', 34: 'Keeperstrainer', 35: 'Speler/Keeperstrainer', 36: 'Hoofd data-analyse', 38: 'Clubarts', 40: 'Hoofd sportwetenschap', 42: 'Data-analist', 44: 'Hoofdscout', 45: 'Speler/Hoofdscout', 46: 'Arts', 48: 'Sportwetenschapper', 49: 'Speler/Jeugdtrainer', 50: 'Hoofd fysiotherapie', 52: 'U19-manager', 54: 'Trainer eerste elftal', 64: 'Hoofd jeugdopleiding', 65: 'Speler/Hoofd jeugd', 66: 'Eigenaar', 70: 'President', 86: 'Loanmanager', 88: 'Technisch directeur', 144: 'Interim-manager' },
-  en: { 1: 'Player', 2: 'Coach', 3: 'Player/Coach', 4: 'Chairman', 6: 'Director', 8: 'Managing director', 10: 'Director of football', 12: 'Physio', 14: 'Scout', 16: 'Manager', 17: 'Player/Manager', 20: 'Assistant manager', 21: 'Player/Assistant manager', 22: 'Media analyst', 24: 'General manager', 26: 'Fitness coach', 27: 'Player/Fitness coach', 34: 'Goalkeeping coach', 35: 'Player/GK coach', 36: 'Head of data analysis', 38: 'Club doctor', 40: 'Head of sports science', 42: 'Data analyst', 44: 'Chief scout', 45: 'Player/Chief scout', 46: 'Doctor', 48: 'Sports scientist', 49: 'Player/Youth coach', 50: 'Head physio', 52: 'U19 manager', 54: 'First-team coach', 64: 'Head of youth development', 65: 'Player/Head of youth', 66: 'Owner', 70: 'President', 86: 'Loan manager', 88: 'Technical director', 144: 'Caretaker manager' },
-  fr: { 1: 'Joueur', 2: 'Entraîneur', 3: 'Joueur/Entraîneur', 4: 'Président du conseil', 6: 'Directeur', 8: 'Directeur général', 10: 'Directeur sportif', 12: 'Kinésithérapeute', 14: 'Recruteur', 16: 'Manager', 17: 'Joueur/Manager', 20: 'Adjoint', 21: 'Joueur/Adjoint', 22: 'Analyste média', 24: 'Manager général', 26: 'Préparateur physique', 27: 'Joueur/Préparateur physique', 34: 'Entraîneur des gardiens', 35: 'Joueur/Entraîneur des gardiens', 36: 'Resp. analyse de données', 38: 'Médecin du club', 40: 'Resp. sciences du sport', 42: 'Analyste de données', 44: 'Recruteur en chef', 45: 'Joueur/Recruteur en chef', 46: 'Médecin', 48: 'Scientifique du sport', 49: 'Joueur/Entraîneur de jeunes', 50: 'Kiné en chef', 52: 'Manager U19', 54: 'Entraîneur équipe première', 64: 'Resp. formation', 65: 'Joueur/Resp. formation', 66: 'Propriétaire', 70: 'Président', 86: 'Resp. des prêts', 88: 'Directeur technique', 144: 'Entraîneur intérimaire' },
-  de: { 1: 'Spieler', 2: 'Trainer', 3: 'Spielertrainer', 4: 'Vorsitzender', 6: 'Direktor', 8: 'Geschäftsführer', 10: 'Sportdirektor', 12: 'Physiotherapeut', 14: 'Scout', 16: 'Manager', 17: 'Spielermanager', 20: 'Co-Trainer', 21: 'Spieler/Co-Trainer', 22: 'Medienanalyst', 24: 'General Manager', 26: 'Fitnesstrainer', 27: 'Spieler/Fitnesstrainer', 34: 'Torwarttrainer', 35: 'Spieler/Torwarttrainer', 36: 'Leiter Datenanalyse', 38: 'Vereinsarzt', 40: 'Leiter Sportwissenschaft', 42: 'Datenanalyst', 44: 'Chefscout', 45: 'Spieler/Chefscout', 46: 'Arzt', 48: 'Sportwissenschaftler', 49: 'Spieler/Jugendtrainer', 50: 'Leitender Physiotherapeut', 52: 'U19-Trainer', 54: 'Trainer 1. Mannschaft', 64: 'Leiter Nachwuchs', 65: 'Spieler/Nachwuchsleiter', 66: 'Eigentümer', 70: 'Präsident', 86: 'Leihspielermanager', 88: 'Technischer Direktor', 144: 'Interimstrainer' },
+  nl: { 1: 'Speler', 2: 'Trainer', 3: 'Speler/Coach', 4: 'Voorzitter', 6: 'Directeur', 8: 'Algemeen directeur', 10: 'Directeur voetbalzaken', 12: 'Fysiotherapeut', 14: 'Scout', 16: 'Manager', 17: 'Speler/Manager', 20: 'Assistent-manager', 21: 'Speler/Assistent-manager', 22: 'Media-analist', 24: 'Algemeen manager', 26: 'Conditietrainer', 27: 'Speler/Conditietrainer', 34: 'Keeperstrainer', 35: 'Speler/Keeperstrainer', 36: 'Hoofd data-analyse', 38: 'Clubarts', 40: 'Hoofd sportwetenschap', 42: 'Data-analist', 44: 'Hoofdscout', 45: 'Speler/Hoofdscout', 46: 'Arts', 48: 'Sportwetenschapper', 49: 'Speler/Jeugdtrainer', 50: 'Hoofd fysiotherapie', 52: 'U19-manager', 54: 'Trainer eerste elftal', 64: 'Hoofd jeugdopleiding', 65: 'Speler/Hoofd jeugd', 66: 'Eigenaar', 70: 'President', 86: '(Ver)huurmanager', 88: 'Technisch directeur', 58: 'Analist rekrutering', 60: 'Prestatie analist', 62: 'Hoofd performance analyse', 144: 'Interim-manager' },
+  en: { 1: 'Player', 2: 'Coach', 3: 'Player/Coach', 4: 'Chairman', 6: 'Director', 8: 'Managing director', 10: 'Director of football', 12: 'Physio', 14: 'Scout', 16: 'Manager', 17: 'Player/Manager', 20: 'Assistant manager', 21: 'Player/Assistant manager', 22: 'Media analyst', 24: 'General manager', 26: 'Fitness coach', 27: 'Player/Fitness coach', 34: 'Goalkeeping coach', 35: 'Player/GK coach', 36: 'Head of data analysis', 38: 'Club doctor', 40: 'Head of sports science', 42: 'Data analyst', 44: 'Chief scout', 45: 'Player/Chief scout', 46: 'Doctor', 48: 'Sports scientist', 49: 'Player/Youth coach', 50: 'Head physio', 52: 'U19 manager', 54: 'First-team coach', 64: 'Head of youth development', 65: 'Player/Head of youth', 66: 'Owner', 70: 'President', 86: 'Loan manager', 88: 'Technical director', 58: 'Recruitment analyst', 60: 'Performance analyst', 62: 'Head of performance analysis', 144: 'Caretaker manager' },
+  fr: { 1: 'Joueur', 2: 'Entraîneur', 3: 'Joueur/Entraîneur', 4: 'Président du conseil', 6: 'Directeur', 8: 'Directeur général', 10: 'Directeur sportif', 12: 'Kinésithérapeute', 14: 'Recruteur', 16: 'Manager', 17: 'Joueur/Manager', 20: 'Adjoint', 21: 'Joueur/Adjoint', 22: 'Analyste média', 24: 'Manager général', 26: 'Préparateur physique', 27: 'Joueur/Préparateur physique', 34: 'Entraîneur des gardiens', 35: 'Joueur/Entraîneur des gardiens', 36: 'Resp. analyse de données', 38: 'Médecin du club', 40: 'Resp. sciences du sport', 42: 'Analyste de données', 44: 'Recruteur en chef', 45: 'Joueur/Recruteur en chef', 46: 'Médecin', 48: 'Scientifique du sport', 49: 'Joueur/Entraîneur de jeunes', 50: 'Kiné en chef', 52: 'Manager U19', 54: 'Entraîneur équipe première', 64: 'Resp. formation', 65: 'Joueur/Resp. formation', 66: 'Propriétaire', 70: 'Président', 86: 'Resp. des prêts', 88: 'Directeur technique', 58: 'Analyste recrutement', 60: 'Analyste de performance', 62: 'Resp. analyse de la performance', 144: 'Entraîneur intérimaire' },
+  de: { 1: 'Spieler', 2: 'Trainer', 3: 'Spielertrainer', 4: 'Vorsitzender', 6: 'Direktor', 8: 'Geschäftsführer', 10: 'Sportdirektor', 12: 'Physiotherapeut', 14: 'Scout', 16: 'Manager', 17: 'Spielermanager', 20: 'Co-Trainer', 21: 'Spieler/Co-Trainer', 22: 'Medienanalyst', 24: 'General Manager', 26: 'Fitnesstrainer', 27: 'Spieler/Fitnesstrainer', 34: 'Torwarttrainer', 35: 'Spieler/Torwarttrainer', 36: 'Leiter Datenanalyse', 38: 'Vereinsarzt', 40: 'Leiter Sportwissenschaft', 42: 'Datenanalyst', 44: 'Chefscout', 45: 'Spieler/Chefscout', 46: 'Arzt', 48: 'Sportwissenschaftler', 49: 'Spieler/Jugendtrainer', 50: 'Leitender Physiotherapeut', 52: 'U19-Trainer', 54: 'Trainer 1. Mannschaft', 64: 'Leiter Nachwuchs', 65: 'Spieler/Nachwuchsleiter', 66: 'Eigentümer', 70: 'Präsident', 86: 'Leihspielermanager', 88: 'Technischer Direktor', 58: 'Rekrutierungsanalyst', 60: 'Leistungsanalyst', 62: 'Leiter Leistungsanalyse', 144: 'Interimstrainer' },
 };
 const jobLabel = p => {
   const L = JOB_LABEL[state.lang] || JOB_LABEL.en;
@@ -1484,7 +1562,7 @@ const META_W = {
 // persoonlijkheidsveld (p.pressure), geen attrs-key; weightedMeta pakt hem daar.
 const META_GK_W = { Reflexes: 12.8, Agility: 8.0, Acceleration: 4.7, Pressure: 4.1, Pace: 3.5, AerialReach: 3.4 };
 function weightedMeta(p, attrs) {
-  const W = (p.posArr || []).includes('GK') ? META_GK_W : META_W;
+  const W = natPos(p).includes('GK') ? META_GK_W : META_W;
   let sum = 0, w = 0;
   for (const k in W) {
     const v = k === 'Pressure' ? (p.pressure > 0 ? p.pressure : null) : attrs[k];
@@ -1544,7 +1622,7 @@ function buildPitch() {
        <circle r="7.5"></circle><text>${pos}</text></g>`).join('');
   $('pitch-wrap').innerHTML =
     `<svg viewBox="0 0 100 104" xmlns="http://www.w3.org/2000/svg">
-       <rect x="1" y="1" width="98" height="102" rx="3" fill="#12301c" stroke="#2a3441"/>
+       <rect x="1" y="1" width="98" height="102" rx="3" fill="#12301c" stroke="#2a2f62"/>
        <line x1="1" y1="52" x2="99" y2="52" stroke="#2a4a34"/>
        <circle cx="50" cy="52" r="10" fill="none" stroke="#2a4a34"/>
        <rect x="30" y="1" width="40" height="14" fill="none" stroke="#2a4a34"/>
@@ -1576,7 +1654,7 @@ function internStrings(obj, pool) {
     const v = obj[k];
     if (typeof v === 'string') { const c = pool.get(v); if (c !== undefined) obj[k] = c; else pool.set(v, v); }
   }
-  for (const arrK of ['nat', 'posArr']) {
+  for (const arrK of ['nat', 'posArr', 'posNat']) {
     const a = obj[arrK];
     if (a) for (let i = 0; i < a.length; i++) { const c = pool.get(a[i]); if (c !== undefined) a[i] = c; else pool.set(a[i], a[i]); }
   }
@@ -1714,6 +1792,7 @@ async function loadDump(force = false) {
     state.players = (data.players || []).filter(p => p.club || p.worldRep !== 0xFFFF);
     state.staff = data.staff || [];
     state.meta = data.meta || {};
+    applyManagerChoice();
     state._wageCeil = undefined;   // loonplafond opnieuw berekenen voor deze dump
     state._clubWages = null;       // loonrang-cache (vraagprijs) opnieuw opbouwen
     state._nowTs = undefined;      // "nu"-tijdstip volgt de nieuwe in-game datum (monthsUntil)
@@ -1789,7 +1868,7 @@ async function postHistorySnapshot() {
     for (const p of state.players) compact[p.id] = [p.ca ?? 0, p.pa ?? 0, p.value ?? null];
     const r = await fetch('/api/history', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ manager: state.meta.manager || 'default', gameDate: gd, players: compact }),
+      body: JSON.stringify({ manager: histKey(), gameDate: gd, players: compact }),
     });
     if (r.ok) localStorage.setItem('fmss_hist_at', String(state.dumpStamp));
   } catch { /* historie is nice-to-have, nooit het laden storen */ }
@@ -1875,14 +1954,37 @@ function renderVerWarn() {
   const el = $('ver-warn');
   const m = state.meta;
   if (m.gameVersion && m.versionOk === false) {
-    el.innerHTML = bannerMsg('warning', tf('verWarn', { v: m.gameVersion, s: m.supportedVersion || '26.3' }));
+    el.innerHTML = bannerMsg('warning', tf('verWarn', { v: m.gameVersion, s: m.supportedVersion || '?' }));
     el.classList.remove('hidden');
   } else if (m.generated && !m.pluginVersion) {
     el.innerHTML = bannerMsg('warning', t('verWarnOldDump'));
     el.classList.remove('hidden');
   } else el.classList.add('hidden');
 }
+// Netwerk-/multiplayer-save: de dump somt dan alle menselijke managers op (meta.managers).
+// De gekozen manager wordt per save onthouden (sleutel = de set managernamen) en bepaalt
+// "Mijn club", de clubreputatie in het interessemodel en de historie (histKey).
+function mgrChoiceKey(list) { return 'fmss_me:' + list.map(m => m.name).sort().join('|'); }
+function applyManagerChoice() {
+  const list = state.meta.managers;
+  if (!Array.isArray(list) || list.length < 2) return;
+  state.meta._scanManager = state.meta._scanManager || state.meta.manager;
+  let pick = null;
+  try { pick = JSON.parse(localStorage.getItem(mgrChoiceKey(list)) || 'null'); } catch { }
+  const m = pick && list.find(x => x.name === pick.name && x.club === pick.club);
+  if (!m) return;
+  state.meta.manager = m.name; state.meta.myClub = m.club; state.meta.myClubRep = m.clubRep;
+}
+function renderManagerPick() {
+  const sel = $('mgr-pick'), list = state.meta.managers;
+  if (!Array.isArray(list) || list.length < 2) { sel.classList.add('hidden'); return; }
+  sel.innerHTML = list.map((m, i) => `<option value="${i}">${escHtml(m.name)} · ${escHtml(m.club)}</option>`).join('');
+  sel.value = String(Math.max(0, list.findIndex(m => m.name === state.meta.manager && m.club === state.meta.myClub)));
+  sel.title = t('mgrPick');
+  sel.classList.remove('hidden');
+}
 function renderClubBadge() {
+  renderManagerPick();
   const mgr = state.meta.manager, club = state.meta.myClub, rep = state.meta.myClubRep;
   // FM-data (namen uit het geheugen) altijd escapen vóór innerHTML.
   $('club-badge').innerHTML = (mgr || club) ? `${mgr ? escHtml(mgr) + ' · ' : ''}<b>${escHtml(club || '?')}</b>` : '';
@@ -2092,7 +2194,7 @@ function applyFilters() {
   const minInterest = +$('f-interest').value || 0;
   const tstatus = $('f-tstatus').value, contractF = $('f-contract').value;
   const onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
-  const advRules = state.mode === 'staff' ? [] : activeAdvRules();   // staf heeft geen veld-attributen
+  const advRules = activeAdvRules();   // spelers: veld-/verborgen attributen; staf: stafattributen
   const staffRole = $('f-staffrole').value;
   const gsel = $('f-gender').value;   // '' = beide, 'm' = mannen, 'v' = vrouwen
   const divVal = $('f-div').value.trim().toLowerCase();   // zoekbalk: substring, hoofdletterongevoelig
@@ -2174,27 +2276,63 @@ function applyFilters() {
   renderVisible();
 }
 
-// Stip op de sectiekop zodra er binnen die sectie een filter actief is; zo zie je ook
-// bij ingeklapte secties waar je moet zijn.
+// Teller op de sectiekop: hoeveel filters er binnen die sectie actief zijn, zodat je ook
+// bij ingeklapte secties ziet waar je moet zijn. Ingevulde velden krijgen zelf ook een
+// markering (lege inputs via :placeholder-shown in CSS, selects via .is-set).
 function updateSecDots() {
   const val = id => { const e = $(id); return e ? e.value.trim() : ''; };
-  const on = {
-    position: activePos.size > 0,
-    role: !!$('f-role').value,
-    quality: ['f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-metapa-min', 'f-metapa-max'].some(id => val(id))
-      || activeAdvRules().length > 0 || (!state.hideCapa && $('f-wonderkid').checked),
-    development: histReady() && !state.hideCapa
-      && (['f-growth-min', 'f-growth-max'].some(id => val(id)) || $('f-new').checked),
-    physical: ['f-height-min', 'f-height-max'].some(id => val(id)) || !!$('f-foot').value,
-    financial: ['f-price', 'f-fee', 'f-wage'].some(id => val(id)),
-    origin: !!(val('f-nat') || $('f-eu').checked || val('f-div')),
-    availability: +$('f-interest').value > 0 || !!$('f-tstatus').value || !!$('f-contract').value || $('f-myclub').checked || $('f-shortlist').checked,
+  const n = (...xs) => xs.filter(Boolean).length;
+  const pair = (a, b) => !!(val(a) || val(b));
+  const showHid = !state.hideCapa;
+  const count = {
+    pitch: activePos.size,
+    role: n($('f-role').value),
+    quality: n(pair('f-age-min', 'f-age-max'), pair('f-ca-min', 'f-ca-max'), pair('f-pa-min', 'f-pa-max'),
+      pair('f-meta-min', 'f-meta-max'), pair('f-metapa-min', 'f-metapa-max'), showHid && $('f-wonderkid').checked)
+      + activeAdvRules().length,
+    development: histReady() && showHid ? n(pair('f-growth-min', 'f-growth-max'), $('f-new').checked) : 0,
+    physical: n(pair('f-height-min', 'f-height-max'), $('f-foot').value),
+    financial: n(val('f-price'), val('f-fee'), val('f-wage')),
+    origin: n(val('f-nat'), $('f-eu').checked, val('f-div')),
+    availability: n(+$('f-interest').value > 0, $('f-tstatus').value, $('f-contract').value, $('f-myclub').checked, $('f-shortlist').checked),
   };
   document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
-    const k = sec.dataset.sec;
-    if (k in on) sec.classList.toggle('f-on', !!on[k]);
+    const k = sec.dataset.sec, head = sec.querySelector('.fsec-head');
+    if (!(k in count) || !head) return;
+    sec.classList.toggle('f-on', count[k] > 0);
+    if (count[k] > 0) head.dataset.count = count[k]; else delete head.dataset.count;
   });
+  document.querySelectorAll('#filters select').forEach(el => el.classList.toggle('is-set', el.id !== 'f-hist-period' && !!el.value && el.value !== '0'));
+  renderQuickFilters();
 }
+
+// ---------- snelfilters (bovenaan het filterpaneel) ----------
+// Eén klik voor de vier meestgebruikte vragen. Ze bedienen de bestaande velden, dus
+// presets, chips en tellers blijven vanzelf kloppen.
+const QUICK_FILTERS = [
+  { id: 'wonderkid', label: 'qfWonderkid', show: () => state.mode !== 'staff' && !state.hideCapa,
+    on: () => $('f-wonderkid').checked, set: v => { $('f-wonderkid').checked = v; } },
+  { id: 'expiring', label: 'qfExpiring', show: () => true,
+    on: () => $('f-contract').value === 'exp12', set: v => { $('f-contract').value = v ? 'exp12' : ''; } },
+  { id: 'sale', label: 'qfSale', show: () => state.mode !== 'staff',
+    on: () => $('f-tstatus').value === 'sale', set: v => { $('f-tstatus').value = v ? 'sale' : ''; } },
+  { id: 'myclub', label: 'myclub', show: () => !!state.meta.myClub,
+    on: () => $('f-myclub').checked, set: v => { $('f-myclub').checked = v; renderMyTeamChips(); } },
+];
+function renderQuickFilters() {
+  const box = $('quick-filters');
+  box.setAttribute('aria-label', t('quickFilters'));
+  const html = QUICK_FILTERS.filter(q => q.show()).map(q =>
+    `<button type="button" class="qf${q.on() ? ' on' : ''}" data-qf="${q.id}" aria-pressed="${q.on()}">${escHtml(t(q.label))}</button>`).join('');
+  if (box.innerHTML !== html) box.innerHTML = html;   // niet bij elke toetsaanslag de DOM vervangen
+}
+$('quick-filters').addEventListener('click', e => {
+  const b = e.target.closest('.qf');
+  const q = b && QUICK_FILTERS.find(x => x.id === b.dataset.qf);
+  if (!q) return;
+  q.set(!q.on());
+  applyFilters();
+});
 
 // ---------- actieve filters als chips boven de tabel ----------
 const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -2235,21 +2373,27 @@ function buildChips() {
   if (+$('f-interest').value > 0) add(`${t('interestmin')} ${$('f-interest').selectedOptions[0].textContent}`, () => { $('f-interest').value = '0'; });
   if ($('f-tstatus').value) add(`${t('tstatus')}: ${$('f-tstatus').selectedOptions[0].textContent}`, () => { $('f-tstatus').value = ''; });
   if ($('f-contract').value) add(`${t('contractF')}: ${$('f-contract').selectedOptions[0].textContent}`, () => { $('f-contract').value = ''; });
-  if (state.mode !== 'staff')
-    for (const r of activeAdvRules()) add(advChipTxt(r), () => { state.advF = state.advF.filter(x => x !== r); saveAdv(); });
+  for (const r of activeAdvRules()) add(advChipTxt(r), () => { state.advF = state.advF.filter(x => x !== r); saveAdv(); });
   if ($('f-myclub').checked) add(t('myclub'), uncheck('f-myclub'));
   if ($('f-shortlist').checked && state.mode !== 'shortlist') add(t('onlyshortlist'), uncheck('f-shortlist'));
   return chips;
 }
 function renderChips(chips) {
-  const bar = $('chipbar');
-  const n = state.filtered.length.toLocaleString();
-  bar.innerHTML = `<span class="chip-count"><b>${n}</b> ${t('results')}</span>` +
-    chips.map((c, i) => `<button class="chip" data-i="${i}" title="${t('clear')}">${escHtml(c.label)}<span class="x">${icon('x', 10)}</span></button>`).join('') +
-    (chips.length > 1 ? `<button class="chip-clear">${t('clearAll')}</button>` : '');
-  bar.querySelectorAll('.chip').forEach(el => el.onclick = () => { chips[+el.dataset.i].clear(); applyFilters(); });
-  const ca = bar.querySelector('.chip-clear');
-  if (ca) ca.onclick = () => $('btn-clear').onclick();
+  // Resultaatteller boven de tabel: "145 van 40.246 spelers".
+  const total = (state.mode === 'staff' ? state.staff : state.players).length;
+  const loc = uiLocale();
+  $('chipbar').innerHTML = `<span class="chip-count"><b>${state.filtered.length.toLocaleString(loc)}</b> ` +
+    `${escHtml(tf('resultsOf', { total: total.toLocaleString(loc), what: t(state.mode === 'staff' ? 'staffWord' : 'playersWord') }))}</span>`;
+  // Actieve filters in het paneel, met "alles wissen" ernaast.
+  const box = $('active-filters');
+  box.classList.toggle('empty', !chips.length);
+  $('af-count').textContent = tf('activeCount', { n: chips.length });
+  $('af-chips').innerHTML = chips.map((c, i) =>
+    `<button type="button" class="chip" data-i="${i}" aria-label="${escHtml(t('clear'))}: ${escHtml(c.label)}">${escHtml(c.label)}<span class="x" aria-hidden="true">${icon('x', 10)}</span></button>`).join('');
+  $('af-chips').querySelectorAll('.chip').forEach(el => el.onclick = () => { chips[+el.dataset.i].clear(); applyFilters(); });
+  // Ingeklapt paneel: teller op de rail, zodat een korte lijst nooit verrast.
+  $('rail-count').textContent = chips.length;
+  $('rail-count').classList.toggle('hidden', !chips.length);
 }
 // ---------- opgeslagen filterpresets ----------
 // Een preset is een momentopname van alle filtervelden (tekst, vinkjes, selects, posities
@@ -2288,7 +2432,16 @@ function applyPreset(s) {
   else if (oc['f-exp12']) $('f-contract').value = 'exp12';
   // Idem vóór de transferstatus-select (v1.2): transferlijst-checkbox → "te koop".
   if (oc['f-listed']) $('f-tstatus').value = 'sale';
-  state.advF = (s.adv || []).map(r => ({ ...r }));
+  // Attribuutregels per soort: spelers- en stafregels leven in aparte sets. De schone lei
+  // hierboven wist die van de huidige modus; de regels uit de preset gaan naar de set van
+  // hun eigen soort (een spelerspreset vanuit de stafmodus komt zo in de spelersmodus aan
+  // en vervuilt de staflijst niet).
+  const rules = (s.adv || []).map(r => ({ ...r }));
+  const pl = rules.filter(r => !isStaffAttr(r.k)), sf = rules.filter(r => isStaffAttr(r.k));
+  const isStaff = state.mode === 'staff';
+  if (pl.length || (!rules.length && !isStaff)) { state.advPlayers = pl; try { localStorage.setItem('fmss_adv', JSON.stringify(pl)); } catch { } }
+  if (sf.length || (!rules.length && isStaff)) { state.advStaff = sf; try { localStorage.setItem('fmss_adv_staff', JSON.stringify(sf)); } catch { } }
+  state.advF = isStaff ? (state.advStaff || []) : (state.advPlayers || jread('fmss_adv', []));
   saveAdv();
   const codes = new Set(s.pos || []);
   activePos.clear();
@@ -2772,7 +2925,7 @@ const POS_ATTR_PROFILE = {ALL:{Crossing:[7.5,9.5,10.7,12],Dribbling:[8.2,10.5,12
 const POS_GROUP_OF = { GK: 'GK', SW: 'DC', DC: 'DC', DL: 'FB', DR: 'FB', WBL: 'FB', WBR: 'FB',
   DM: 'DM', MC: 'MC', ML: 'W', MR: 'W', AML: 'W', AMR: 'W', AMC: 'AMC', ST: 'ST' };
 const posGroupsOf = p => {
-  const gs = [...new Set((p.posArr || []).map(x => POS_GROUP_OF[x]).filter(g => POS_ATTR_PROFILE[g]))];
+  const gs = [...new Set(natPos(p).map(x => POS_GROUP_OF[x]).filter(g => POS_ATTR_PROFILE[g]))];
   return gs.length ? gs : ['ALL'];
 };
 // Positienorm voor attribuut-ankers a op willekeurige CA (lineair tussen ankers, doorgetrokken erbuiten).
@@ -2837,7 +2990,7 @@ function showDetail(p) {
   <div class="sub">${getAge(p)} · ${escHtml(natsLabel(p))}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
   ${gauge}
   <div class="kv">
-    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${escHtml(p.pos || '–')}</div><div><b>${t('foot')}</b> ${escHtml(footLabel(p))}</div>` : `<div><b>${t('c_role')}</b> ${escHtml(jobLabel(p))}</div>`}
+    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${posHtml(p)}</div><div><b>${t('foot')}</b> ${escHtml(footLabel(p))}</div>` : `<div><b>${t('c_role')}</b> ${escHtml(jobLabel(p))}</div>`}
     <div><b>${t('estval')}</b> ${valTxt}</div>
     ${!state.hideCapa && feeEstimate(p).v > 0 ? `<div><b>${t('c_fee')}</b> ${fmtMoney(feeEstimate(p).v * 0.85)} – ${fmtMoney(feeEstimate(p).v * 1.15)}</div>` : ''}
     <div><b>${t('wageLabel')}</b> ${fmtWage(p.wage)}${p.wage > 0 ? ` <span class="dim">${wageSuf()}</span>` : ''}</div>
@@ -2884,7 +3037,7 @@ function showDetail(p) {
     const canPot = !state.hideCapa && p.pa > p.ca;
     if (!state.hideCapa)
       html += `<label class="potswitch${canPot ? '' : ' off'}"><input type="checkbox" id="pot-toggle" ${state.showPot ? 'checked' : ''} ${canPot ? '' : 'disabled'}> ${t('showPot')}${state.showPot ? ` <span class="dim">(${t('potNote')})</span>` : ''}</label>`;
-    const isGk = (p.posArr || []).includes('GK');
+    const isGk = natPos(p).includes('GK');
     const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
     const proj = (!state.hideCapa && state.showPot) ? projectAttrs(p) : null;
     const col = {};
@@ -2922,9 +3075,15 @@ function showDetail(p) {
       <div style="grid-area:pers">${state.hideCapa ? '' : persHtml}</div>
     </div>`;
   } else if (p.staffAttrs) {
-    html += `<div class="attr-cols"><div class="attr-col"><h3>${t('staffAttrs')}</h3>` +
-      Object.entries(p.staffAttrs).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v], idx) =>
-        `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${k.replace(/_/g, ' ')}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div></div>';
+    // Gegroepeerd zoals FM (coaching, keepers, mentaal, kennis, medisch & data) en vertaald.
+    const cols = STAFF_ATTR_GROUPS.map(([g, keys]) => {
+      const rows = keys.filter(k => p.staffAttrs[k] > 0 && staffAttrUsable(k));
+      return rows.length ? `<div class="attr-col"><h3>${t(g)}</h3>` + rows.map((k, idx) => {
+        const v = p.staffAttrs[k];
+        return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${escHtml(staffAttrName(k))}</span><span class="v ${attrClass(v)}">${v}</span></div>`;
+      }).join('') + '</div>' : '';
+    }).join('');
+    html += `<div class="attr-cols staff-cols">${cols}</div>`;
   }
   $('detail-body').innerHTML = html;
   document.querySelector('.detail-star').onclick = () => toggleShortlist(p.id);
@@ -2946,7 +3105,7 @@ function showDetail(p) {
 // meetpunten (delta-opslag); tussenliggende dumps zonder wijziging lopen vlak door.
 async function renderDevChart(p) {
   try {
-    const r = await fetch(`/api/history/series?uid=${p.id}&manager=${encodeURIComponent(state.meta.manager || 'default')}`);
+    const r = await fetch(`/api/history/series?uid=${p.id}&manager=${encodeURIComponent(histKey())}`);
     if (!r.ok) return;
     const { dates, entries } = await r.json();
     const box = $('dev-box');
@@ -3099,14 +3258,14 @@ function cardGroups(p, isGk) {
 // Bouwt het kaartmodel uit een echte speler (alle afgeleide waardes en labels).
 function buildCardModel(p) {
   const L = CARDL[state.lang] || CARDL.en;
-  const isGk = (p.posArr || []).includes('GK');
+  const isGk = natPos(p).includes('GK');
   const meta = metaScore(p);
   const ca = p.ca || 0, pa = p.pa || 0;
   const wk = isWonderkid(p);
   const tier = wk ? 'gold' : ca >= 150 ? 'elite' : ca >= 115 ? 'strong' : 'neutral';
 
-  const st = isFree(p) ? { t: L.sFree, c: '#8294a8' }
-    : p.notForSale ? { t: L.sNfs, c: '#8294a8' }
+  const st = isFree(p) ? { t: L.sFree, c: '#959ac8' }
+    : p.notForSale ? { t: L.sNfs, c: '#959ac8' }
     : p.setForRelease ? { t: L.sRel, c: '#e06060' }
     : p.listed ? { t: L.sListed, c: '#e8a13c' }
     : p.loanListed ? { t: L.sLoan, c: '#4aa3ff' }
@@ -3115,7 +3274,7 @@ function buildCardModel(p) {
   const wr = p.worldRep || 0;
   const rep = wr >= 6500 ? L.repW : wr >= 4500 ? L.repC : wr >= 2500 ? L.repN : L.repL;
   const ip = p.attrs ? p.attrs.InjuryProneness : 0;
-  const injury = ip > 0 ? (ip >= 14 ? { t: L.injH, c: '#e06060' } : ip >= 8 ? { t: L.injM, c: '#e8a13c' } : { t: L.injL, c: '#46c46e' }) : null;
+  const injury = ip > 0 ? (ip >= 14 ? { t: L.injH, c: '#e06060' } : ip >= 8 ? { t: L.injM, c: '#e8a13c' } : { t: L.injL, c: '#3fc56f' }) : null;
 
   const ev = estValue(p);
   const fee = feeEstimate(p);
@@ -3129,18 +3288,18 @@ function buildCardModel(p) {
   return {
     L, tier, wk, gk: isGk, name: (p.name || '?').toUpperCase(),
     club: p.club || L.sFree, division: p.div || '', nation: natsLabel(p) || '',
-    positions: (p.posArr || []).slice(0, 3).join(' · ') || '–',
+    positions: natPos(p).slice(0, 3).join(' · ') || '–',
     age: getAge(p), foot: footLabel(p), height: p.height ? p.height + ' cm' : '–',
     ca, pa, hideNum, hexNum: state.hideMeta ? null : meta != null ? meta.toFixed(1) : '–',
     groups: cardGroups(p, isGk), roles,
     value: ev.v > 0 ? (ev.est ? '~' : '') + fmtMoney(ev.v) : '–',
     ask, wage: p.wage > 0 ? fmtWage(p.wage) + ' ' + wageSuf() : '–', contract: fmtDate(p.expires) || '–',
-    status: st, rep, injury, snap: 'FM26' + (snapDate ? ' · ' + snapDate : ''),
+    status: st, rep, injury, snap: (state.meta.game || 'FM26') + (snapDate ? ' · ' + snapDate : ''),
   };
 }
 
-const CARD_TIER = { elite: '#46c46e', strong: '#4aa3ff', neutral: '#aeb9c6', gold: '#f5c518' };
-const cardFmc = v => v >= 16 ? '#46c46e' : v >= 11 ? '#e8a13c' : '#aeb9c6';
+const CARD_TIER = { elite: '#3fc56f', strong: '#4aa3ff', neutral: '#c0c3e6', gold: '#f5c518' };
+const cardFmc = v => v >= 16 ? '#3fc56f' : v >= 11 ? '#e8a13c' : '#c0c3e6';
 function cardAlpha(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
 
 function drawPlayerCard(p) {
@@ -3149,7 +3308,7 @@ function drawPlayerCard(p) {
   cv.width = 1200; cv.height = 1600;
   const x = cv.getContext('2d');
   const W = 600, H = 800, g = 1;
-  const P = { bg2: '#1c242f', bd: '#2a3441', tx: '#dbe4ee', mu: '#8294a8', gr: '#46c46e', am: '#e8a13c', gd: '#f5c518' };
+  const P = { bg2: '#1f2352', bd: '#2a2f62', tx: '#e9ebfa', mu: '#959ac8', gr: '#3fc56f', am: '#e8a13c', gd: '#f5c518' };
   const T = CARD_TIER[d.tier], wk = d.wk;
   const A = cardAlpha, fmc = cardFmc;
   const F = (w, s) => `${w} ${s}px "Segoe UI", system-ui, sans-serif`;
@@ -3167,7 +3326,7 @@ function drawPlayerCard(p) {
       const cx0 = x0 + i * step;
       const f = Math.max(0, Math.min(1, val - i));
       const frac = f >= .75 ? 1 : f >= .25 ? .5 : 0;
-      starPath(cx0, cy, r); x.fillStyle = A('#0b0f14', .5); x.fill();
+      starPath(cx0, cy, r); x.fillStyle = A('#0b0c24', .5); x.fill();
       x.strokeStyle = A(fillCol, .45); x.lineWidth = 1.25; x.stroke();
       if (frac > 0) {
         x.save(); starPath(cx0, cy, r); x.clip();
@@ -3183,7 +3342,7 @@ function drawPlayerCard(p) {
   x.clearRect(0, 0, W, H);
   x.textBaseline = 'alphabetic';
   x.save(); rr(0, 0, W, H, 20); x.clip();
-  let bg = x.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#1c242f'); bg.addColorStop(.45, '#151b24'); bg.addColorStop(1, '#0e1218'); x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  let bg = x.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#1d1f4a'); bg.addColorStop(.45, '#171a3f'); bg.addColorStop(1, '#111330'); x.fillStyle = bg; x.fillRect(0, 0, W, H);
   let rg = x.createRadialGradient(300, 180, 0, 300, 180, 420); rg.addColorStop(0, A(T, d.tier === 'neutral' ? .08 : .13)); rg.addColorStop(1, A(T, 0)); x.fillStyle = rg; x.fillRect(0, 0, W, H);
   if (wk) { x.save(); x.translate(300, 400); x.rotate(-.42); x.fillStyle = A(P.gd, .04); x.fillRect(-150, -620, 110, 1240); x.fillStyle = A(P.gd, .03); x.fillRect(10, -620, 34, 1240); x.restore(); }
   let tb = x.createLinearGradient(0, 0, W, 0); tb.addColorStop(0, A(T, 0)); tb.addColorStop(.12, A(T, .95)); tb.addColorStop(.88, A(T, .95)); tb.addColorStop(1, A(T, 0)); x.shadowColor = A(T, .6 * g); x.shadowBlur = 16 * g; x.fillStyle = tb; x.fillRect(0, 0, W, 5); x.shadowBlur = 0;
@@ -3232,7 +3391,7 @@ function drawPlayerCard(p) {
     gridHead(grp[0], x0, 250);
     grp[1].forEach(([nm, v], idx) => {
       const ry = rowY0 + idx * rowH;
-      if (idx % 2 === 0) { rr(x0 - 6, ry - 14, colW + 12, 19, 4); x.fillStyle = A('#0b0f14', .35); x.fill(); }
+      if (idx % 2 === 0) { rr(x0 - 6, ry - 14, colW + 12, 19, 4); x.fillStyle = A('#0b0c24', .35); x.fill(); }
       // lange NL-labels ("Beheersing strafschopgebied") krimpen eerst, afkappen is laatste redmiddel
       x.textAlign = 'left'; const lsz = fit(nm, colW - 36, 10.5, 8.5, 600); x.font = F(600, lsz); x.fillStyle = A(P.tx, .72); x.fillText(trunc(nm, colW - 36), x0, ry);
       const vx = x0 + colW;
@@ -3433,7 +3592,7 @@ async function reportBug() {
     '### What happened?', '', '_Describe the problem here._', '',
     '### Environment (auto-filled)',
     `- FMSuperScout app: v${APP_VERSION}`,
-    `- Plugin: ${m.pluginVersion || 'unknown (dump predates v0.1.34 or no dump loaded)'}`,
+    `- Reader: ${m.host || 'plugin'} ${m.pluginVersion || 'unknown (dump predates v0.1.34 or no dump loaded)'}${m.game ? ' · ' + m.game : ''}`,
     `- FM game version: ${m.gameVersion || 'unknown'} (supported: ${m.supportedVersion || '?'}, ok: ${m.versionOk ?? '?'})`,
     `- Players/staff loaded: ${state.players.length} / ${state.staff.length}`,
     ...(lastStatus && lastStatus.dumpSize
@@ -3456,6 +3615,66 @@ async function reportBug() {
 // het permanent stil; donateurs krijgen een goudkleurig koffie-icoon als bedankje.
 const KOFI = 'https://ko-fi.com/fmsuperscout';
 function openKofi() { window.open(KOFI, '_blank', 'noopener'); }
+
+// ---------- steunvenster ----------
+// Het koffie-icoon opent eerst dit venstertje in plaats van direct Ko-fi: drie manieren om
+// te helpen, waarvan twee gratis (een ster op GitHub, de tool delen). Wie niet wil of kan
+// betalen kan zo toch iets terugdoen, en niemand belandt onverwacht op een betaalpagina.
+// "Al gedoneerd?" staat hier altijd, niet alleen in het seizoenskaartje.
+const GITHUB_URL = 'https://github.com/mavarobli/FMSuperScout';
+const DOWNLOAD_URL = 'https://github.com/mavarobli/FMSuperScout/releases/latest';
+function closeSupport() {
+  $('support-pop').classList.add('hidden');
+  document.removeEventListener('keydown', supportKey, true);
+  document.removeEventListener('mousedown', supportOutside, true);
+}
+const supportKey = e => { if (e.key === 'Escape') { e.stopPropagation(); closeSupport(); $('btn-coffee').focus(); } };
+const supportOutside = e => { if (!e.target.closest('#support-pop, #btn-coffee')) closeSupport(); };
+async function copyText(txt) {
+  try { await navigator.clipboard.writeText(txt); return true; }
+  catch {
+    // Vangnet (bv. geen klembordrechten): via een tijdelijk tekstveld.
+    const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch { }
+    ta.remove(); return ok;
+  }
+}
+function openSupport() {
+  const el = $('support-pop');
+  if (!el.classList.contains('hidden')) { closeSupport(); return; }
+  const sup = localStorage.getItem('fmss_supporter') === '1';
+  const act = (id, ico, title, sub, href) => {
+    const inner = `<span class="sp-ico">${ico}</span><span class="sp-txt"><b>${escHtml(t(title))}</b><span>${escHtml(t(sub))}</span></span>`;
+    return href ? `<a class="sp-act" data-sp="${id}" href="${href}" target="_blank" rel="noopener">${inner}</a>`
+                : `<button type="button" class="sp-act" data-sp="${id}">${inner}</button>`;
+  };
+  el.innerHTML = `<button type="button" class="sp-x" aria-label="${escHtml(t('donateLater'))}">${icon('x', 12)}</button>
+    <div class="sp-title" id="sp-title">${icon('heart', 15)} ${escHtml(t('spTitle'))}</div>
+    <p class="sp-intro">${escHtml(t('spIntro'))}</p>
+    ${act('kofi', '<span aria-hidden="true">☕</span>', 'spKofi', 'spKofiSub', KOFI)}
+    ${act('star', icon('star', 16), 'spStar', 'spStarSub', GITHUB_URL)}
+    ${act('share', icon('link', 16), 'spShare', 'spShareSub', null)}
+    <div class="sp-foot">${sup ? `<span class="sp-thanks">${icon('check', 12)} ${escHtml(t('spThanks'))}</span>`
+                               : `<button type="button" class="sp-donated">${escHtml(t('alreadyDonated'))}</button>`}</div>`;
+  el.classList.remove('hidden');
+  el.querySelector('.sp-x').onclick = closeSupport;
+  el.querySelector('[data-sp="kofi"]').addEventListener('click', () => closeSupport());
+  el.querySelector('[data-sp="star"]').addEventListener('click', () => closeSupport());
+  el.querySelector('[data-sp="share"]').onclick = async () => {
+    const ok = await copyText(DOWNLOAD_URL);
+    showToast(ok ? t('spCopied') : DOWNLOAD_URL, ok ? 'check' : 'link');
+    closeSupport();
+  };
+  const d = el.querySelector('.sp-donated');
+  if (d) d.onclick = () => {
+    localStorage.setItem('fmss_kofi_off', '1'); localStorage.setItem('fmss_supporter', '1');
+    $('btn-coffee').classList.add('supporter');
+    showToast(t('supporterThanks'), 'check'); closeSupport();
+  };
+  document.addEventListener('keydown', supportKey, true);
+  document.addEventListener('mousedown', supportOutside, true);
+  el.querySelector('.sp-act').focus();
+}
 const kofiOff = () => localStorage.getItem('fmss_kofi_off') === '1';
 // Gebruikstellers voor het rapport; de baseline wordt bij elk rapport verschoven zodat
 // de cijfers per seizoen zijn, niet cumulatief.
@@ -3594,7 +3813,7 @@ function openCompare() {
     (two ? '<div class="cmp-cell cmp-delta"></div>' : '') + '</div>';
 
   // ----- winsttelling (voor het kop-badge): bij hoeveel attributen uniek de beste? -----
-  const isGk = players.every(p => (p.posArr || []).includes('GK'));
+  const isGk = players.every(p => natPos(p).includes('GK'));
   const groups = isGk ? ATTR_GROUPS_GK : ATTR_GROUPS_OUTFIELD;
   const wins = players.map(() => 0);
   for (const [, keys] of groups)
@@ -3744,7 +3963,7 @@ function analyseSquad() {
   const squad = state.players.filter(p => (p.club || '').toLowerCase() === club);
   const groups = SQUAD_GROUPS.map(g => {
     const set = new Set(g.pos);
-    const members = squad.filter(p => (p.posArr || []).some(x => set.has(x))).sort((a, b) => (b.ca || 0) - (a.ca || 0));
+    const members = squad.filter(p => natPos(p).some(x => set.has(x))).sort((a, b) => (b.ca || 0) - (a.ca || 0));
     const cas = members.map(p => p.ca || 0);
     const ages = members.map(p => getAge(p)).filter(x => x != null);
     const bestCa = cas.length ? Math.max(...cas) : 0;
@@ -3903,8 +4122,9 @@ $('btn-clear').onclick = () => {
   applyFilters();
 };
 $('btn-sidebar').onclick = () => document.body.classList.toggle('sidebar-collapsed');
+$('rail-open').onclick = () => document.body.classList.remove('sidebar-collapsed');
 $('btn-export').onclick = exportShortlist;
-$('btn-coffee').onclick = openKofi;
+$('btn-coffee').onclick = openSupport;
 $('btn-report').onclick = reportBug;
 $('es-report').onclick = reportBug;
 // Handmatige update-check in Instellingen, naast de stille 20-uurs autocheck.
@@ -3957,15 +4177,27 @@ checkSetupState();
 // één scherm past (progressive disclosure). Eigen klikgedrag wordt daarna onthouden.
 const rawSecs = localStorage.getItem('fmss_secs');
 const collapsedSecs = new Set(rawSecs ? JSON.parse(rawSecs) : ['presets', 'role', 'development', 'physical', 'financial', 'origin', 'availability']);
+// Koppen zijn divs (de i18n-pass zet hun tekst); maak ze als knop bedienbaar met het
+// toetsenbord (Tab + Enter/Spatie) en meld open/dicht aan schermlezers.
+const asButton = (el, onActivate) => {
+  el.setAttribute('role', 'button'); el.tabIndex = 0;
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onActivate(); } });
+};
 document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
-  const key = sec.dataset.sec;
+  const key = sec.dataset.sec, head = sec.querySelector('.fsec-head');
   if (collapsedSecs.has(key)) sec.classList.add('collapsed');
-  sec.querySelector('.fsec-head').addEventListener('click', () => {
+  const sync = () => head.setAttribute('aria-expanded', String(!sec.classList.contains('collapsed')));
+  const toggle = () => {
     sec.classList.toggle('collapsed');
     if (sec.classList.contains('collapsed')) collapsedSecs.add(key); else collapsedSecs.delete(key);
     localStorage.setItem('fmss_secs', JSON.stringify([...collapsedSecs]));
-  });
+    sync();
+  };
+  head.addEventListener('click', toggle);
+  asButton(head, toggle);
+  sync();
 });
+asButton($('club-badge'), () => $('club-badge').onclick());
 
 // '/' focust het zoekveld
 document.addEventListener('keydown', e => {
@@ -3985,6 +4217,22 @@ document.addEventListener('keydown', e => {
   if (y < wrap.scrollTop) wrap.scrollTop = y;
   else if (y + ROW_H * 2 > wrap.scrollTop + wrap.clientHeight) wrap.scrollTop = y - wrap.clientHeight + ROW_H * 2;
   showDetail(state.filtered[i]);
+});
+
+// Manager kiezen in een netwerk-save: onthouden per save en de afgeleide staat opnieuw opbouwen.
+$('mgr-pick').addEventListener('change', () => {
+  const list = state.meta.managers || [], m = list[Number($('mgr-pick').value)];
+  if (!m) return;
+  try { localStorage.setItem(mgrChoiceKey(list), JSON.stringify({ name: m.name, club: m.club })); } catch { }
+  state.meta.manager = m.name; state.meta.myClub = m.club; state.meta.myClubRep = m.clubRep;
+  for (const p of state.players) { p._int = undefined; p._fee = undefined; }   // interesse/vraagprijs hangen van jouw club af
+  state._wageCeil = undefined;   // loonplafond is dat van jouw club
+  renderClubBadge();
+  renderMyTeamChips();
+  // Deze dump hoort nu bij de gekozen carrière: opnieuw als momentopname aanbieden.
+  try { localStorage.removeItem('fmss_hist_at'); } catch { }
+  postHistorySnapshot();
+  loadHistDeltas().then(() => applyFilters());
 });
 
 // club-badge klik → filters wissen + mijn club aan
@@ -4101,7 +4349,7 @@ $('btn-fetch').onclick = async () => {
         // Structureel niet opgepikt = vrijwel altijd de FM-zelfherstart die de mod-laag
         // eruit gooit (TROUBLESHOOTING.md 4d) → link direct naar de fix.
         b.innerHTML = bannerMsg('warning', t('reqNoPickup')) +
-          ` <a href="https://github.com/mavarobli/FMSuperScout/blob/main/TROUBLESHOOTING.md#4d-fm26-is-not-picking-up-the-request-on-every-single-attempt" target="_blank" rel="noopener">${escHtml(t('reqNoPickupMore'))}</a>`;
+          ` <a href="https://github.com/mavarobli/FMSuperScout/blob/main/TROUBLESHOOTING.md#2-football-manager-is-not-picking-up-the-request" target="_blank" rel="noopener">${escHtml(t('reqNoPickupMore'))}</a>`;
         b.onclick = () => { b.className = 'hidden'; };
       } catch { }
     }, 15000);
@@ -4120,6 +4368,7 @@ function applyLang() {
   document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
   document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
   document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); el.title = t(el.dataset.i18nAria); });
   // ?-helpteksten tonen via de eigen app-tooltip (zie initHelpTip), niet meer via title.
   $('f-name').placeholder = t('searchph');
   $('btn-coffee').title = t('donateBtn');
@@ -4147,7 +4396,14 @@ function applyLang() {
 }
 
 function setMode(mode) {
+  const wasStaff = state.mode === 'staff';
   state.mode = mode;
+  // Elke soort lijst houdt zijn eigen attribuutregels: meewisselen met de modus.
+  if (wasStaff !== (mode === 'staff')) {
+    if (wasStaff) state.advStaff = state.advF; else state.advPlayers = state.advF;
+    state.advF = mode === 'staff' ? (state.advStaff || []) : (state.advPlayers || jread('fmss_adv', []));
+    updateAdvBtn();
+  }
   const isAn = mode === 'analysis';
   $('tab-players').classList.toggle('active', mode === 'players');
   $('tab-staff').classList.toggle('active', mode === 'staff');

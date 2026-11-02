@@ -5,6 +5,90 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-02
+
+Scanner 1.6.0, plugin 0.2.0. Football Manager 27 support, without BepInEx.
+
+### Added
+- **Football Manager 27.** FMSuperScout reads FM27 (game_plugin 27.0, Unity 6000.3). The
+  database layout turned out to be almost unchanged from FM26; every field was re-verified
+  against a running FM 27.0 save (names, ages, CA/PA, attributes per position, positions,
+  contracts, wages, values, loans, clubs, competitions, staff roles and attributes,
+  personality, gender bit) and against FM's own squad screen. Only the human-manager class
+  offset moved (0x450 → 0x440).
+- **External scanner** (`FMSuperScout.Scanner.exe`, self-contained, ~10 MB): reads
+  `fm.exe` from the outside, read-only, with the same scan core as the old plugin. Works
+  for FM27 and FM26. A full FM27 scan of 40k players + 24k staff takes about 6 seconds.
+  F9 still works in-game: a small watcher starts with the app and stays active as long as
+  Football Manager runs, also after you close the app.
+- Memory layouts per FM version (`core/Fields.cs`): the scanner picks the layout from the
+  game_plugin.dll version. A new FM version is a new layout with only the changed fields.
+
+### Changed
+- **No more BepInEx.** The installer only installs the app and the scanner; nothing goes
+  into the game folder any more. This removes the known BepInEx problems at once: antivirus
+  quarantining `winhttp.dll`, the 1-3 minute first launch, and the Doorstop relaunch bug
+  that left F9 dead (issues #7, #12, #13, #14, #25). An FM26 plugin that is already
+  installed keeps working; plugin and scanner never scan at the same time.
+- New look in FM27 style: deep navy-indigo with a subtle violet accent for controls; green
+  is reserved for "good" (CA, growth, best values). Player card and logo follow suit.
+- Growth history is kept per game: an FM27 career with the same manager name no longer
+  writes into the FM26 history (player IDs carry over between editions, so growth would
+  have compared FM26 with FM27 values).
+- UI texts no longer name a specific FM version.
+
+- Positions now show natural **and accomplished** positions (rating 15+), like FM's own
+  position column; accomplished ones are dimmed behind the natural ones (issue #23). Keeper
+  weighting, potential projection and squad analysis keep using natural positions only.
+- Staff attributes are translated and grouped like FM27's own staff profile (training,
+  mental, knowledge, medical & data) in all four languages (issue #26). Thanks to
+  MisterC72 for PR #27. Every attribute was checked against FM27's staff screens: what the
+  old labels called goalkeeping distribution/handling/reflexes turned out to be Authority,
+  an unknown mental value and Goalkeeping; Adaptability (from personality) is new.
+- New filter panel: quick filters (wonderkids, contract ending, for sale, my club), the
+  active filters with "clear all" at the top, a count per section, filled-in fields
+  highlighted, saved filters always at the bottom, and a slim rail with a filter count when
+  the panel is collapsed. The results line reads "145 of 40,246 players".
+- New logo: the centre circle.
+- The coffee icon opens a small support panel instead of jumping straight to Ko-fi: buy a
+  coffee, star the project on GitHub (free), or copy the download link to share it.
+  "Already donated?" is always there.
+- The attribute filter works on staff too, with staff attributes, and keeps separate rules
+  for the players and staff lists.
+- Network/multiplayer saves: when a save has more than one human manager, a picker next
+  to the club badge lets you choose which one is you; the choice is remembered per save.
+- MIT license file added (issue #11).
+
+### Fixed
+- "Working with youngsters" was divided by five (it is stored as 1-20), so it always showed
+  0-4. Heads of youth development now average 16, as they should.
+- Recruitment analysts, performance analysts and heads of performance analysis showed as
+  generic "Staff" (in FM26 too: the old role codes never occurred in either game).
+- Reopening the app while the F9 watcher of an earlier session was still running (FM open)
+  could leave the new session without a watcher once FM closed; the running watcher now
+  takes over the new session, and "New data" restarts a watcher that has stopped.
+- A hanging scan no longer blocks F9 and "New data" for the rest of the session (stopped after
+  5 minutes), and a scan that cannot start (e.g. blocked by antivirus) no longer stops the
+  watcher.
+- With the old FM26 BepInEx plugin still installed, F9 started two scans at once; the
+  watcher now steps aside when it sees the plugin loaded in the game.
+- The scanner opens Football Manager with read-only rights; the extra rights for the frozen
+  snapshot retry are only requested when that retry is needed, and the snapshot is released
+  correctly.
+- Network saves: without a choice the same manager is now picked on every scan, so growth
+  history no longer splits; picking a manager updates the wage ceiling, team chips and
+  history right away.
+- Saved filters keep player and staff attribute rules apart instead of overwriting each
+  other.
+- Filter section headers and the club badge can be used with the keyboard.
+- Old dumps no longer show "Working with youngsters" with its broken value.
+- The active-filter marker on the Position section never appeared.
+- Network saves could pair the name of one human manager with the club of another.
+- Football Manager running as administrator was reported as "not running"; the scan now
+  says exactly what is wrong and how to fix it.
+- The gold coffee icon for supporters had turned into the accent colour.
+- The zip package (`build-package.ps1`) missed `nations.js`.
+
 ## [1.5.0] - 2026-08-04
 
 Plugin: v0.1.46. The community release: meta for everyone, four languages,

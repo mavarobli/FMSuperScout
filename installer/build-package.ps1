@@ -14,9 +14,14 @@ New-Item -ItemType Directory -Force -Path $pkg | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $pkg 'app') | Out-Null
 
 # App-bestanden (alleen wat de tool nodig heeft; geen testdata/servertooling voor devs)
-foreach ($f in @('server.js', 'index.html', 'app.js', 'style.css', 'logo.svg')) {
+foreach ($f in @('server.js', 'index.html', 'app.js', 'nations.js', 'style.css', 'logo.svg')) {
   Copy-Item (Join-Path $repo "app\$f") -Destination (Join-Path $pkg 'app') -Force
 }
+
+# Scanner (self-contained exe) naast node.exe: server.js zoekt hem op ..\FMSuperScout.Scanner.exe
+& dotnet publish (Join-Path $repo 'scanner\FMSuperScout.Scanner.csproj') -c Release --nologo
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish scanner faalde (exit $LASTEXITCODE)" }
+Copy-Item (Join-Path $repo 'scanner\dist\FMSuperScout.Scanner.exe') -Destination $pkg -Force
 
 # Installer-bestanden
 foreach ($f in @('FMSuperScout.vbs', 'icon.ico', 'install.ps1', 'uninstall.ps1',
