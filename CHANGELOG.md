@@ -5,6 +5,8 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-02
+
 FMSuperScout for Mac. Windows: same results, internals reorganised.
 
 ### Added
