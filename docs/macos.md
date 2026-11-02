@@ -36,8 +36,50 @@ MacBook Pro M1 Pro (16 GB), macOS 27.0, SIP aan, geen Rosetta. FM27 27.0.0.24867
   - Verder o.a. `db::CLUB`, `db::TEAM`, `db::COMP`, `db::FULL_CONTRACT`, `db::CITY`,
     `db::STADIUM`, `db::NATIONAL_TEAM`, `db::LOAN_CONTRACT`, `MANAGER_DETAILS`.
 - Aantallen komen overeen met Windows op dezelfde save (24.058 vs. 24.057 staf).
-- Volgende stap: de veld-offsets binnen deze objecten vastleggen door objecten van bekende
-  personen te dumpen en naast de Windows-waarden te leggen.
+
+### Veldkaart Mac ↔ Windows (gemeten, 2 november 2026)
+
+Objectdumps van Givairo Read, Luciano Valente (spelers), Oscar Moens en Zeb Jacobs (staf) op
+dezelfde save als Windows, naast de Windows-waarden gelegd. Alles hieronder klopt byte-exact
+(waarde £65.812.584, CA/PA, posities, attributen, persoonlijkheid, geboortedatum, UID,
+salaris, contracteinde, clubreputatie) [M].
+
+Het verschil zit alléén in hoe de persoonsobjecten zijn opgebouwd (MSVC vs. Itanium plaatst
+de basisklassen anders). De velden zelf liggen in vaste blokken die één-op-één verschuiven:
+
+| Blok | Windows | Mac (`db::ACTUAL_PLAYER`, 0x3A8 groot, begin S) |
+|---|---|---|
+| Speler (`PLAO_*`: posities, attributen, CA/PA, reputatie, lengte, waarde) | t.o.v. speler = persoon − 0x288 | **S + (Windows-offset − 8)**: posities S+0x148, CA S+0x25C, PA S+0x25E, waarde S+0x22C |
+| Persoon (`PERO_*`: namen, land, persoonlijkheid, geboortedatum, contract) | persoon + offset | **S + 0x278 + (offset − 0x30)**: voornaam S+0x298, contract S+0x2F0 |
+| DB-basis (UID, geslachtsbyte) | persoon + 0x0C / + 0x19 | **S + 0x388** + 0x0C / + 0x19 |
+
+| Blok | Windows | Mac (`db::ACTUAL_NON_PLAYER`, 0x228 groot, begin M) |
+|---|---|---|
+| Staf (`NPLO_*`: CA/PA, stafattributen) | t.o.v. staf = persoon − 0x100 | **M + zelfde offset** (CA M+0xDA, attributen M+0x10…) |
+| Persoon (`PERO_*`) | persoon + offset | **M + 0xF8 + (offset − 0x30)** |
+| DB-basis (UID, geslacht) | persoon + 0x0C / + 0x19 | **M + 0x208** + 0x0C / + 0x19 |
+
+**Ongewijzigd t.o.v. Windows** [M]: `db::FULL_CONTRACT` (team +0x10, salaris +0x20, functie
++0x26, einddatum +0x48), `db::TEAM` (teamtype +0x28, club +0x30, spelerslijst +0x38/+0x40,
+competitie +0x50/+0x60, manager +0x80, schema +0xA0, reputatie +0xA8), `db::CLUB` (teams
++0x18/+0x20, naam +0xC0/+0xC8), `db::COMP` (naam +0x40/+0x48), `db::NATION` (UID +0x0C,
+naam +0x20). Datums gebruiken dezelfde codering (jaar << 16 | dag-van-jaar).
+
+Klassen worden op de Mac herkend aan hun RTTI-naam in plaats van aan de MSVC-offset-truc.
+Nog niet gemeten: de klasse voor spelers die ook staf zijn (Windows 0x380), het menselijke
+manager-object (`db::HUMAN_NON_PLAYER` staat in TEAM+0x80) en de in-game datum (TEAM+0xA0 →
++0x94, vrijwel zeker gelijk).
+
+### Wat er nog moet gebeuren voor een Mac-versie
+
+De veldkaart (oorspronkelijk fase 3, 8-15 dagen) is daarmee grotendeels klaar. Resterend:
+1. **Mac-backend in `core/`** (4-6 dagen): geheugenbron via `mach_vm_read_overwrite` binnen
+   het proces, modulekaart via dyld, klassen op RTTI-naam, de veldkaart hierboven als layout;
+   gebouwd met .NET NativeAOT als dylib (geen JIT nodig, dus geen extra entitlement).
+2. **Starter** (2-3 dagen): een kleine Mac-app die FM start met de module erbij (de
+   Steam-startoptie werkt op de Mac niet), en de request-flag/F9 afhandelt.
+3. **Web-app cross-platform** (2-3 dagen): datamap, procesdetectie, venster openen.
+4. **Testen** op de MacBook met dezelfde save als Windows: de uitkomst moet gelijk zijn.
 
 ## Kort
 
