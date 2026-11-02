@@ -339,12 +339,48 @@ internal sealed partial class MemScan
         yield return "";
     }
 
+    private const string CoreFoundation = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation";
+    [DllImport(CoreFoundation)] private static extern nint CFBundleGetMainBundle();
+    [DllImport(CoreFoundation)] private static extern nint CFBundleGetValueForInfoDictionaryKey(nint bundle, nint key);
+    [DllImport(CoreFoundation)] private static extern nint CFStringCreateWithCString(nint alloc, string s, uint encoding);
+    [DllImport(CoreFoundation)] private static extern unsafe byte CFStringGetCString(nint s, byte* buf, nint size, uint encoding);
+    [DllImport(CoreFoundation)] private static extern nint CFGetTypeID(nint cf);
+    [DllImport(CoreFoundation)] private static extern nint CFStringGetTypeID();
+    [DllImport(CoreFoundation)] private static extern void CFRelease(nint cf);
+    private const uint kCFStringEncodingUTF8 = 0x08000100;
+
+    // Waarde uit de Info.plist van fm.app, via CoreFoundation (leest ook binaire plists).
+    private static unsafe string MainBundleString(string key)
+    {
+        nint k = CFStringCreateWithCString(0, key, kCFStringEncodingUTF8);
+        if (k == 0) return null;
+        try
+        {
+            nint v = CFBundleGetValueForInfoDictionaryKey(CFBundleGetMainBundle(), k);
+            if (v == 0 || CFGetTypeID(v) != CFStringGetTypeID()) return null;
+            byte* buf = stackalloc byte[128];
+            return CFStringGetCString(v, buf, 128, kCFStringEncodingUTF8) != 0 ? Marshal.PtrToStringUTF8((nint)buf) : null;
+        }
+        finally { CFRelease(k); }
+    }
+
     /// <summary>
-    /// Versie uit de Info.plist van game_plugin.bundle, anders die van fm.app; lukt beide niet,
-    /// dan de hoofdversie uit de programmanaam ("Football Manager 27"), met onbekende minor.
+    /// Versie van fm.app (CoreFoundation), anders uit de Info.plist van game_plugin.bundle; lukt
+    /// dat niet, dan de hoofdversie uit de programmanaam ("Football Manager 27"), minor onbekend.
     /// </summary>
     public (string version, int major, int minor) GameVersionInfo()
     {
+        _appPath ??= Environment.ProcessPath;
+        foreach (string key in new[] { "CFBundleShortVersionString", "CFBundleVersion" })
+        {
+            try
+            {
+                var m = Regex.Match(MainBundleString(key) ?? "", @"^\s*(\d+)\.(\d+)");
+                if (m.Success && int.Parse(m.Groups[1].Value) >= 20)
+                    return (MainBundleString(key).Trim(), int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value));
+            }
+            catch { }
+        }
         foreach (string exe in new[] { GpPath, _appPath })
         {
             if (string.IsNullOrEmpty(exe)) continue;

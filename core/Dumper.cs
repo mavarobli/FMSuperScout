@@ -1229,7 +1229,8 @@ internal static class Dumper
             var (dAvailPhys, dAvailCommit, dLoad) = MemScan.MemoryStatus();
             w.WriteLine($"Host: {Host.Kind} v{Host.Version}  ·  game: {F.Game} (game_plugin {GameVersion ?? "?"}, gepind op {F.SupportedVersion}.x)");
             w.WriteLine($"Scanregio's: {m.ScanRegions.Count}  ·  leesbron: {ScanMode}");
-            w.WriteLine($"Geheugen (na scan): {dAvailPhys / (1024 * 1024):N0} MB fysiek vrij · {dAvailCommit / (1024 * 1024):N0} MB commit vrij · belasting {dLoad}%");
+            if (dAvailPhys != 0)   // 0 = onbekend (Mac)
+                w.WriteLine($"Geheugen (na scan): {dAvailPhys / (1024 * 1024):N0} MB fysiek vrij · {dAvailCommit / (1024 * 1024):N0} MB commit vrij · belasting {dLoad}%");
             if (m.ImageNote != null) w.WriteLine($"Let op: {m.ImageNote}");
             w.WriteLine($"GameAssembly.dll: {m.GaBase:X}-{m.GaEnd:X}");
             w.WriteLine($"game_plugin.dll:  {m.GpBase:X}-{m.GpEnd:X}");
