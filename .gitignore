@@ -7,6 +7,9 @@ plugin/obj/
 scanner/bin/
 scanner/obj/
 scanner/dist/
+mac/bin/
+mac/obj/
+mac/out/
 dist/
 installer/icon-256.png
 

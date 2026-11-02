@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    FMSuperScout voor macOS: de scan-kern (../core) als native bibliotheek (NativeAOT, geen
+    JIT nodig — FM27 heeft daar geen entitlement voor). De lader (loader/fmss_loader.c) laadt
+    hem in Football Manager; zie mac/README.md en docs/macos.md.
+
+    Bouwen kan alleen op een Mac (NativeAOT kent geen cross-OS-build):
+      dotnet publish mac -c Release -r osx-arm64     (of osx-x64)
+      → mac/bin/Release/net8.0/osx-arm64/publish/fmss_core.dylib
+    mac/build.sh doet dit plus de lader en de installatie.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>fmss_core</AssemblyName>
+    <RootNamespace>FMSuperScout</RootNamespace>
+    <Version>1.7.0</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DebugType>none</DebugType>
+    <PublishAot>true</PublishAot>
+    <NativeLib>Shared</NativeLib>
+    <SelfContained>true</SelfContained>
+    <!-- Kleinere bibliotheek: foutmeldingen van .NET zelf als sleutel i.p.v. volledige tekst. -->
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <StripSymbols>true</StripSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\core\*.cs" Exclude="..\core\*.Win.cs" />
+  </ItemGroup>
+
+</Project>

@@ -15,8 +15,11 @@ const APP_DIR = __dirname;
 // De plugin schrijft dumps hierheen. Zelfde bron als de plugin (%LOCALAPPDATA%): bij een
 // verplaatst/redirected profiel wijkt homedir+AppData af en keken app en plugin naar
 // verschillende mappen ("F9 werkt, app blijft leeg").
-const DATA_DIR = path.join(
-  process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'FMSuperScout');
+// Op de Mac: ~/Library/Application Support (daar schrijft de module in FM, = .NET's LocalApplicationData).
+const IS_MAC = process.platform === 'darwin';
+const DATA_DIR = IS_MAC
+  ? path.join(os.homedir(), 'Library', 'Application Support', 'FMSuperScout')
+  : path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'FMSuperScout');
 
 // App-modus (standalone venster): server sluit zichzelf af zodra het venster dicht is.
 // Het sluiten van het venster wordt betrouwbaar gemeld via /api/bye (pagehide-beacon).
@@ -268,7 +271,8 @@ function checkSetup(cb) {
     setupCache = { at: Date.now(), val };
     cb(val);
   };
-  execFile('reg', ['query', 'HKLM\\Software\\FMSuperScout', '/v', 'GamePath'],
+  if (process.platform !== 'win32') return done(null);   // geen register, geen BepInEx
+  execFile('reg', ['query','HKLM\\Software\\FMSuperScout', '/v', 'GamePath'],
     { windowsHide: true }, (err, out) => {
       const m = !err && /GamePath\s+REG_SZ\s+(.+)/i.exec(out || '');
       done(m ? m[1].trim() : null);
@@ -316,6 +320,7 @@ const server = http.createServer((req, res) => {
       dumpTime: dump ? dump.mtime : null,
       dumpSize: dump ? dump.size : null,   // uit latestDump: geen losse stat die kan racen met een F9-herschrijf
       appMode: APP_MODE,
+      platform: process.platform,
       scanner: !!SCANNER,
       plugin,
     }));
@@ -399,6 +404,21 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/fmstatus') {   // zie checkSetup hieronder voor de installatiestaat
     // Draait Football Manager? Zonder draaiende game valt er niets te scannen (scanner)
     // en wordt een data-verzoek nooit opgepikt (plugin).
+    if (IS_MAC) {
+      // Mac: draait FM, en draait het mét onze module? Die schrijft elke 5 s een teken van
+      // leven (mac-agent.json) met zijn pid; FM via Steam gestart heeft geen module.
+      execFile('pgrep', ['-x', 'Football Manager 27'], (err, out) => {
+        const pids = String(out || '').split(/\s+/).filter(Boolean).map(Number);
+        let module = false;
+        try {
+          const a = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'mac-agent.json'), 'utf8'));
+          module = pids.includes(a.pid) && Date.now() - a.at < 20000;
+        } catch { /* geen module actief */ }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ running: pids.length > 0, module }));
+      });
+      return;
+    }
     execFile('tasklist', ['/FI', 'IMAGENAME eq fm.exe', '/NH'], { windowsHide: true }, (err, out) => {
       const running = !err && /fm\.exe/i.test(out || '');
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -487,6 +507,11 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/update-install' && req.method === 'POST') {
+    if (process.platform !== 'win32') {   // de installer is Windows-only; de app linkt op de Mac naar de release
+      res.writeHead(501, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'not supported on this platform' }));
+      return;
+    }
     if (updState.phase === 'idle' || updState.phase === 'error')
       runUpdate().catch(e => { updState = { phase: 'error', error: String(e.message || e) }; });
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -543,7 +568,17 @@ process.on('uncaughtException', e => console.error('Onverwachte fout (server dra
 const URL_LOCAL = `http://localhost:${PORT}`;
 
 // Open de app in een chromeless Edge-venster (app-modus); anders in de standaardbrowser.
+// Mac: Chrome, Edge of Brave als app-venster als die er zijn, anders de standaardbrowser.
 function openApp() {
+  if (IS_MAC) {
+    const browser = ['Google Chrome', 'Microsoft Edge', 'Brave Browser']
+      .find(b => fs.existsSync(path.join('/Applications', `${b}.app`)));
+    const args = browser
+      ? ['-na', browser, '--args', `--app=${URL_LOCAL}`, `--user-data-dir=${path.join(DATA_DIR, 'window')}`, '--window-size=1440,900', '--no-first-run']
+      : [URL_LOCAL];
+    try { spawn('open', args, { detached: true, stdio: 'ignore' }).unref(); } catch { /* handmatig openen */ }
+    return;
+  }
   const edge = [
     path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
     path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),

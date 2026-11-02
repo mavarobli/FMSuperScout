@@ -40,7 +40,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\core\*.cs" />
+    <Compile Include="..\core\*.cs" Exclude="..\core\*.Mac.cs" />
   </ItemGroup>
 
 </Project>

@@ -54,7 +54,9 @@ internal static class Dumper
         public readonly Dictionary<uint, Person> Staff = new();
         public readonly Dictionary<int, int> OffsetHist = new();
         public readonly Dictionary<int, long> AllOffHist = new();
-        public readonly List<(ulong person, string name, string club, int rep)> Managers = new();
+        // obj = waar de scan het object vond (Windows: persoonsdeel; Mac: objectbegin = wat TEAM+0x80
+        // aanwijst), person = PERO-basis.
+        public readonly List<(ulong obj, ulong person, string name, string club, int rep)> Managers = new();
         public readonly Dictionary<ulong, uint> PersonToUid = new();
         public readonly List<ulong> ClubObjs = new();
         public long Candidates, VtGp, Women;
@@ -118,11 +120,22 @@ internal static class Dumper
     /// externe scanner reageren allebei op F9 en request.flag en schrijven naar dezelfde
     /// bestanden. Wie de mutex niet krijgt, slaat over (false) — er loopt al een dump.
     /// </summary>
+    private static readonly object LocalGate = new();
+
     public static bool TryDump(GameProcess game)
     {
         Mutex gate;
         try { gate = new Mutex(false, @"Local\FMSuperScout-dump"); }
         catch (UnauthorizedAccessException) { return false; }   // aangemaakt door een elevated dump die nu loopt
+        catch (PlatformNotSupportedException)
+        {
+            // NativeAOT op macOS kent geen benoemde mutexen. Daar scant alleen de module in
+            // FM zelf, dus een slot binnen het proces volstaat.
+            if (!Monitor.TryEnter(LocalGate)) return false;
+            try { DumpAll(game); }
+            finally { Monitor.Exit(LocalGate); }
+            return true;
+        }
         using var _ = gate;
         bool owned;
         try { owned = gate.WaitOne(0); }
@@ -181,7 +194,29 @@ internal static class Dumper
         // veldrapporten ("faalt willekeurig") herleidbaar tot wel/geen geheugendruk.
         var (availPhys, availCommit, memLoad) = MemScan.MemoryStatus();
         const ulong MB = 1024 * 1024;
-        Host.Info($"Geheugen: {availPhys / MB:N0} MB fysiek vrij · {availCommit / MB:N0} MB commit vrij · belasting {memLoad}%");
+        if (availPhys != 0)
+            Host.Info($"Geheugen: {availPhys / MB:N0} MB fysiek vrij · {availCommit / MB:N0} MB commit vrij · belasting {memLoad}%");
+
+        // Cap op MemScan.MaxWorkers (Windows 8): elke worker draagt een 32MB-leesbuffer, dus
+        // cores-1 werd op 16/32-core-machines 480MB-1GB extra RAM bovenop FM zelf — precies de
+        // machines waar mega-saves toch al tegen OOM aanhikken. Boven ~8 workers is
+        // ReadProcessMemory bovendien de flessenhals, niet de CPU.
+        int maxDop = System.Math.Clamp(Environment.ProcessorCount - 1, 1, MemScan.MaxWorkers);
+        // Weinig fysiek geheugen vrij? Minder workers: minder buffers en minder paging-druk
+        // tegelijk. Trager, maar het faalt niet — belangrijker op een doorsnee-pc.
+        if (availPhys != 0 && availPhys < 2048 * MB && maxDop > 2)
+        {
+            maxDop = 2;
+            Host.Info($"Weinig geheugen vrij ({availPhys / MB:N0} MB) — scan beperkt tot 2 workers.");
+        }
+        // Leesbuffers vóór de regiolijst: vastgepind en aangemeld, zodat de Mac-scan (die ín
+        // FM's proces ook onze eigen heap ziet) de kopieën erin niet als FM-objecten telt.
+        for (int t = 0; t < maxDop; t++)
+            if (BufPool[t] == null)
+            {
+                BufPool[t] = GC.AllocateUninitializedArray<byte>(ChunkSize, pinned: true);
+                MemScan.RegisterOwnBuffer(BufPool[t]);
+            }
 
         var mem = new MemScan(game, useSnapshot);
         // Bijgehouden zodat TryStartDump's finally de VA-kloon op élk pad vrijgeeft
@@ -224,7 +259,7 @@ internal static class Dumper
         var staff = new Dictionary<uint, Person>();
         var offsetHist = new Dictionary<int, int>();     // matches (speler/staf)
         var allOffHist = new Dictionary<int, long>();     // ALLE class-offsets (diagnose)
-        var managers = new List<(ulong person, string name, string club, int rep)>(); // human-managers
+        var managers = new List<(ulong obj, ulong person, string name, string club, int rep)>(); // human-managers
         var personToUid = new Dictionary<ulong, uint>(1 << 17); // person/objectstart-adres → uid
         var clubObjs = new List<ulong>();                        // gedetecteerde club-objecten
         long candidates = 0, vtGp = 0, women = 0;
@@ -239,18 +274,6 @@ internal static class Dumper
         ulong modLo = mem.ModLo, modHi = mem.ModHi;   // snelle inline-afwijzing in de hotloop
         object progLock = new();
         var regions = mem.ScanRegions.Where(r => r.size >= 0x40).ToList();
-        // Cap op 8 workers: elke worker draagt een 32MB-leesbuffer, dus cores-1 werd op
-        // 16/32-core-machines 480MB-1GB extra RAM bovenop FM zelf — precies de machines
-        // waar mega-saves toch al tegen OOM aanhikken. Boven ~8 workers is ReadProcessMemory
-        // bovendien de flessenhals, niet de CPU.
-        int maxDop = System.Math.Clamp(Environment.ProcessorCount - 1, 1, 8);
-        // Weinig fysiek geheugen vrij? Minder workers: minder buffers en minder paging-druk
-        // tegelijk. Trager, maar het faalt niet — belangrijker op een doorsnee-pc.
-        if (availPhys != 0 && availPhys < 2048 * MB && maxDop > 2)
-        {
-            maxDop = 2;
-            Host.Info($"Weinig geheugen vrij ({availPhys / MB:N0} MB) — scan beperkt tot 2 workers.");
-        }
 
         // N workers, elk een round-robin-deel van de regio's (regio's variëren sterk in
         // grootte → interleaven balanceert de last). Task.Run i.p.v. Parallel.ForEach:
@@ -270,7 +293,7 @@ internal static class Dumper
             var L = locals[worker] = new ScanLocal();
             tasks[worker] = System.Threading.Tasks.Task.Run(() =>
             {
-                var buf = BufPool[worker] ??= new byte[ChunkSize];
+                var buf = BufPool[worker];
                 for (int ri = worker; ri < regions.Count; ri += maxDop)
                 {
                     var (start, size) = regions[ri];
@@ -308,56 +331,76 @@ internal static class Dumper
                             if (inGp) L.VtGp++;
 
                             ulong p = chunkBase + (ulong)i;
-                            int off = mem.DynamicOffsetFromVtable(vt);    // gecachte image → geen syscall
-                            if (off == 0) continue;
-                            uint uid = BitConverter.ToUInt32(buf, i + (int)F.OBJ_DUNI);   // uit de buffer
-                            if (uid == 0 || uid == 0xFFFFFFFF) continue;
-                            if (off is > 0 and < 0x2000)
-                                L.AllOffHist[off] = L.AllOffHist.GetValueOrDefault(off) + 1;
-
-                            bool isPlayer = off == F.PLAYER_OFFSET || off == F.PLAYER_STAFF_OFFSET;
-                            bool isStaff = off == F.STAFF_OFFSET || off == F.HUMAN_MANAGER_OFFSET;
-                            if (!isPlayer && !isStaff)
+                            var cls = mem.Classify(vt, p, F);             // gecachet → geen syscall per kandidaat
+                            if (cls == null) continue;
+                            if (cls.Kind == ObjKind.Club)
                             {
-                                ulong tb = mem.Ptr(p + F.CLUB_TEAMS_BEGIN), te = mem.Ptr(p + F.CLUB_TEAMS_END);
-                                if (tb != 0 && te > tb && (te - tb) % 8 == 0 && (te - tb) / 8 is >= 1 and <= 64
-                                    && ClubNameOf(mem, p) != null)
-                                    L.ClubObjs.Add(p);
+                                if (IsClub(mem, p)) L.ClubObjs.Add(p);
+                                continue;
+                            }
+                            // UID uit de buffer als hij erin valt (Windows: altijd), anders los gelezen.
+                            long uidAt = i + cls.DbOff + F.OBJ_DUNI;
+                            uint uid = uidAt >= 0 && uidAt + 4 <= want
+                                ? BitConverter.ToUInt32(buf, (int)uidAt)
+                                : mem.U32(p + (ulong)(cls.DbOff + F.OBJ_DUNI));
+                            if (uid == 0 || uid == 0xFFFFFFFF) continue;
+                            if (cls.Hist != 0)
+                                L.AllOffHist[cls.Hist] = L.AllOffHist.GetValueOrDefault(cls.Hist) + 1;
+                            if (cls.Kind == ObjKind.None)
+                            {
+                                if (mem.ClubsByShape && IsClub(mem, p)) L.ClubObjs.Add(p);
                                 continue;
                             }
 
-                            ulong basePtr = p - (ulong)off;
-                            if (isPlayer)
+                            ulong basePtr = p + (ulong)cls.BlockOff;     // speler- of stafblok
+                            ulong person = p + (ulong)cls.PersonOff;
+                            ulong db = p + (ulong)cls.DbOff;
+                            if (cls.Kind == ObjKind.Player)
                             {
                                 ushort ca = mem.U16(basePtr + F.PLAO_CA);
                                 ushort pa = mem.U16(basePtr + F.PLAO_PA);
                                 if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
                                 // Databasekeuze: sla het niet-gekozen geslacht over
-                                // (person+0x19 bit 0x10 = vrouw). ScanDb 2 = beide → niets overslaan.
-                                bool female = (mem.U8(p + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0;
+                                // (db+0x19 bit 0x10 = vrouw). ScanDb 2 = beide → niets overslaan.
+                                bool female = (mem.U8(db + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0;
                                 if (female ? ScanDb == 0 : ScanDb == 1) { L.Women++; continue; }
-                                L.OffsetHist[off] = L.OffsetHist.GetValueOrDefault(off) + 1;
+                                L.OffsetHist[cls.Hist] = L.OffsetHist.GetValueOrDefault(cls.Hist) + 1;
                                 if (!L.Players.ContainsKey(uid))
                                 {
-                                    L.Players[uid] = ReadPlayer(mem, p, basePtr, uid, ca, pa);
+                                    L.Players[uid] = ReadPlayer(mem, person, basePtr, db, uid, ca, pa);
                                     L.PersonToUid[p] = uid;
                                     L.PersonToUid[basePtr] = uid;
+                                    L.PersonToUid[person] = uid;
+                                    // Mac (DB-basis los van het objectbegin): ook het persoonsfacet
+                                    // en de DB-basis, voor als selectielijsten daarheen wijzen.
+                                    if (cls.DbOff != 0) { L.PersonToUid[person + 0x30] = uid; L.PersonToUid[db] = uid; }
                                 }
                             }
                             else
                             {
                                 ushort ca = mem.U16(basePtr + F.NPLO_CA);
                                 ushort pa = mem.U16(basePtr + F.NPLO_PA);
-                                if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
-                                L.OffsetHist[off] = L.OffsetHist.GetValueOrDefault(off) + 1;
+                                bool human = cls.Kind == ObjKind.HumanManager;
+                                if (ca < 1 || ca > 200 || pa < 1 || pa > 200)
+                                {
+                                    // Een op naam herkende manager (Mac) telt ook zonder leesbaar
+                                    // stafblok mee voor "mijn club"; als staflid alleen met CA/PA.
+                                    if (human && cls.Exact)
+                                    {
+                                        var (hc, hrep, _) = ResolveClub(mem, person);
+                                        L.Managers.Add((p, person, ReadName(mem, person), hc, hrep));
+                                    }
+                                    continue;
+                                }
+                                L.OffsetHist[cls.Hist] = L.OffsetHist.GetValueOrDefault(cls.Hist) + 1;
                                 if (!L.Staff.ContainsKey(uid))
                                 {
-                                    var st = ReadStaff(mem, p, basePtr, uid, ca, pa);
+                                    var st = ReadStaff(mem, person, basePtr, db, uid, ca, pa);
                                     L.Staff[uid] = st;
-                                    if (off == F.HUMAN_MANAGER_OFFSET)
+                                    if (human)
                                     {
-                                        var (mc, mrep, _) = ResolveClub(mem, p);
-                                        L.Managers.Add((p, st.Name, mc ?? st.Club, mrep));
+                                        var (mc, mrep, _) = ResolveClub(mem, person);
+                                        L.Managers.Add((p, person, st.Name, mc ?? st.Club, mrep));
                                     }
                                 }
                             }
@@ -426,7 +469,8 @@ internal static class Dumper
         // ---- Squad-gebaseerde clubkoppeling (authoritatief) ----
         // Loop clubs → teams → spelerslijst. Elke speler krijgt de club van zijn selectie.
         // Ook: welke club heeft de human-manager als teammanager → jouw club.
-        var mgrAddrs = new HashSet<ulong>(managers.Select(x => x.person));
+        var mgrAddrs = new HashSet<ulong>();
+        foreach (var mg in managers) { mgrAddrs.Add(mg.obj); mgrAddrs.Add(mg.person); }
         var squadClub = new Dictionary<uint, (string club, int tt, int rep, string div)>();
         MultiClub = new HashSet<uint>();
         MultiClubSample = new List<string>();
@@ -568,8 +612,8 @@ internal static class Dumper
         // vast de eerste in naamvolgorde; de app laat de gebruiker zelf kiezen.
         if (HumanManagers.Count > 1) { MyClub = HumanManagers[0].club; MyClubRep = HumanManagers[0].rep; }
         var me = managers.FirstOrDefault(x => MyClub != null && x.club == MyClub && !string.IsNullOrEmpty(x.name));
-        if (me.person == 0) me = managers.FirstOrDefault(x => !string.IsNullOrEmpty(x.club));
-        if (me.person == 0 && managers.Count > 0) me = managers[0];
+        if (me.obj == 0) me = managers.FirstOrDefault(x => !string.IsNullOrEmpty(x.club));
+        if (me.obj == 0 && managers.Count > 0) me = managers[0];
         ManagerName = me.name;
         if (MyClub == null) { MyClub = me.club; MyClubRep = me.rep; }
         if (HumanManagers.Count > 1)
@@ -656,7 +700,7 @@ internal static class Dumper
     }
 
     // ---------- speler ----------
-    private static Person ReadPlayer(MemScan m, ulong person, ulong pl, uint uid, ushort ca, ushort pa)
+    private static Person ReadPlayer(MemScan m, ulong person, ulong pl, ulong db, uint uid, ushort ca, ushort pa)
     {
         var e = new Person { Uid = uid, Ca = ca, Pa = pa, IsPlayer = true };
         e.Name = ReadName(m, person);
@@ -726,7 +770,7 @@ internal static class Dumper
         e.Controversy = ClampAttr(m.U8(person + F.PERO_CONTROVERSY));
         e.PersonAddr = person;
         e.PlAddr = pl;
-        e.Gender = (m.U8(person + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
+        e.Gender = (m.U8(db + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
         var (cname, crep, cdiv) = ResolveClub(m, person);
         e.Club = cname; e.ClubRep = crep; e.Div = cdiv;
         // Moederclub = club uit het volledige contract (person+0xA8→team→club). Voor verhuurde
@@ -738,7 +782,7 @@ internal static class Dumper
     }
 
     // ---------- staf ----------
-    private static Person ReadStaff(MemScan m, ulong person, ulong st, uint uid, ushort ca, ushort pa)
+    private static Person ReadStaff(MemScan m, ulong person, ulong st, ulong db, uint uid, ushort ca, ushort pa)
     {
         var e = new Person { Uid = uid, Ca = ca, Pa = pa, IsPlayer = false };
         e.Name = ReadName(m, person);
@@ -765,7 +809,7 @@ internal static class Dumper
             e.Job = JobName(e.JobId);
         }
         if (string.IsNullOrEmpty(e.Job)) e.Job = "Staflid";
-        e.Gender = (m.U8(person + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
+        e.Gender = (m.U8(db + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
         var (sclub, _, sdiv) = ResolveClub(m, person);
         e.Club = sclub; e.Div = sdiv;
         return e;
@@ -888,6 +932,14 @@ internal static class Dumper
         return null;
     }
 
+    // Clubobject: een teamvector [club+0x18, club+0x20) met 1..64 teams en een leesbare naam.
+    private static bool IsClub(MemScan m, ulong p)
+    {
+        ulong tb = m.Ptr(p + F.CLUB_TEAMS_BEGIN), te = m.Ptr(p + F.CLUB_TEAMS_END);
+        return tb != 0 && te > tb && (te - tb) % 8 == 0 && (te - tb) / 8 is >= 1 and <= 64
+            && ClubNameOf(m, p) != null;
+    }
+
     private static string ClubNameOf(MemScan m, ulong club)
     {
         string name = m.IndirectString(club + F.CLUB_NAME) ?? m.IndirectString(club + F.CLUB_SHORT_NAME);
@@ -977,13 +1029,12 @@ internal static class Dumper
         GameVersion = null; VersionOk = true; F = fallback;
         try
         {
-            if (string.IsNullOrEmpty(mem.GpPath)) return;
-            var fvi = FileVersionInfo.GetVersionInfo(mem.GpPath);
-            GameVersion = fvi.FileVersion;
+            var (version, major, minor) = mem.GameVersionInfo();
+            GameVersion = version;
             if (string.IsNullOrEmpty(GameVersion)) return;   // geen versie-info: geen oordeel
-            var layout = Fields.ForVersion(fvi.FileMajorPart);
+            var layout = Fields.ForVersion(major);
             F = layout ?? fallback;
-            VersionOk = layout != null && fvi.FileMinorPart == F.SupportedMinor;
+            VersionOk = layout != null && minor == F.SupportedMinor;
             Host.Info($"game_plugin.dll versie {GameVersion} → layout {F.Game} (gepind op {F.SupportedVersion}.x → {(VersionOk ? "ok" : "AFWIJKEND")})");
         }
         catch (Exception e) { Host.Warn("Versiedetectie mislukt: " + e.Message); }
@@ -1202,14 +1253,15 @@ internal static class Dumper
             }
             // Health-check: de grote pieken horen speler=0x288 en staf=0x100 te zijn. Wijkt dit
             // af na een FM-patch, dan zijn de class-offsets verschoven en moeten ze opnieuw gepind.
-            w.WriteLine("=== Class-offsets (meta+4) met plausibele UID, top 15 ===");
+            w.WriteLine("=== Klassen (Windows: class-offset meta+4) met plausibele UID, top 15 ===");
             foreach (var kv in AllOffHist.OrderByDescending(x => x.Value).Take(15))
-                w.WriteLine($"  0x{kv.Key:X} ({kv.Key,5}) : {kv.Value:N0}");
+                w.WriteLine($"  {m.HistLabel(kv.Key)} : {kv.Value:N0}");
             w.WriteLine();
-            w.WriteLine("Matches per offset (speler/staf-filter geslaagd):");
+            w.WriteLine("Matches per klasse (speler/staf-filter geslaagd):");
             foreach (var kv in hist.OrderByDescending(x => x.Value))
-                w.WriteLine($"  0x{kv.Key:X} ({kv.Key}) : {kv.Value}");
+                w.WriteLine($"  {m.HistLabel(kv.Key)} : {kv.Value}");
             w.WriteLine();
+            foreach (var line in m.ClassReport()) w.WriteLine(line);
             w.WriteLine($"Mijn club: {ManagerName} · {MyClub} · reputatie={MyClubRep}");
             w.WriteLine($"Clubs gedetecteerd: {ClubCount} · spelers via selectie gekoppeld: {LinkedViaSquad}");
             // NB: de "memory"-datum komt uit het team-wedstrijdschema (eerstvolgende speeldag),

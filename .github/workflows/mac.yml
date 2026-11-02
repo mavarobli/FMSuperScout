@@ -1,0 +1,42 @@
+# Bouwt de Mac-versie (NativeAOT kan alleen op macOS) en levert een universele map op:
+# fmss_core.dylib (arm64 + x86_64), de lader, FMSuperScout.command en de app. Zo is elke
+# wijziging aan core/ of mac/ ook voor de Mac gecompileerd, zonder dat er een Mac voor nodig is.
+name: mac
+on:
+  push:
+    paths: ['core/**', 'mac/**', 'app/**', '.github/workflows/mac.yml']
+  pull_request:
+    paths: ['core/**', 'mac/**']
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Module bouwen (arm64 + x64)
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+        run: |
+          for rid in osx-arm64 osx-x64; do
+            dotnet publish mac/FMSuperScout.Mac.csproj -c Release -r $rid -o out/$rid
+          done
+      - name: Universeel samenvoegen + lader
+        run: |
+          mkdir -p dist/FMSuperScout
+          lipo -create out/osx-arm64/fmss_core.dylib out/osx-x64/fmss_core.dylib -output dist/FMSuperScout/fmss_core.dylib
+          clang -dynamiclib -O2 -Wall -arch arm64 -arch x86_64 -o dist/FMSuperScout/fmss_loader.dylib mac/loader/fmss_loader.c
+          codesign -s - -f dist/FMSuperScout/fmss_core.dylib dist/FMSuperScout/fmss_loader.dylib
+          cp -R app dist/FMSuperScout/app
+          cp mac/FMSuperScout.command dist/FMSuperScout/
+          chmod +x dist/FMSuperScout/FMSuperScout.command
+          lipo -info dist/FMSuperScout/fmss_core.dylib
+          nm -gU dist/FMSuperScout/fmss_core.dylib | grep fmss_run
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FMSuperScout-mac
+          path: dist/

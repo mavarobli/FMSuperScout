@@ -70,16 +70,29 @@ Nog niet gemeten: de klasse voor spelers die ook staf zijn (Windows 0x380), het 
 manager-object (`db::HUMAN_NON_PLAYER` staat in TEAM+0x80) en de in-game datum (TEAM+0xA0 →
 +0x94, vrijwel zeker gelijk).
 
-### Wat er nog moet gebeuren voor een Mac-versie
+### Stand van de Mac-versie (branch `mac-support`, zie `mac/README.md`)
 
-De veldkaart (oorspronkelijk fase 3, 8-15 dagen) is daarmee grotendeels klaar. Resterend:
-1. **Mac-backend in `core/`** (4-6 dagen): geheugenbron via `mach_vm_read_overwrite` binnen
-   het proces, modulekaart via dyld, klassen op RTTI-naam, de veldkaart hierboven als layout;
-   gebouwd met .NET NativeAOT als dylib (geen JIT nodig, dus geen extra entitlement).
-2. **Starter** (2-3 dagen): een kleine Mac-app die FM start met de module erbij (de
-   Steam-startoptie werkt op de Mac niet), en de request-flag/F9 afhandelt.
-3. **Web-app cross-platform** (2-3 dagen): datamap, procesdetectie, venster openen.
-4. **Testen** op de MacBook met dezelfde save als Windows: de uitkomst moet gelijk zijn.
+Gebouwd, nog niet op de Mac getest:
+1. **Mac-backend in `core/`**: `MemScan.Mac.cs` naast `MemScan.Win.cs`, met een gedeelde
+   `MemScan.cs` en dezelfde `Dumper`. Lezen via `mach_vm_read_overwrite` binnen het proces,
+   modulekaart via dyld, klassen op RTTI-naam. De gemeten layouts hierboven staan als vaste
+   waarden in de code; de module meet ze bij elke scan ook zelf na (diagnostics: "= gemeten ✓").
+   Niet-gemeten klassen (speler-staf, `db::HUMAN_NON_PLAYER`) meet de module zelf op: het
+   persoonsfacet is het deelobject waarvan de contractpointer naar een `db::FULL_CONTRACT`
+   wijst, de DB-basis het laatste deelobject. Gebouwd met .NET NativeAOT als dylib.
+   Op Windows is de uitkomst na de ombouw identiek (zelfde save direct na elkaar gescand:
+   40.143 spelers, 24.058 staf, 0 verschillen).
+2. **Starter**: `mac/FMSuperScout.command` start de app en FM met de lader
+   (`mac/loader/fmss_loader.c`), die de module op een eigen thread start. Geen F9 op de Mac
+   (sneltoetsen uitlezen vraagt een macOS-toestemming voor FM); "Nieuwe data" in de app werkt
+   via request.flag. De module meldt zich elke 5 s (`mac-agent.json`), zodat de app ziet of FM
+   mét of zonder module draait.
+3. **Web-app**: datamap, procesdetectie (`pgrep`), venster (Chrome/Edge/Brave als app-venster,
+   anders de standaardbrowser), zelf-update alleen op Windows.
+4. **Bouwen**: `mac/build.sh` op de Mac zelf, of de workflow `mac.yml` (universeel artifact).
+
+Nog te doen: testen op de MacBook met dezelfde save als Windows (de uitkomst moet gelijk
+zijn), de in-game datum controleren, en daarna een downloadbare Mac-uitgave.
 
 ## Kort
 

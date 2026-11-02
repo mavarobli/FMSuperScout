@@ -115,6 +115,7 @@ const I18N = {
     dumping: 'Spelersdata inlezen…', dumpReady: 'Nieuwe data klaar, klik om te laden',
     dumpLoaded: 'Nieuwe data geladen',
     dumpError: 'Uitlezen mislukt', fmNotRunning: 'Start eerst Football Manager en laad je save.',
+    fmNoModule: 'Football Manager draait zonder FMSuperScout. Sluit FM en start het opnieuw via FMSuperScout.command (niet via Steam).',
     dumpIncomplete: 'De dump is onvolledig (FM was er waarschijnlijk nog mee bezig). Probeer het zo opnieuw.',
     reqNoPickup: 'Het verzoek wordt niet opgepikt. Is je save geladen? Probeer F9 in de game, of herstart FMSuperScout.',
     reqNoPickupMore: 'Blijft dit terugkomen? Lees de fix',
@@ -246,6 +247,7 @@ const I18N = {
     dumping: 'Reading player data…', dumpReady: 'New data ready, click to load',
     dumpLoaded: 'New data loaded',
     dumpError: 'Read failed', fmNotRunning: 'Start Football Manager and load your save first.',
+    fmNoModule: 'Football Manager is running without FMSuperScout. Quit FM and start it again with FMSuperScout.command (not from Steam).',
     dumpIncomplete: 'The dump is incomplete (FM was probably still writing it). Try again in a moment.',
     reqNoPickup: 'The request is not being picked up. Is your save loaded? Try F9 in the game, or restart FMSuperScout.',
     reqNoPickupMore: 'Keeps coming back? Read the fix',
@@ -377,6 +379,7 @@ const I18N = {
     dumping: 'Lecture des données…', dumpReady: 'Nouvelles données prêtes, cliquez pour charger',
     dumpLoaded: 'Nouvelles données chargées',
     dumpError: 'Échec de la lecture', fmNotRunning: 'Lancez d\'abord Football Manager et chargez votre sauvegarde.',
+    fmNoModule: 'Football Manager tourne sans FMSuperScout. Quittez FM et relancez-le avec FMSuperScout.command (pas depuis Steam).',
     dumpIncomplete: 'Le dump est incomplet (FM était sans doute encore occupé). Réessayez dans un instant.',
     reqNoPickup: 'La demande n\'est pas prise en compte. Sauvegarde chargée ? Essayez F9 dans le jeu, ou relancez FMSuperScout.',
     reqNoPickupMore: 'Ça revient sans cesse ? Lisez le correctif',
@@ -508,6 +511,7 @@ const I18N = {
     dumping: 'Spielerdaten werden gelesen…', dumpReady: 'Neue Daten bereit, zum Laden klicken',
     dumpLoaded: 'Neue Daten geladen',
     dumpError: 'Auslesen fehlgeschlagen', fmNotRunning: 'Starte zuerst Football Manager und lade deinen Spielstand.',
+    fmNoModule: 'Football Manager läuft ohne FMSuperScout. Beende FM und starte es erneut über FMSuperScout.command (nicht über Steam).',
     dumpIncomplete: 'Der Dump ist unvollständig (FM war vermutlich noch beschäftigt). Versuche es gleich noch einmal.',
     reqNoPickup: 'Die Anfrage wird nicht angenommen. Spielstand geladen? Versuche F9 im Spiel oder starte FMSuperScout neu.',
     reqNoPickupMore: 'Kommt das immer wieder? Lies den Fix',
@@ -3549,7 +3553,13 @@ async function startSelfUpdate(el) {
   const setTxt = (txt, cls = '') => { el.innerHTML = `<span class="${cls}">${escHtml(txt)}</span>`; };
   try {
     setTxt(tf('updDl', { pct: 0 }));
-    await fetch('/api/update-install', { method: 'POST' });
+    const r = await fetch('/api/update-install', { method: 'POST' });
+    // Geen installer voor dit platform (Mac): gewoon de releasepagina openen.
+    if (r.status === 501) {
+      window.open(`${REPO_URL}/releases/latest`, '_blank', 'noopener');
+      el.classList.add('hidden');
+      return;
+    }
     for (; ;) {
       await new Promise(r => setTimeout(r, 500));
       let st;
@@ -4332,6 +4342,8 @@ $('btn-fetch').onclick = async () => {
   try {
     const st = await (await fetch('/api/fmstatus')).json();
     if (!st.running) { b.className = 'scanning error'; b.innerHTML = bannerMsg('warning', t('fmNotRunning')); b.onclick = null; return; }
+    // Mac: FM via Steam gestart heeft de module niet; dan wordt het verzoek nooit opgepikt.
+    if (st.module === false) { b.className = 'scanning error'; b.innerHTML = bannerMsg('warning', t('fmNoModule')); b.onclick = null; return; }
     await fetch('/api/refresh', { method: 'POST' });
     fetchPending = true; fetchBaseDumpTime = lastDumpTime;
     b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('reqSent')); b.onclick = null;
