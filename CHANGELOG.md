@@ -60,8 +60,8 @@ Working towards 1.6.0: Football Manager 27 support, without BepInEx.
 ### Fixed
 - "Working with youngsters" was divided by five (it is stored as 1-20), so it always showed
   0-4. Heads of youth development now average 16, as they should.
-- Data analysts, heads of data analysis and heads of performance analysis showed as generic
-  "Staff" (in FM26 too: the old role codes never occurred in either game).
+- Recruitment analysts, performance analysts and heads of performance analysis showed as
+  generic "Staff" (in FM26 too: the old role codes never occurred in either game).
 - Reopening the app while the F9 watcher of an earlier session was still running (FM open)
   could leave the new session without a watcher once FM closed; the running watcher now
   takes over the new session, and "New data" restarts a watcher that has stopped.

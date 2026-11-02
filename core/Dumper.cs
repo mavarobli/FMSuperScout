@@ -927,8 +927,8 @@ internal static class Dumper
         [144] = "Interim-manager",
         // Analyserollen (FM26 én FM27; de vroegere pins 36/42 kwamen in geen van beide voor).
         // Vastgesteld 02-11-2026 via het attribuutprofiel (data-analyse ~12-13), het aantal
-        // per club (58/62: hooguit één) en FM zelf (62: Kevin Balvers, PSV).
-        [58] = "Hoofd data-analyse", [60] = "Data-analist", [62] = "Hoofd performance-analyse",
+        // per club, en bevestigd in FM: 58 Govert Soeters, 60 Michel Valke (Feyenoord), 62 Kevin Balvers (PSV).
+        [58] = "Analist rekrutering", [60] = "Prestatie analist", [62] = "Hoofd performance analyse",
     };
     private static string JobName(int v) => Jobs.TryGetValue(v, out var s) ? s : null;
 
