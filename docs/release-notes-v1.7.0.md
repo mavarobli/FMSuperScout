@@ -33,3 +33,8 @@ the output is identical (same save, scanned back to back: 0 differences).
 - README and TROUBLESHOOTING: Mac install, first launch, and what to do if FM was started from
   Steam.
 - `docs/macos.md`: how the Mac version works and what was measured.
+
+**SHA-256**
+
+- `FMSuperScout-Setup.exe`: `e66bd535ffad242cc4dc8bcfd03e04512d1216b17684b34243387cb60ffaa355`
+- `FMSuperScout-Mac.dmg`: `3124fec15fe634e52a236bc827fc4443d82c8755e90529b67e1472f665977fc1`
