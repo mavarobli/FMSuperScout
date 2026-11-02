@@ -913,17 +913,17 @@ internal static class Dumper
     // Echte functie uit personJobTypes-enum (byte op contract+0x26).
     private static readonly Dictionary<int, string> Jobs = new()
     {
-        [1] = "Speler", [2] = "Coach", [3] = "Speler/Coach", [4] = "Voorzitter",
-        [6] = "Directeur", [8] = "Algemeen directeur", [10] = "Technisch directeur",
+        [1] = "Speler", [2] = "Trainer", [3] = "Speler/Coach", [4] = "Voorzitter",
+        [6] = "Directeur", [8] = "Algemeen directeur", [10] = "Directeur voetbalzaken",
         [12] = "Fysiotherapeut", [14] = "Scout", [16] = "Manager", [17] = "Speler/Manager",
         [20] = "Assistent-manager", [21] = "Speler/Assistent-manager", [22] = "Media-analist",
-        [24] = "Algemeen manager", [26] = "Fitnesscoach", [27] = "Speler/Fitnesscoach",
+        [24] = "Algemeen manager", [26] = "Conditietrainer", [27] = "Speler/Conditietrainer",
         [34] = "Keeperstrainer", [35] = "Speler/Keeperstrainer", [36] = "Hoofd data-analyse",
         [38] = "Clubarts", [40] = "Hoofd sportwetenschap", [42] = "Data-analist",
         [44] = "Hoofdscout", [45] = "Speler/Hoofdscout", [46] = "Arts", [48] = "Sportwetenschapper",
         [49] = "Speler/Jeugdtrainer", [50] = "Hoofd fysiotherapie", [52] = "U19-manager",
         [54] = "Trainer eerste elftal", [64] = "Hoofd jeugdopleiding", [65] = "Speler/Hoofd jeugd",
-        [66] = "Eigenaar", [70] = "President", [86] = "Loanmanager", [88] = "Technisch directeur",
+        [66] = "Eigenaar", [70] = "President", [86] = "(Ver)huurmanager", [88] = "Technisch directeur",
         [144] = "Interim-manager",
         // Analyserollen (FM26 én FM27; de vroegere pins 36/42 kwamen in geen van beide voor).
         // Vastgesteld 02-11-2026 via het attribuutprofiel (data-analyse ~12-13), het aantal
