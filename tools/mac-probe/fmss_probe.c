@@ -18,6 +18,7 @@
 //
 // Bouwen: zie build.sh (clang -dynamiclib -arch arm64 -arch x86_64).
 
+#include <dlfcn.h>
 #include <mach/mach.h>
 #include <mach/mach_vm.h>
 #include <mach-o/dyld.h>
@@ -32,7 +33,10 @@
 #include <time.h>
 #include <unistd.h>
 
-extern char *__cxa_demangle(const char *mangled, char *buf, size_t *len, int *status);
+// Demangler pas bij het draaien opzoeken (FM heeft de C++-runtime al geladen): zo hoeft de
+// module er bij het bouwen niet tegen te linken. Niet gevonden = gemangelde naam tonen.
+typedef char *(*demangle_fn)(const char *, char *, size_t *, int *);
+static demangle_fn g_demangle;
 
 static char g_dir[1024], g_out[1100], g_flag[1100];
 static const char *g_home;
@@ -130,6 +134,7 @@ static void scan(void) {
   if (!g_gp.hi) { outf(f, "game_plugin niet gevonden — is je save geladen?\n"); fclose(f); return; }
   outf(f, "game_plugin: 0x%lx-0x%lx\n", (unsigned long)g_gp.lo, (unsigned long)g_gp.hi);
 
+  if (!g_demangle) g_demangle = (demangle_fn)dlsym(RTLD_DEFAULT, "__cxa_demangle");
   if (!g_tab) g_tab = calloc(TSIZE, sizeof(slot_t));
   else memset(g_tab, 0, TSIZE * sizeof(slot_t));
   const size_t CH = 8u << 20;
@@ -185,7 +190,7 @@ static void scan(void) {
     int ok = 1;
     for (char *c = mangled; *c; c++) if (*c < 32 || *c > 126) { ok = 0; break; }
     if (!ok || !mangled[0]) continue;
-    int st = 0; char *dem = __cxa_demangle(mangled, NULL, NULL, &st);
+    int st = -1; char *dem = g_demangle ? g_demangle(mangled, NULL, NULL, &st) : NULL;
     outf(f, "%10llu  %6lld  0x%08llx  %s\n", g_tab[i].count, (long long)-ott,
          (unsigned long long)(vt - g_gp.lo), st == 0 && dem ? dem : mangled);
     free(dem);

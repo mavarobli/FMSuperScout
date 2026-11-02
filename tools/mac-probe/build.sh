@@ -8,8 +8,7 @@ DIR="$HOME/Library/Application Support/FMSuperScout"
 mkdir -p "$DIR"
 
 # Universeel (Apple Silicon + Intel): FM27 is ook universeel.
-# -lc++: __cxa_demangle (leesbare klassennamen) zit in de C++-runtime.
-clang -dynamiclib -O2 -Wall -arch arm64 -arch x86_64 -o "$DIR/fmss_probe.dylib" fmss_probe.c -lc++
+clang -dynamiclib -O2 -Wall -arch arm64 -arch x86_64 -o "$DIR/fmss_probe.dylib" fmss_probe.c
 rm -f "$DIR/mac-probe.txt" "$DIR/mac-probe.flag"
 
 cat <<EOF
