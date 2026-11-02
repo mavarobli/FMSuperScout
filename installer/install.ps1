@@ -8,9 +8,17 @@ Write-Host ''
 Write-Host '  FMSuperScout installeren...' -ForegroundColor Green
 Write-Host "  Doel: $target"
 
+# 0) Draaiende FMSuperScout stoppen: de scan-wachter kan na het sluiten van de app
+#    doorlopen zolang FM open staat en houdt dan FMSuperScout.Scanner.exe vast.
+Get-Process FMSuperScout.Scanner -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -like "*Programs\FMSuperScout*" } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Milliseconds 500
+
 # 1) Bestanden kopieren
 New-Item -ItemType Directory -Force -Path $target | Out-Null
-foreach ($item in @('node.exe', 'icon.ico', 'FMSuperScout.vbs', 'Uninstall FMSuperScout.cmd', 'uninstall.ps1')) {
+foreach ($item in @('node.exe', 'FMSuperScout.Scanner.exe', 'icon.ico', 'FMSuperScout.vbs', 'Uninstall FMSuperScout.cmd', 'uninstall.ps1')) {
   $p = Join-Path $src $item
   if (Test-Path $p) { Copy-Item $p -Destination $target -Force }
 }

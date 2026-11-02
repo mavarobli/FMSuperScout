@@ -16,10 +16,14 @@ internal static class Dumper
     internal static string MyClub;       // club van de human-manager
     internal static string ManagerName;  // naam van de human-manager
     internal static int MyClubRep;       // reputatie van jouw club (~0..10000)
+    // Alle menselijke managers (netwerk-/multiplayer-save): de app laat dan kiezen wie jij bent.
+    internal static List<(string name, string club, int rep)> HumanManagers = new();
     internal static int GameYear;        // afgeleid huidig seizoensjaar
     internal static DateTime? GameDate;  // exacte in-game datum uit geheugen (null = niet gevonden)
     internal static string GameVersion;  // versie van game_plugin.dll (bv. "26.3.2.0")
     internal static bool VersionOk = true; // major.minor == gepinde offsets-versie
+    // Geheugenindeling van de geladen game (FM26/FM27…), gekozen op de game_plugin.dll-versie.
+    private static Fields F = Fields.FM26;
     // Team-object van de human-manager, waaruit de in-game datum wordt gelezen (team-schema).
     internal static ulong DiagMyTeam;
     // Datum-stemmen van alle teams ([team+0xA0]+0x94), als kruischeck op de team-schema-lezing.
@@ -109,24 +113,44 @@ internal static class Dumper
 
     private enum DumpResult { Done, RetryWithSnapshot }
 
+    /// <summary>
+    /// Dump met een procesoverstijgende vergrendeling: de BepInEx-plugin (in fm.exe) en de
+    /// externe scanner reageren allebei op F9 en request.flag en schrijven naar dezelfde
+    /// bestanden. Wie de mutex niet krijgt, slaat over (false) — er loopt al een dump.
+    /// </summary>
+    public static bool TryDump(GameProcess game)
+    {
+        Mutex gate;
+        try { gate = new Mutex(false, @"Local\FMSuperScout-dump"); }
+        catch (UnauthorizedAccessException) { return false; }   // aangemaakt door een elevated dump die nu loopt
+        using var _ = gate;
+        bool owned;
+        try { owned = gate.WaitOne(0); }
+        catch (AbandonedMutexException) { owned = true; }   // vorige houder gecrasht: wij nemen over
+        if (!owned) return false;
+        try { DumpAll(game); }
+        finally { gate.ReleaseMutex(); }
+        return true;
+    }
+
     // Scanstrategie: eerst live (snel, geen extra geheugendruk — zoals t/m 1.4.0). Alleen
     // als de live scan >10% van de regio's niet kon lezen volgt automatisch één herkansing
     // met een bevroren geheugen-momentopname (VA-kloon). Zo betaalt niemand de snapshot-
     // kosten (commit-geheugen, tragere game tijdens de scan) tenzij het aantoonbaar nodig is.
-    public static void DumpAll()
+    public static void DumpAll(GameProcess game)
     {
-        if (DumpCore(useSnapshot: false) == DumpResult.RetryWithSnapshot)
+        if (DumpCore(game, useSnapshot: false) == DumpResult.RetryWithSnapshot)
         {
             ReleaseScan();
-            Plugin.Log.LogInfo("Herkansing: scan opnieuw vanuit een bevroren geheugen-momentopname (VA-kloon)…");
-            DumpCore(useSnapshot: true);
+            Host.Info("Herkansing: scan opnieuw vanuit een bevroren geheugen-momentopname (VA-kloon)…");
+            DumpCore(game, useSnapshot: true);
         }
     }
 
-    private static DumpResult DumpCore(bool useSnapshot)
+    private static DumpResult DumpCore(GameProcess game, bool useSnapshot)
     {
         var sw = Stopwatch.StartNew();
-        Plugin.Log.LogInfo("FMSuperScout: geheugen scannen…");
+        Host.Info("FMSuperScout: geheugen scannen…");
         Directory.CreateDirectory(OutDir);
         // Database-keuze (Instellingen in de app → scan-config.json): mannen, vrouwen of
         // beide. Per scan gelezen, dus een omgezette keuze geldt vanaf de eerstvolgende
@@ -143,7 +167,7 @@ internal static class Dumper
         // dan mogen badge, Mijn club-filter en historie niet stilletjes op de vorige
         // carrière blijven draaien.
         GameDate = null;   // niet de datum van een vorige dump/save laten doorwerken in AgeFrom
-        MyClub = null; ManagerName = null; MyClubRep = 0;
+        MyClub = null; ManagerName = null; MyClubRep = 0; HumanManagers = new();
         GameYear = 0; ClubCount = 0; LinkedViaSquad = 0; VtGp = 0;
         DiagMyTeam = 0; DateVotes = new(); AllOffHist = new();
         DiagStaffRaw = 0; DiagStaffAlsoPlayer = 0;
@@ -157,9 +181,9 @@ internal static class Dumper
         // veldrapporten ("faalt willekeurig") herleidbaar tot wel/geen geheugendruk.
         var (availPhys, availCommit, memLoad) = MemScan.MemoryStatus();
         const ulong MB = 1024 * 1024;
-        Plugin.Log.LogInfo($"Geheugen: {availPhys / MB:N0} MB fysiek vrij · {availCommit / MB:N0} MB commit vrij · belasting {memLoad}%");
+        Host.Info($"Geheugen: {availPhys / MB:N0} MB fysiek vrij · {availCommit / MB:N0} MB commit vrij · belasting {memLoad}%");
 
-        var mem = new MemScan(useSnapshot);
+        var mem = new MemScan(game, useSnapshot);
         // Bijgehouden zodat TryStartDump's finally de VA-kloon op élk pad vrijgeeft
         // (ook bij een exception mid-scan) — zolang de kloon leeft, kost elke door FM
         // gewijzigde pagina een copy-on-write-kopie.
@@ -167,22 +191,22 @@ internal static class Dumper
         if (useSnapshot)
         {
             PhaseLog.Add($"snapshot maken: {mem.SnapshotMs} ms");
-            Plugin.Log.LogInfo(mem.Snapshotted
+            Host.Info(mem.Snapshotted
                 ? $"Scan leest uit een bevroren geheugen-momentopname (VA-kloon, opname {mem.SnapshotMs} ms)."
                 : $"Snapshot niet beschikbaar ({mem.SnapshotError ?? "onbekend"}) — herkansing leest opnieuw live geheugen.");
         }
         ScanMode = !useSnapshot ? "live"
             : mem.Snapshotted ? "snapshot (VA-kloon), herkansing"
             : $"live, herkansing (snapshot mislukt: {mem.SnapshotError ?? "onbekend"})";
-        if (mem.ImageNote != null) Plugin.Log.LogWarning(mem.ImageNote);
+        if (mem.ImageNote != null) Host.Warn(mem.ImageNote);
         Phase("MemScan-ctor (image-reads)");
         if (mem.GaBase == 0)
         {
-            Plugin.Log.LogError("GameAssembly.dll niet gevonden — kan niet dumpen.");
-            WriteError("GameAssembly.dll niet gevonden. Is FM26 goed geladen?");
+            Host.Error("GameAssembly.dll niet gevonden — kan niet dumpen.");
+            WriteError("GameAssembly.dll not found. Is Football Manager fully loaded?");
             return DumpResult.Done;
         }
-        Plugin.Log.LogInfo($"Scanregio's: {mem.ScanRegions.Count}, GameAssembly {mem.GaBase:X}-{mem.GaEnd:X}, " +
+        Host.Info($"Scanregio's: {mem.ScanRegions.Count}, GameAssembly {mem.GaBase:X}-{mem.GaEnd:X}, " +
                            $"game_plugin {mem.GpBase:X}-{mem.GpEnd:X}");
         DetectGameVersion(mem);
         if (mem.GpBase == 0)
@@ -191,8 +215,8 @@ internal static class Dumper
             // het opstarten van FM. Een dump in dat venster is gegarandeerd leeg — vroeger
             // schreef die een lege dump.json over de goede heen (issue #7). Nu: afbreken,
             // bestaande dump met rust laten.
-            Plugin.Log.LogError("game_plugin.dll niet geladen — dump afgebroken, bestaande dump.json blijft staan.");
-            WriteError("FM26 is still starting up (game database not loaded yet). Load your save, then try again.");
+            Host.Error("game_plugin.dll niet geladen — dump afgebroken, bestaande dump.json blijft staan.");
+            WriteError("Football Manager is still starting up (game database not loaded yet). Load your save, then try again.");
             return DumpResult.Done;
         }
 
@@ -225,7 +249,7 @@ internal static class Dumper
         if (availPhys != 0 && availPhys < 2048 * MB && maxDop > 2)
         {
             maxDop = 2;
-            Plugin.Log.LogInfo($"Weinig geheugen vrij ({availPhys / MB:N0} MB) — scan beperkt tot 2 workers.");
+            Host.Info($"Weinig geheugen vrij ({availPhys / MB:N0} MB) — scan beperkt tot 2 workers.");
         }
 
         // N workers, elk een round-robin-deel van de regio's (regio's variëren sterk in
@@ -286,16 +310,16 @@ internal static class Dumper
                             ulong p = chunkBase + (ulong)i;
                             int off = mem.DynamicOffsetFromVtable(vt);    // gecachte image → geen syscall
                             if (off == 0) continue;
-                            uint uid = BitConverter.ToUInt32(buf, i + Fields.OBJ_DUNI);   // uit de buffer
+                            uint uid = BitConverter.ToUInt32(buf, i + (int)F.OBJ_DUNI);   // uit de buffer
                             if (uid == 0 || uid == 0xFFFFFFFF) continue;
                             if (off is > 0 and < 0x2000)
                                 L.AllOffHist[off] = L.AllOffHist.GetValueOrDefault(off) + 1;
 
-                            bool isPlayer = off == Fields.PLAYER_OFFSET || off == Fields.PLAYER_STAFF_OFFSET;
-                            bool isStaff = off == Fields.STAFF_OFFSET || off == Fields.HUMAN_MANAGER_OFFSET;
+                            bool isPlayer = off == F.PLAYER_OFFSET || off == F.PLAYER_STAFF_OFFSET;
+                            bool isStaff = off == F.STAFF_OFFSET || off == F.HUMAN_MANAGER_OFFSET;
                             if (!isPlayer && !isStaff)
                             {
-                                ulong tb = mem.Ptr(p + 0x18), te = mem.Ptr(p + 0x20);
+                                ulong tb = mem.Ptr(p + F.CLUB_TEAMS_BEGIN), te = mem.Ptr(p + F.CLUB_TEAMS_END);
                                 if (tb != 0 && te > tb && (te - tb) % 8 == 0 && (te - tb) / 8 is >= 1 and <= 64
                                     && ClubNameOf(mem, p) != null)
                                     L.ClubObjs.Add(p);
@@ -305,12 +329,12 @@ internal static class Dumper
                             ulong basePtr = p - (ulong)off;
                             if (isPlayer)
                             {
-                                ushort ca = mem.U16(basePtr + Fields.PLAO_CA);
-                                ushort pa = mem.U16(basePtr + Fields.PLAO_PA);
+                                ushort ca = mem.U16(basePtr + F.PLAO_CA);
+                                ushort pa = mem.U16(basePtr + F.PLAO_PA);
                                 if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
                                 // Databasekeuze: sla het niet-gekozen geslacht over
                                 // (person+0x19 bit 0x10 = vrouw). ScanDb 2 = beide → niets overslaan.
-                                bool female = (mem.U8(p + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0;
+                                bool female = (mem.U8(p + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0;
                                 if (female ? ScanDb == 0 : ScanDb == 1) { L.Women++; continue; }
                                 L.OffsetHist[off] = L.OffsetHist.GetValueOrDefault(off) + 1;
                                 if (!L.Players.ContainsKey(uid))
@@ -322,15 +346,15 @@ internal static class Dumper
                             }
                             else
                             {
-                                ushort ca = mem.U16(basePtr + Fields.NPLO_CA);
-                                ushort pa = mem.U16(basePtr + Fields.NPLO_PA);
+                                ushort ca = mem.U16(basePtr + F.NPLO_CA);
+                                ushort pa = mem.U16(basePtr + F.NPLO_PA);
                                 if (ca < 1 || ca > 200 || pa < 1 || pa > 200) continue;
                                 L.OffsetHist[off] = L.OffsetHist.GetValueOrDefault(off) + 1;
                                 if (!L.Staff.ContainsKey(uid))
                                 {
                                     var st = ReadStaff(mem, p, basePtr, uid, ca, pa);
                                     L.Staff[uid] = st;
-                                    if (off == Fields.HUMAN_MANAGER_OFFSET)
+                                    if (off == F.HUMAN_MANAGER_OFFSET)
                                     {
                                         var (mc, mrep, _) = ResolveClub(mem, p);
                                         L.Managers.Add((p, st.Name, mc ?? st.Club, mrep));
@@ -365,7 +389,7 @@ internal static class Dumper
         }
         System.Threading.Tasks.Task.WaitAll(tasks);
         if (regionErrors > 0)
-            Plugin.Log.LogWarning($"{regionErrors} scanregio('s) overgeslagen na interne fout (eerste: {firstRegionError}) — rest van de scan is doorgegaan.");
+            Host.Warn($"{regionErrors} scanregio('s) overgeslagen na interne fout (eerste: {firstRegionError}) — rest van de scan is doorgegaan.");
 
         // Merge alle worker-resultaten in de gedeelde verzamelingen (single-threaded, geen lock nodig).
         foreach (var L in locals)
@@ -384,16 +408,16 @@ internal static class Dumper
         // veldrapporten, óók als de scan verder gewoon slaagt.
         double unreadFrac = totalBytes > 0 ? (double)Interlocked.Read(ref unreadBytes) / totalBytes : 0;
         if (unreadFrac > 0)
-            Plugin.Log.LogInfo($"Onleesbaar tijdens scan: {unreadFrac:P1} van {totalBytes / MB:N0} MB.");
+            Host.Info($"Onleesbaar tijdens scan: {unreadFrac:P1} van {totalBytes / MB:N0} MB.");
         // Live poging miste te veel? Direct herkansen met een bevroren momentopname, vóórdat
         // we tijd steken in koppeling en wegschrijven. De snapshot leest ook pagina's die FM
         // ondertussen vrijgeeft/herschrijft, dus dit vangt scans tijdens simulatie/laden af.
         if (!useSnapshot && unreadFrac > 0.10)
         {
-            Plugin.Log.LogWarning($"{(int)System.Math.Round(unreadFrac * 100)}% van de scanregio's was live onleesbaar — herkansing met snapshot volgt.");
+            Host.Warn($"{(int)System.Math.Round(unreadFrac * 100)}% van de scanregio's was live onleesbaar — herkansing met snapshot volgt.");
             return DumpResult.RetryWithSnapshot;
         }
-        Plugin.Log.LogInfo($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten · database: " +
+        Host.Info($"vtables in game_plugin: {vtGp:N0} van {candidates:N0} kandidaten · database: " +
             (ScanDb == 2 ? "beide (niets overgeslagen)" : ScanDb == 1 ? $"vrouwen ({women:N0} mannen overgeslagen)" : $"mannen ({women:N0} vrouwen overgeslagen)"));
         Dumper.AllOffHist = allOffHist;
         Dumper.VtGp = vtGp;
@@ -411,7 +435,7 @@ internal static class Dumper
         {
             string cname = ClubNameOf(mem, club);
             if (cname == null) continue;
-            ulong tb = mem.Ptr(club + 0x18), te = mem.Ptr(club + 0x20);
+            ulong tb = mem.Ptr(club + F.CLUB_TEAMS_BEGIN), te = mem.Ptr(club + F.CLUB_TEAMS_END);
             if (tb == 0 || te <= tb) continue;
             ulong teamCount = (te - tb) / 8;
             if (teamCount > 64) continue;
@@ -419,15 +443,15 @@ internal static class Dumper
             {
                 ulong team = mem.Ptr(tb + ti * 8);
                 if (team == 0) continue;
-                int tt = mem.U8(team + 0x28);            // teamtype (0 = eerste elftal)
-                int trep = mem.U16(team + 0xA8);
+                int tt = mem.U8(team + F.TEAM_TYPE);            // teamtype (0 = eerste elftal)
+                int trep = mem.U16(team + F.TEAM_REP);
                 if (trep is < 0 or > 12000) trep = 0;
                 // manager van dit team → is het jouw human-manager?
-                ulong mgr = mem.Ptr(team + 0x80);
+                ulong mgr = mem.Ptr(team + F.TEAM_MANAGER);
                 if (mgr != 0 && mgrAddrs.Contains(mgr) && (MyClub == null || tt == 0))
                 { MyClub = cname; MyClubRep = trep; DiagMyTeam = team; }
                 // spelerslijst
-                ulong pb = mem.Ptr(team + 0x38), pe = mem.Ptr(team + 0x40);
+                ulong pb = mem.Ptr(team + F.TEAM_PLAYERS_BEGIN), pe = mem.Ptr(team + F.TEAM_PLAYERS_END);
                 if (pb == 0 || pe <= pb) continue;
                 ulong pcount = (pe - pb) / 8;
                 if (pcount > 200) continue;
@@ -450,11 +474,11 @@ internal static class Dumper
         foreach (var p in players.Values)
         {
             if (p.PersonAddr == 0) continue;
-            ulong pcon = mem.Ptr(p.PersonAddr + (ulong)Fields.PERO_FULL_CONTRACT);
+            ulong pcon = mem.Ptr(p.PersonAddr + (ulong)F.PERO_FULL_CONTRACT);
             if (pcon == 0) continue;
-            ulong pteam = mem.Ptr(pcon + 0x10);
+            ulong pteam = mem.Ptr(pcon + F.CON_TEAM);
             if (pteam == 0) continue;
-            ulong pclub = mem.Ptr(pteam + 0x30);
+            ulong pclub = mem.Ptr(pteam + F.TEAM_CLUB);
             if (pclub != 0) clubAddrs.Add(pclub);
         }
         DateVotes = new Dictionary<uint, int>();
@@ -462,7 +486,7 @@ internal static class Dumper
         {
             string cname = ClubNameOf(mem, club);
             if (cname == null) continue;
-            ulong tb2 = mem.Ptr(club + 0x18), te2 = mem.Ptr(club + 0x20);
+            ulong tb2 = mem.Ptr(club + F.CLUB_TEAMS_BEGIN), te2 = mem.Ptr(club + F.CLUB_TEAMS_END);
             if (tb2 == 0 || te2 <= tb2 || (te2 - tb2) % 8 != 0) continue;
             long tcnt2 = (long)((te2 - tb2) / 8);
             if (tcnt2 > 24) continue;
@@ -470,16 +494,16 @@ internal static class Dumper
             {
                 ulong team = mem.Ptr(tb2 + (ulong)ti * 8);
                 if (team == 0) continue;
-                int tt = mem.U8(team + 0x28);
-                int trep = mem.U16(team + 0xA8);
+                int tt = mem.U8(team + F.TEAM_TYPE);
+                int trep = mem.U16(team + F.TEAM_REP);
                 if (trep is < 0 or > 12000) trep = 0;
                 // Datum-stem: [team+0xA0]+0x94 = eerstvolgende wedstrijd van dit team. Normaliseer
                 // op de gedecodeerde datum (het rauwe veld kan vlagbits in 9-15 dragen; op de rauwe
                 // waarde stemmen versnippert dezelfde dag → v0.1.11-bug: alles weggefilterd).
-                ulong dobj = mem.Ptr(team + (ulong)Fields.TEAM_SCHEDULE);
+                ulong dobj = mem.Ptr(team + (ulong)F.TEAM_SCHEDULE);
                 if (dobj != 0)
                 {
-                    var (dy, ddoy) = DecodeFmDate(mem.U32(dobj + (ulong)Fields.SCHED_NEXT_MATCH));
+                    var (dy, ddoy) = DecodeFmDate(mem.U32(dobj + (ulong)F.SCHED_NEXT_MATCH));
                     if (dy is >= 2020 and <= 2060)
                     {
                         uint norm = ((uint)dy << 16) | (uint)ddoy;
@@ -487,7 +511,7 @@ internal static class Dumper
                     }
                 }
                 string tdiv = CompNameOf(mem, team);
-                ulong pb2 = mem.Ptr(team + 0x38), pe2 = mem.Ptr(team + 0x40);
+                ulong pb2 = mem.Ptr(team + F.TEAM_PLAYERS_BEGIN), pe2 = mem.Ptr(team + F.TEAM_PLAYERS_END);
                 if (pb2 == 0 || pe2 <= pb2 || (pe2 - pb2) % 8 != 0) continue;
                 long pcnt2 = (long)((pe2 - pb2) / 8);
                 if (pcnt2 > 60) continue;
@@ -510,7 +534,7 @@ internal static class Dumper
             }
         }
         Phase("squad-walk 2 (contract-keten-clubs)");
-        Plugin.Log.LogInfo($"Squad-walk v2: {squadClub.Count} spelers gekoppeld over {clubAddrs.Count} keten-clubs.");
+        Host.Info($"Squad-walk v2: {squadClub.Count} spelers gekoppeld over {clubAddrs.Count} keten-clubs.");
 
         // Koppel clubs aan spelers (squad wint; anders blijft contract-keten-fallback staan).
         foreach (var p in players.Values)
@@ -524,20 +548,33 @@ internal static class Dumper
         // de in-game datum (team-schema). Robuuster dan de squad-walk-match hierboven.
         foreach (var mg in managers)
         {
-            ulong mcon = mem.Ptr(mg.person + (ulong)Fields.PERO_FULL_CONTRACT);
+            ulong mcon = mem.Ptr(mg.person + (ulong)F.PERO_FULL_CONTRACT);
             if (mcon == 0) continue;
-            ulong mteam = mem.Ptr(mcon + 0x10);
+            ulong mteam = mem.Ptr(mcon + F.CON_TEAM);
             if (mteam == 0) continue;
             DiagMyTeam = mteam;
             break;
         }
 
-        // Human-manager fallback als geen team-match gevonden is.
-        var me = managers.FirstOrDefault(x => !string.IsNullOrEmpty(x.club));
+        // Menselijke managers met naam en club, ontdubbeld (één persoon kan als meerdere
+        // objecten voorkomen). Naam en club horen bij dezelfde manager: eerst die van de club
+        // die de team-walk vond, anders de eerste met een club. Voorheen kwamen naam en club
+        // los van elkaar tot stand en konden ze in een netwerk-save van twee mensen zijn.
+        HumanManagers = managers.Where(x => !string.IsNullOrEmpty(x.name) && !string.IsNullOrEmpty(x.club))
+            .GroupBy(x => (x.name, x.club)).Select(g => (g.Key.name, g.Key.club, g.Max(x => x.rep)))
+            .OrderBy(x => x.name, StringComparer.Ordinal).ThenBy(x => x.club, StringComparer.Ordinal).ToList();
+        // Netwerk-save: welke manager de team-walk als eerste raakt hangt af van de geheugen-
+        // volgorde en kan per dump verschillen (en daarmee de historie splitsen). Kies dan
+        // vast de eerste in naamvolgorde; de app laat de gebruiker zelf kiezen.
+        if (HumanManagers.Count > 1) { MyClub = HumanManagers[0].club; MyClubRep = HumanManagers[0].rep; }
+        var me = managers.FirstOrDefault(x => MyClub != null && x.club == MyClub && !string.IsNullOrEmpty(x.name));
+        if (me.person == 0) me = managers.FirstOrDefault(x => !string.IsNullOrEmpty(x.club));
         if (me.person == 0 && managers.Count > 0) me = managers[0];
         ManagerName = me.name;
         if (MyClub == null) { MyClub = me.club; MyClubRep = me.rep; }
-        Plugin.Log.LogInfo($"Manager: {ManagerName ?? "?"} · club: {MyClub ?? "?"} (rep {MyClubRep}) · " +
+        if (HumanManagers.Count > 1)
+            Host.Info($"Netwerk-save: {HumanManagers.Count} menselijke managers ({string.Join(", ", HumanManagers.Select(h => $"{h.name}/{h.club}"))}) — de app laat kiezen.");
+        Host.Info($"Manager: {ManagerName ?? "?"} · club: {MyClub ?? "?"} (rep {MyClubRep}) · " +
                            $"{clubObjs.Count} clubs, {squadClub.Count} spelers via selectie gekoppeld");
 
         // Huidig seizoensjaar afleiden uit de data: de jeugdinstroom genereert elk jaar
@@ -549,7 +586,7 @@ internal static class Dumper
                 byHist[pl.BirthYear] = byHist.GetValueOrDefault(pl.BirthYear) + 1;
         int youngestCohort = byHist.Where(kv => kv.Value >= 30).Select(kv => kv.Key).DefaultIfEmpty(0).Max();
         GameYear = youngestCohort > 0 ? youngestCohort + 16 : DateTime.Now.Year;
-        Plugin.Log.LogInfo($"Afgeleid seizoensjaar: {GameYear} (jongste cohort {youngestCohort})");
+        Host.Info($"Afgeleid seizoensjaar: {GameYear} (jongste cohort {youngestCohort})");
 
         // ---- Exacte in-game datum (best effort) ----
         // Zoek in de statics/code van game_plugin naar u32's die exact een FM-datum coderen
@@ -571,9 +608,9 @@ internal static class Dumper
         var staffAlsoPlayer = staff.Keys.Where(uid => players.ContainsKey(uid)).ToList();
         DiagStaffAlsoPlayer = staffAlsoPlayer.Count;
         foreach (var uid in staffAlsoPlayer) staff.Remove(uid);
-        Plugin.Log.LogInfo($"Speler/staf-ontdubbeling: staf ruw {DiagStaffRaw}, ook speler {DiagStaffAlsoPlayer}, netto staf {staff.Count}.");
+        Host.Info($"Speler/staf-ontdubbeling: staf ruw {DiagStaffRaw}, ook speler {DiagStaffAlsoPlayer}, netto staf {staff.Count}.");
 
-        Plugin.Log.LogInfo($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
+        Host.Info($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
 
         // Vangnet: een geladen save heeft altijd spelers. 0 spelers én 0 staf betekent dat de
@@ -583,7 +620,7 @@ internal static class Dumper
         if (players.Count == 0 && staff.Count == 0)
         {
             WriteDiag(mem, players, staff, offsetHist, candidates, sw.ElapsedMilliseconds);
-            Plugin.Log.LogError("0 spelers en 0 staf gevonden — dump niet weggeschreven, bestaande dump.json blijft staan.");
+            Host.Error("0 spelers en 0 staf gevonden — dump niet weggeschreven, bestaande dump.json blijft staan.");
             WriteError("The scan found no players. Is your save fully loaded? If it is, FMSuperScout may need an update for this FM version.");
             return DumpResult.Done;
         }
@@ -595,11 +632,11 @@ internal static class Dumper
         if (unreadFrac > 0.10)
         {
             int pct = (int)System.Math.Round(unreadFrac * 100);
-            Plugin.Log.LogWarning($"{pct}% van de scanregio's was onleesbaar ({players.Count} spelers gevonden).");
+            Host.Warn($"{pct}% van de scanregio's was onleesbaar ({players.Count} spelers gevonden).");
             if (File.Exists(Path.Combine(OutDir, "dump.json")))
             {
                 WriteDiag(mem, players, staff, offsetHist, candidates, sw.ElapsedMilliseconds);
-                Plugin.Log.LogError("Dump niet weggeschreven — bestaande dump.json blijft staan. Probeer opnieuw met volledig geladen save.");
+                Host.Error("Dump niet weggeschreven — bestaande dump.json blijft staan. Probeer opnieuw met volledig geladen save.");
                 WriteError($"The scan could not read {pct}% of FM's memory, even after a retry with a frozen snapshot. " +
                            "Windows is probably low on memory: close other apps, make sure the page file is not capped, or reboot. " +
                            "Your existing data was kept.");
@@ -612,7 +649,7 @@ internal static class Dumper
         Phase("JSON schrijven");
         WriteDiag(mem, players, staff, offsetHist, candidates, sw.ElapsedMilliseconds);
 
-        Plugin.Log.LogInfo($"Klaar in {sw.ElapsedMilliseconds} ms. Bestand in {OutDir}. " +
+        Host.Info($"Klaar in {sw.ElapsedMilliseconds} ms. Bestand in {OutDir}. " +
                            "Open de FMSuperScout web-app en klik Verversen.");
         WriteStatus("done", players.Count, staff.Count);   // web-app-banner leest dit
         return DumpResult.Done;
@@ -623,45 +660,51 @@ internal static class Dumper
     {
         var e = new Person { Uid = uid, Ca = ca, Pa = pa, IsPlayer = true };
         e.Name = ReadName(m, person);
-        (e.BirthYear, e.BirthDoy) = DecodeFmDate(m.U32(person + Fields.PERO_DOB));
+        (e.BirthYear, e.BirthDoy) = DecodeFmDate(m.U32(person + F.PERO_DOB));
         e.Age = AgeFrom(e.BirthYear, e.BirthDoy);
         e.Nat = ReadNation(m, person);
         e.NatId = ReadNationId(m, person);
-        e.Height = m.U16(pl + Fields.PLAO_HEIGHT);
+        e.Height = m.U16(pl + F.PLAO_HEIGHT);
         if (e.Height is < 140 or > 220) e.Height = 0;
 
         // attributen (÷5)
         foreach (var (key, off) in Fields.PlayerAttrs)
-            e.Attrs[key] = Attr(m, pl + (ulong)Fields.PLAO_ATTRS + (ulong)off);
+            e.Attrs[key] = Attr(m, pl + (ulong)F.PLAO_ATTRS + (ulong)off);
         foreach (var (key, off) in Fields.PlayerHiddenAttrs)
-            e.Attrs[key] = Attr(m, pl + (ulong)Fields.PLAO_ATTRS + (ulong)off);
+            e.Attrs[key] = Attr(m, pl + (ulong)F.PLAO_ATTRS + (ulong)off);
 
-        int lf = Attr(m, pl + (ulong)Fields.PLAO_ATTRS + Fields.FOOT_LEFT);
-        int rf = Attr(m, pl + (ulong)Fields.PLAO_ATTRS + Fields.FOOT_RIGHT);
+        int lf = Attr(m, pl + (ulong)F.PLAO_ATTRS + Fields.FOOT_LEFT);
+        int rf = Attr(m, pl + (ulong)F.PLAO_ATTRS + Fields.FOOT_RIGHT);
         e.Foot = (rf >= 14 && lf >= 14) ? "Beide" : (rf >= lf ? "Rechts" : "Links");
 
         // posities
         var pos = new List<(string k, int v)>();
         foreach (var (key, off) in Fields.Positions)
         {
-            int v = m.U8(pl + (ulong)Fields.PLAO_POSITIONS + (ulong)off);
+            int v = m.U8(pl + (ulong)F.PLAO_POSITIONS + (ulong)off);
             if (v >= 1) pos.Add((key, v));
         }
+        // Twee lijsten (issue #23): PosArr = natuurlijk + bedreven (15+, zoals FM's eigen
+        // positiekolom), hoogste eerst — voor de kolom, het positiefilter en rollen. PosNat =
+        // alleen (bijna) natuurlijk (≥ top-2) — voor wat de hoofdrol van een speler moet
+        // kennen: keepersweging, potentieprojectie en selectie-analyse.
         int top = pos.Count > 0 ? pos.Max(x => x.v) : 0;
-        e.PosArr = pos.Where(x => x.v >= System.Math.Max(15, top - 2)).OrderByDescending(x => x.v).Select(x => x.k).ToList();
-        if (e.PosArr.Count == 0 && pos.Count > 0)
-            e.PosArr = pos.OrderByDescending(x => x.v).Take(1).Select(x => x.k).ToList();
+        var ranked = pos.OrderByDescending(x => x.v).ToList();
+        e.PosNat = ranked.Where(x => x.v >= System.Math.Max(15, top - 2)).Select(x => x.k).ToList();
+        if (e.PosNat.Count == 0 && ranked.Count > 0) e.PosNat = ranked.Take(1).Select(x => x.k).ToList();
+        e.PosArr = ranked.Where(x => x.v >= 15).Select(x => x.k).ToList();
+        if (e.PosArr.Count == 0) e.PosArr = e.PosNat;
 
         // Marktwaarde: 0x234 is FM's echte transferwaarde (geverifieerd via offset-discovery
         // tegen in-game bedragen); 0x238 is de vraagprijs (meestal niet ingesteld).
-        e.Value = MoneyVal(m.U32(pl + Fields.PLAO_GUIDE_VALUE));   // 0x234
-        e.GuideValue = Money(m.U32(pl + Fields.PLAO_TRANSFER_VALUE)); // 0x238 (vraagprijs)
-        ulong con = m.Ptr(person + Fields.PERO_FULL_CONTRACT);
+        e.Value = MoneyVal(m.U32(pl + F.PLAO_GUIDE_VALUE));   // 0x234
+        e.GuideValue = Money(m.U32(pl + F.PLAO_TRANSFER_VALUE)); // 0x238 (vraagprijs)
+        ulong con = m.Ptr(person + F.PERO_FULL_CONTRACT);
         if (con != 0)
         {
-            e.Wage = Money(m.U32(con + Fields.CON_WEEKLY_WAGE));
-            e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
-            byte flags = m.U8(con + Fields.CON_STATUS_FLAGS);
+            e.Wage = Money(m.U32(con + F.CON_WEEKLY_WAGE));
+            e.Expires = FmDateIso(m.U32(con + F.CON_EXPIRY));
+            byte flags = m.U8(con + F.CON_STATUS_FLAGS);
             e.Listed = (flags & (1 << 0)) != 0 || (flags & (1 << 3)) != 0; // Listed / by request
             // Bit 1 = huurlijst-kandidaat (naast 0=Listed, 3=by request, 4=NFS, 5=Release).
             // Nog niet in-game geverifieerd; diagnostics.txt toont een bit-histogram en een
@@ -671,19 +714,19 @@ internal static class Dumper
             e.NotForSale = (flags & (1 << 4)) != 0;
             e.SetForRelease = (flags & (1 << 5)) != 0;
         }
-        e.CurRep = m.U16(pl + Fields.PLAO_CUR_REP);
-        e.WorldRep = m.U16(pl + Fields.PLAO_WORLD_REP);
-        e.Ambition = ClampAttr(m.U8(person + Fields.PERO_AMBITION));
-        e.Loyalty = ClampAttr(m.U8(person + Fields.PERO_LOYALTY));
-        e.Professionalism = ClampAttr(m.U8(person + Fields.PERO_PROFESSIONALISM));
-        e.Adaptability = ClampAttr(m.U8(person + Fields.PERO_ADAPTABILITY));
-        e.Pressure = ClampAttr(m.U8(person + Fields.PERO_PRESSURE));
-        e.Sportsmanship = ClampAttr(m.U8(person + Fields.PERO_SPORTSMANSHIP));
-        e.Temperament = ClampAttr(m.U8(person + Fields.PERO_TEMPERAMENT));
-        e.Controversy = ClampAttr(m.U8(person + Fields.PERO_CONTROVERSY));
+        e.CurRep = m.U16(pl + F.PLAO_CUR_REP);
+        e.WorldRep = m.U16(pl + F.PLAO_WORLD_REP);
+        e.Ambition = ClampAttr(m.U8(person + F.PERO_AMBITION));
+        e.Loyalty = ClampAttr(m.U8(person + F.PERO_LOYALTY));
+        e.Professionalism = ClampAttr(m.U8(person + F.PERO_PROFESSIONALISM));
+        e.Adaptability = ClampAttr(m.U8(person + F.PERO_ADAPTABILITY));
+        e.Pressure = ClampAttr(m.U8(person + F.PERO_PRESSURE));
+        e.Sportsmanship = ClampAttr(m.U8(person + F.PERO_SPORTSMANSHIP));
+        e.Temperament = ClampAttr(m.U8(person + F.PERO_TEMPERAMENT));
+        e.Controversy = ClampAttr(m.U8(person + F.PERO_CONTROVERSY));
         e.PersonAddr = person;
         e.PlAddr = pl;
-        e.Gender = (m.U8(person + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
+        e.Gender = (m.U8(person + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
         var (cname, crep, cdiv) = ResolveClub(m, person);
         e.Club = cname; e.ClubRep = crep; e.Div = cdiv;
         // Moederclub = club uit het volledige contract (person+0xA8→team→club). Voor verhuurde
@@ -699,24 +742,30 @@ internal static class Dumper
     {
         var e = new Person { Uid = uid, Ca = ca, Pa = pa, IsPlayer = false };
         e.Name = ReadName(m, person);
-        (e.BirthYear, e.BirthDoy) = DecodeFmDate(m.U32(person + Fields.PERO_DOB));
+        (e.BirthYear, e.BirthDoy) = DecodeFmDate(m.U32(person + F.PERO_DOB));
         e.Age = AgeFrom(e.BirthYear, e.BirthDoy);
         e.Nat = ReadNation(m, person);
         e.NatId = ReadNationId(m, person);
 
         foreach (var (key, off) in Fields.StaffAttrs)
-            e.StaffAttrs[key] = Attr(m, st + (ulong)Fields.NPLO_ATTRS + (ulong)off);
+            e.StaffAttrs[key] = Fields.StaffAttrsRaw.Contains(key)
+                ? ClampAttr(m.U8(st + (ulong)F.NPLO_ATTRS + (ulong)off))
+                : Attr(m, st + (ulong)F.NPLO_ATTRS + (ulong)off);
+        // Aanpassingsvermogen toont FM27 bij staf onder Mentaal; het is de persoonlijkheids-
+        // waarde (pero, ruw 1-20) — bij Oscar Moens 20 = "Elite" in FM.
+        int adapt = ClampAttr(m.U8(person + F.PERO_ADAPTABILITY));
+        if (adapt > 0) e.StaffAttrs["Aanpassingsvermogen"] = adapt;
 
-        ulong con = m.Ptr(person + Fields.PERO_FULL_CONTRACT);
+        ulong con = m.Ptr(person + F.PERO_FULL_CONTRACT);
         if (con != 0)
         {
-            e.Wage = Money(m.U32(con + Fields.CON_WEEKLY_WAGE));
-            e.Expires = FmDateIso(m.U32(con + Fields.CON_EXPIRY));
-            e.JobId = m.U8(con + 0x26);          // pero.Pcjo — functie-byte; app vertaalt per taal
+            e.Wage = Money(m.U32(con + F.CON_WEEKLY_WAGE));
+            e.Expires = FmDateIso(m.U32(con + F.CON_EXPIRY));
+            e.JobId = m.U8(con + F.CON_JOB);          // pero.Pcjo — functie-byte; app vertaalt per taal
             e.Job = JobName(e.JobId);
         }
         if (string.IsNullOrEmpty(e.Job)) e.Job = "Staflid";
-        e.Gender = (m.U8(person + (ulong)Fields.PERO_GENDER) & Fields.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
+        e.Gender = (m.U8(person + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
         var (sclub, _, sdiv) = ResolveClub(m, person);
         e.Club = sclub; e.Div = sdiv;
         return e;
@@ -734,20 +783,20 @@ internal static class Dumper
 
     private static string ReadName(MemScan m, ulong person)
     {
-        string common = m.NestedString(person + Fields.PERO_COMMON_NAME);
+        string common = m.NestedString(person + F.PERO_COMMON_NAME);
         if (!string.IsNullOrEmpty(common)) return common;
-        string first = m.NestedString(person + Fields.PERO_FIRST_NAME);
-        string second = m.NestedString(person + Fields.PERO_SECOND_NAME);
+        string first = m.NestedString(person + F.PERO_FIRST_NAME);
+        string second = m.NestedString(person + F.PERO_SECOND_NAME);
         string name = string.Join(" ", new[] { first, second }.Where(s => !string.IsNullOrEmpty(s)));
         return string.IsNullOrEmpty(name) ? null : name;
     }
 
     private static List<string> ReadNation(MemScan m, ulong person)
     {
-        ulong nat = m.Ptr(person + Fields.PERO_NATION);
+        ulong nat = m.Ptr(person + F.PERO_NATION);
         if (nat == 0) return new List<string>();
-        string s = m.IndirectString(nat + Fields.NATION_SHORT_NAME)
-                 ?? m.IndirectString(nat + Fields.NATION_NAME);
+        string s = m.IndirectString(nat + F.NATION_SHORT_NAME)
+                 ?? m.IndirectString(nat + F.NATION_NAME);
         return s == null ? new List<string>() : new List<string> { s };
     }
 
@@ -757,9 +806,9 @@ internal static class Dumper
     // EU-lijst taalvrij maken. De app negeert het veld voorlopig.
     private static uint ReadNationId(MemScan m, ulong person)
     {
-        ulong nat = m.Ptr(person + Fields.PERO_NATION);
+        ulong nat = m.Ptr(person + F.PERO_NATION);
         if (nat == 0) return 0;
-        uint id = m.U32(nat + (ulong)Fields.OBJ_DUNI);
+        uint id = m.U32(nat + (ulong)F.OBJ_DUNI);
         return id == 0xFFFFFFFF ? 0 : id;
     }
 
@@ -768,8 +817,6 @@ internal static class Dumper
     //   team     = [contract + 0x10] (pero.Pcti)
     //   club     = [team + 0x30]     (teao.Tclu)
     //   naam     = indirecte string op club + 0xC0 (cluo.Cnam) / +0xC8 (Csnm)
-    private const int CLUB_NAME = 0xC0;
-    private const int CLUB_SHORT_NAME = 0xC8;
 
     // Fallback-club via contract-keten: contract(0xA8)→team(0x10)→club(0x30). Voor spelers
     // buiten geladen competities (die niet in een selectie-object staan). De squad-walk
@@ -814,13 +861,13 @@ internal static class Dumper
 
     private static (string name, int rep, string div) ResolveClub(MemScan m, ulong person)
     {
-        ulong con = m.Ptr(person + (ulong)Fields.PERO_FULL_CONTRACT);
+        ulong con = m.Ptr(person + (ulong)F.PERO_FULL_CONTRACT);
         if (con == 0) return (null, 0, null);
-        ulong team = m.Ptr(con + 0x10);
+        ulong team = m.Ptr(con + F.CON_TEAM);
         if (team == 0) return (null, 0, null);
-        int rep = m.U16(team + 0xA8);
+        int rep = m.U16(team + F.TEAM_REP);
         if (rep is < 0 or > 12000) rep = 0;
-        ulong club = m.Ptr(team + 0x30);
+        ulong club = m.Ptr(team + F.TEAM_CLUB);
         return (club == 0 ? null : ClubNameOf(m, club), rep, CompNameOf(m, team));
     }
 
@@ -828,15 +875,14 @@ internal static class Dumper
     // de korte op comp+0x48. Volgorde bewust: de korte naam mist bij niet-gelicentieerde
     // competities de landkwalificatie (heel Spanje werd "Eerste Divisie"); de volledige
     // naam heeft die wel ("Oostenrijkse Eredivisie" — geverifieerd 15-07 via de comp-kaart).
-    private static readonly int[] TeamCompOffs = { Fields.TEAM_COMP, Fields.TEAM_COMP_ALT };
     private static string CompNameOf(MemScan m, ulong team)
     {
-        foreach (int toff in TeamCompOffs)
+        foreach (uint toff in new[] { F.TEAM_COMP, F.TEAM_COMP_ALT })
         {
-            ulong comp = m.Ptr(team + (ulong)toff);
+            ulong comp = m.Ptr(team + toff);
             if (comp == 0) continue;
-            string s = m.IndirectString(comp + Fields.COMP_NAME);
-            if (!PlausibleClub(s)) s = m.IndirectString(comp + Fields.COMP_SHORT_NAME);
+            string s = m.IndirectString(comp + F.COMP_NAME);
+            if (!PlausibleClub(s)) s = m.IndirectString(comp + F.COMP_SHORT_NAME);
             if (PlausibleClub(s)) return s;
         }
         return null;
@@ -844,7 +890,7 @@ internal static class Dumper
 
     private static string ClubNameOf(MemScan m, ulong club)
     {
-        string name = m.IndirectString(club + CLUB_NAME) ?? m.IndirectString(club + CLUB_SHORT_NAME);
+        string name = m.IndirectString(club + F.CLUB_NAME) ?? m.IndirectString(club + F.CLUB_SHORT_NAME);
         return PlausibleClub(name) ? name : null;
     }
 
@@ -879,6 +925,10 @@ internal static class Dumper
         [54] = "Trainer eerste elftal", [64] = "Hoofd jeugdopleiding", [65] = "Speler/Hoofd jeugd",
         [66] = "Eigenaar", [70] = "President", [86] = "Loanmanager", [88] = "Technisch directeur",
         [144] = "Interim-manager",
+        // Analyserollen (FM26 én FM27; de vroegere pins 36/42 kwamen in geen van beide voor).
+        // Vastgesteld 02-11-2026 via het attribuutprofiel (data-analyse ~12-13), het aantal
+        // per club (58/62: hooguit één) en FM zelf (62: Kevin Balvers, PSV).
+        [58] = "Hoofd data-analyse", [60] = "Data-analist", [62] = "Hoofd performance-analyse",
     };
     private static string JobName(int v) => Jobs.TryGetValue(v, out var s) ? s : null;
 
@@ -916,19 +966,27 @@ internal static class Dumper
 
     // Versie van game_plugin.dll (de module waarop alle offsets zijn gepind). Wijkt de
     // major.minor af van de gepinde versie, dan meldt de web-app "data mogelijk onbetrouwbaar".
+    // Kiest ook de geheugenindeling (Fields) bij de hoofdversie: FM26 en FM27 delen de scan,
+    // maar niet elke offset. Onbekende hoofdversie (FM28…): nieuwste layout als beste gok,
+    // met versiewaarschuwing — de class-offset-scan zelf is patch-bestendig.
     private static void DetectGameVersion(MemScan mem)
     {
-        GameVersion = null; VersionOk = true;
+        // Terugval zonder bruikbare versie-info: de plugin draait alleen in FM26; de externe
+        // scanner gokt op de nieuwste layout.
+        var fallback = Host.Kind == "plugin" ? Fields.FM26 : Fields.All[0];
+        GameVersion = null; VersionOk = true; F = fallback;
         try
         {
             if (string.IsNullOrEmpty(mem.GpPath)) return;
             var fvi = FileVersionInfo.GetVersionInfo(mem.GpPath);
             GameVersion = fvi.FileVersion;
             if (string.IsNullOrEmpty(GameVersion)) return;   // geen versie-info: geen oordeel
-            VersionOk = fvi.FileMajorPart == Fields.SUPPORTED_MAJOR && fvi.FileMinorPart == Fields.SUPPORTED_MINOR;
-            Plugin.Log.LogInfo($"game_plugin.dll versie {GameVersion} (offsets gepind op {Fields.SUPPORTED_VERSION}.x → {(VersionOk ? "ok" : "AFWIJKEND")})");
+            var layout = Fields.ForVersion(fvi.FileMajorPart);
+            F = layout ?? fallback;
+            VersionOk = layout != null && fvi.FileMinorPart == F.SupportedMinor;
+            Host.Info($"game_plugin.dll versie {GameVersion} → layout {F.Game} (gepind op {F.SupportedVersion}.x → {(VersionOk ? "ok" : "AFWIJKEND")})");
         }
-        catch (Exception e) { Plugin.Log.LogWarning("Versiedetectie mislukt: " + e.Message); }
+        catch (Exception e) { Host.Warn("Versiedetectie mislukt: " + e.Message); }
     }
 
     // In-game datum: gelezen van het schema-object van MIJN team ([team+0xA0]+0x94, of +0x18) =
@@ -948,9 +1006,9 @@ internal static class Dumper
             uint pin = 0;
             if (DiagMyTeam != 0)
             {
-                ulong sch = mem.Ptr(DiagMyTeam + (ulong)Fields.TEAM_SCHEDULE);
+                ulong sch = mem.Ptr(DiagMyTeam + (ulong)F.TEAM_SCHEDULE);
                 if (sch != 0)
-                    foreach (int so in new[] { Fields.SCHED_NEXT_MATCH, Fields.SCHED_NEXT_MATCH_ALT })
+                    foreach (int so in new[] { F.SCHED_NEXT_MATCH, F.SCHED_NEXT_MATCH_ALT })
                     {
                         var (y, d) = DecodeFmDate(mem.U32(sch + (ulong)so));
                         if (y >= GameYear - 1 && y <= GameYear + 1) { pin = ((uint)y << 16) | (uint)d; break; }
@@ -963,11 +1021,11 @@ internal static class Dumper
                 GameYear = year;
                 foreach (var p in players.Concat(staff))
                     if (p.BirthYear > 0) p.Age = AgeAt(p.BirthYear, p.BirthDoy, GameDate.Value);
-                Plugin.Log.LogInfo($"In-game datum via team-schema: {GameDate.Value:yyyy-MM-dd} (kruischeck {DateVotes.GetValueOrDefault(pin)} teamstemmen)");
+                Host.Info($"In-game datum via team-schema: {GameDate.Value:yyyy-MM-dd} (kruischeck {DateVotes.GetValueOrDefault(pin)} teamstemmen)");
             }
-            else Plugin.Log.LogInfo("In-game datum: team-schema niet leesbaar — bron blijft 'derived'.");
+            else Host.Info("In-game datum: team-schema niet leesbaar — bron blijft 'derived'.");
         }
-        catch (Exception e) { Plugin.Log.LogWarning("Datum-bepaling mislukt: " + e.Message); }
+        catch (Exception e) { Host.Warn("Datum-bepaling mislukt: " + e.Message); }
     }
 
     // ---------- output ----------
@@ -997,15 +1055,24 @@ internal static class Dumper
             j.Prop("gameDateSource", "derived");
         }
         j.Prop("gameYear", gy);
-        j.Prop("pluginVersion", Plugin.Version);
+        j.Prop("pluginVersion", Host.Version);
+        j.Prop("host", Host.Kind);   // "plugin" (BepInEx, in fm.exe) of "scanner" (extern)
+        j.Prop("game", F.Game);
         j.Prop("gameVersion", GameVersion);
-        j.Prop("supportedVersion", Fields.SUPPORTED_VERSION);
+        j.Prop("supportedVersion", F.SupportedVersion);
         j.Prop("versionOk", VersionOk);
         j.Prop("manager", ManagerName);
         j.Prop("myClub", MyClub);
         j.Prop("myClubRep", MyClubRep);
+        if (HumanManagers.Count > 1)
+        {
+            j.Key("managers"); j.BeginArr();
+            foreach (var (name, club, rep) in HumanManagers)
+            { j.BeginObj(); j.Prop("name", name); j.Prop("club", club); j.Prop("clubRep", rep); j.EndObj(); }
+            j.EndArr();
+        }
         j.Prop("currency", "GBP");
-        j.Prop("source", "FMSuperScout plugin v" + Plugin.Version);
+        j.Prop("source", $"FMSuperScout {Host.Kind} v{Host.Version}");
         j.EndObj();
 
         // Voortgang 0.90→1.0 tijdens het wegschrijven (laatste ~10% van de doorlooptijd).
@@ -1058,6 +1125,9 @@ internal static class Dumper
         {
             j.Prop("pos", string.Join(", ", p.PosArr));
             j.Key("posArr"); j.BeginArr(); foreach (var x in p.PosArr) j.Val(x); j.EndArr();
+            // Alleen als het afwijkt: de meeste spelers hebben geen bedreven nevenpositie.
+            if (p.PosNat.Count != p.PosArr.Count)
+            { j.Key("posNat"); j.BeginArr(); foreach (var x in p.PosNat) j.Val(x); j.EndArr(); }
             if (p.TeamType >= 0) j.Prop("teamType", p.TeamType);   // 0=1e, ~3=reserves, ≥10=jeugd
             j.Prop("foot", p.Foot);
             if (p.Height > 0) j.Prop("height", p.Height);
@@ -1106,6 +1176,7 @@ internal static class Dumper
             using var w = new StreamWriter(path, false);
             w.WriteLine($"FMSuperScout diagnostics — {DateTime.Now}");
             var (dAvailPhys, dAvailCommit, dLoad) = MemScan.MemoryStatus();
+            w.WriteLine($"Host: {Host.Kind} v{Host.Version}  ·  game: {F.Game} (game_plugin {GameVersion ?? "?"}, gepind op {F.SupportedVersion}.x)");
             w.WriteLine($"Scanregio's: {m.ScanRegions.Count}  ·  leesbron: {ScanMode}");
             w.WriteLine($"Geheugen (na scan): {dAvailPhys / (1024 * 1024):N0} MB fysiek vrij · {dAvailCommit / (1024 * 1024):N0} MB commit vrij · belasting {dLoad}%");
             if (m.ImageNote != null) w.WriteLine($"Let op: {m.ImageNote}");
@@ -1120,9 +1191,9 @@ internal static class Dumper
             // de pieken nu — samen met docs/repin-guide.md is dat het halve herstelwerk.
             if (!VersionOk)
             {
-                w.WriteLine("=== REPIN-HINTS (gameversie wijkt af van gepinde " + Fields.SUPPORTED_VERSION + ".x) ===");
-                w.WriteLine($"Gepind: speler=0x{Fields.PLAYER_OFFSET:X} speler+staf=0x{Fields.PLAYER_STAFF_OFFSET:X} " +
-                            $"staf=0x{Fields.STAFF_OFFSET:X} manager=0x{Fields.HUMAN_MANAGER_OFFSET:X}");
+                w.WriteLine("=== REPIN-HINTS (gameversie wijkt af van gepinde " + F.SupportedVersion + ".x) ===");
+                w.WriteLine($"Gepind: speler=0x{F.PLAYER_OFFSET:X} speler+staf=0x{F.PLAYER_STAFF_OFFSET:X} " +
+                            $"staf=0x{F.STAFF_OFFSET:X} manager=0x{F.HUMAN_MANAGER_OFFSET:X}");
                 w.WriteLine("Kandidaten nu (grootste class-pieken hieronder). Vuistregels: elke class toont");
                 w.WriteLine("als twee pieken 0x28 uit elkaar (neem de laagste van het paar); de staf-piek is");
                 w.WriteLine("groter dan de spelerpiek; manager is een mini-piek (~2). Volledige werkwijze:");
@@ -1190,7 +1261,7 @@ internal static class Dumper
             w.WriteLine("=== Speler in twee clubselecties (steekproef, check in FM) ===");
             foreach (var s in MultiClubSample) w.WriteLine("  " + s);
         }
-        catch (Exception e) { Plugin.Log.LogWarning("Diag schrijven mislukt: " + e.Message); }
+        catch (Exception e) { Host.Warn("Diag schrijven mislukt: " + e.Message); }
     }
 }
 
@@ -1214,7 +1285,8 @@ internal sealed class Person
     public ushort Pa;
     public int Height;
     public string Foot;
-    public List<string> PosArr = new();
+    public List<string> PosArr = new();   // natuurlijk + bedreven (15+), hoogste eerst
+    public List<string> PosNat = new();   // alleen (bijna) natuurlijk
     public long Value;
     public long GuideValue;
     public long Wage;

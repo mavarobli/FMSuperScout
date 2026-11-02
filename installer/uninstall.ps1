@@ -6,6 +6,8 @@ $target = Join-Path $env:LOCALAPPDATA 'Programs\FMSuperScout'
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
   Where-Object { $_.CommandLine -like "*Programs\FMSuperScout*" } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+# Scan-wachter (kan na het sluiten van de app doorlopen zolang FM draait)
+Get-Process FMSuperScout.Scanner | Stop-Process -Force
 
 # Snelkoppelingen
 $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\FMSuperScout.lnk'

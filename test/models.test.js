@@ -138,3 +138,23 @@ test('roleScore: betere attributen => hogere rolscore', () => {
   const sStrong = M.roleScore(strong, role);
   assert.ok(sStrong >= sWeak, `sterker profiel moet minstens even hoog scoren (${sStrong} vs ${sWeak})`);
 });
+
+test('historie: FM27 krijgt een eigen carrière-sleutel, FM26 houdt de kale managernaam', () => {
+  const saved = M.state.meta;
+  try {
+    M.state.meta = { manager: 'Jan Jansen' };                  // oude dump zonder game-veld
+    assert.equal(M.histKey(), 'Jan Jansen');
+    M.state.meta = { manager: 'Jan Jansen', game: 'FM26' };
+    assert.equal(M.histKey(), 'Jan Jansen');
+    M.state.meta = { manager: 'Jan Jansen', game: 'FM27' };
+    assert.equal(M.histKey(), 'Jan Jansen (FM27)');
+    M.state.meta = {};
+    assert.equal(M.histKey(), 'default');
+  } finally { M.state.meta = saved; }
+});
+
+test('posities: natPos valt terug op posArr (oude dumps) en gebruikt posNat als die er is', () => {
+  assert.deepEqual(M.natPos({ posArr: ['DC'] }), ['DC']);
+  assert.deepEqual(M.natPos({ posArr: ['DC', 'DM'], posNat: ['DC'] }), ['DC']);
+  assert.deepEqual(M.natPos({}), []);
+});

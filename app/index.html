@@ -23,6 +23,7 @@
     <button id="tab-analysis" class="tab" data-i18n="analysis">Analyse</button>
   </nav>
   <div id="club-badge" title="Klik = filter op jouw club"></div>
+  <select id="mgr-pick" class="hidden" data-i18n-title="mgrPick"></select>
   <span id="update-pill" class="hidden"></span>
   <div id="dump-info"></div>
   <div id="game-date"></div>
@@ -78,26 +79,28 @@
 <div id="ver-warn" class="hidden"></div>
 <div id="main">
   <aside id="filters">
+    <!-- Ingeklapt: smalle rail met filterteller (zie body.sidebar-collapsed) -->
+    <div id="filters-rail">
+      <button id="rail-open" type="button" data-i18n-aria="railOpen">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+      </button>
+      <span id="rail-count" class="hidden"></span>
+    </div>
     <div class="fgroup">
       <div class="search-wrap">
         <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input type="text" id="f-name" data-i18n-ph="searchph" placeholder="Zoek naam of club">
       </div>
+      <div id="quick-filters" role="group"></div>
     </div>
 
-    <div class="fsection" id="fg-presets" data-sec="presets">
-      <div class="fsec-head" data-i18n="presetsTitle">Opgeslagen filters</div>
-      <div id="preset-dd">
-        <button id="preset-dd-btn" type="button" disabled>
-          <span id="preset-dd-label"></span>
-          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <div id="preset-dd-menu" class="hidden"></div>
+    <div id="active-filters" class="empty">
+      <div class="af-head">
+        <span id="af-count"></span>
+        <button id="btn-clear" type="button" data-i18n="clearfilters">Filters wissen</button>
       </div>
-      <button id="btn-preset-save">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        <span data-i18n="presetSave">Huidige filters opslaan</span>
-      </button>
+      <div id="af-chips"></div>
+      <div class="af-empty" data-i18n="noActiveFilters"></div>
     </div>
 
     <div class="fsection" id="fg-pitch" data-sec="pitch">
@@ -205,7 +208,19 @@
       <label class="chk"><input type="checkbox" id="f-shortlist"> <span data-i18n="onlyshortlist">Alleen shortlist</span></label>
     </div>
 
-    <button id="btn-clear" data-i18n="clearfilters">Filters wissen</button>
+    <div id="filters-foot">
+      <div id="preset-dd">
+        <button id="preset-dd-btn" type="button" disabled>
+          <span id="preset-dd-label"></span>
+          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="preset-dd-menu" class="hidden"></div>
+      </div>
+      <button id="btn-preset-save" type="button" data-i18n-aria="presetSave">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span data-i18n="presetSave">Huidige filters opslaan</span>
+      </button>
+    </div>
   </aside>
 
   <section id="content">

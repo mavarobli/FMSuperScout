@@ -73,3 +73,12 @@ test('i18n: geen lege vertaalwaarden', () => {
     for (const [k, v] of Object.entries(M.I18N[lang]))
       assert.ok(typeof v === 'string' && v.length > 0, `I18N.${lang}.${k} is leeg`);
 });
+
+test('i18n: stafattributen hebben een label in elke taal, voor elke gedumpte sleutel', () => {
+  const keys = M.STAFF_ATTR_GROUPS.flatMap(([, ks]) => ks);
+  assert.equal(new Set(keys).size, 22, '21 stafattributen + Aanpassingsvermogen (KV_vangen bewust verborgen)');
+  for (const lang of Object.keys(M.I18N)) {
+    for (const k of keys) assert.ok(M.STAFF_ATTR_LABEL[lang]?.[k], `${lang}: label ontbreekt voor ${k}`);
+    for (const [g] of M.STAFF_ATTR_GROUPS) assert.ok(M.I18N[lang][g], `${lang}: groepnaam ${g} ontbreekt`);
+  }
+});

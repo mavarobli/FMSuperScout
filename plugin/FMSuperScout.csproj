@@ -20,6 +20,11 @@
     <InteropDir Condition="'$(InteropDir)' == ''">$(MSBuildThisFileDirectory)..\refs\fm26-editor-workspace\BepInEx\interop</InteropDir>
   </PropertyGroup>
 
+  <!-- Gedeelde scan-kern (ook gebruikt door de externe scanner in ../scanner). -->
+  <ItemGroup>
+    <Compile Include="..\core\*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <Reference Include="$(BepInExCore)\BepInEx.Core.dll" Private="false" />
     <Reference Include="$(BepInExCore)\BepInEx.Unity.IL2CPP.dll" Private="false" />

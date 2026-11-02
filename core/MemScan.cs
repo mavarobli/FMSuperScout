@@ -4,7 +4,53 @@ using System.Runtime.InteropServices;
 namespace FMSuperScout;
 
 /// <summary>
-/// Geheugentoegang via ReadProcessMemory op ONS EIGEN proces.
+/// Het FM-proces dat gelezen wordt: het eigen proces (BepInEx-plugin, draait ín fm.exe)
+/// of een extern fm.exe (scanner). Alleen leesrechten; er wordt nooit iets geschreven.
+/// </summary>
+internal sealed class GameProcess : IDisposable
+{
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern nint OpenProcess(uint access, bool inherit, int pid);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern nint GetCurrentProcess();
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(nint h);
+
+    private const uint PROCESS_VM_READ = 0x0010;
+    private const uint PROCESS_QUERY_INFORMATION = 0x0400;
+    private const uint PROCESS_DUP_HANDLE = 0x0040;
+    private const uint PROCESS_CREATE_PROCESS = 0x0080;   // nodig voor de VA-kloon (PssCaptureSnapshot)
+
+    public nint Handle { get; }
+    public Process Process { get; }
+    private readonly bool _own;
+
+    private GameProcess(nint h, Process p, bool own) { Handle = h; Process = p; _own = own; }
+
+    public static GameProcess Current() => new(GetCurrentProcess(), Process.GetCurrentProcess(), false);
+
+    /// <summary>Open een extern FM-proces, alleen met leesrechten (least privilege).</summary>
+    public static GameProcess Open(Process p)
+    {
+        nint h = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, p.Id);
+        if (h == 0) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), $"fm.exe (pid {p.Id}) niet te openen");
+        return new(h, p, true);
+    }
+
+    /// <summary>
+    /// Handle met kloonrechten voor PssCaptureSnapshot — alleen bij de snapshot-herkansing
+    /// nodig, dus pas dan aangevraagd. 0 = niet gekregen. Eigen proces: de pseudo-handle.
+    /// Een extern handle sluit de aanroeper (ReleaseCloneHandle) zodra de opname klaar is.
+    /// </summary>
+    public nint OpenCloneHandle() =>
+        _own ? OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE | PROCESS_CREATE_PROCESS, false, Process.Id) : Handle;
+    public void ReleaseCloneHandle(nint h) { if (_own && h != 0) CloseHandle(h); }
+
+    public void Dispose() { if (_own) CloseHandle(Handle); }
+}
+
+/// <summary>
+/// Geheugentoegang via ReadProcessMemory op het FM-proces (eigen of extern, zie GameProcess).
 /// Belangrijk: rauwe pointer-derefs (*(ulong*)p) crashen de game onherstelbaar
 /// bij één ongeldig adres (access violation, niet op te vangen in .NET).
 /// ReadProcessMemory doet de read in kernel-mode en geeft false terug bij een
@@ -31,10 +77,10 @@ internal sealed class MemScan
     private static extern ulong VirtualQueryEx(nint hProcess, ulong lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, ulong dwLength);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern nint GetCurrentProcess();
-
-    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(nint hObject);
+
+    [DllImport("kernel32.dll")]
+    private static extern nint GetCurrentProcess();
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool ReadProcessMemory(nint hProcess, ulong lpBaseAddress,
@@ -94,7 +140,8 @@ internal sealed class MemScan
     // point-in-time-beeld. De kloon kost wél commit-geheugen en vertraagt FM (elke write
     // wordt een pagina-kopie), dus hij is een herkansing voor als live lezen faalt, geen
     // standaardroute.
-    private nint _proc = GetCurrentProcess();
+    private readonly GameProcess _game;
+    private nint _proc;
     private nint _snap, _vaClone;
     public bool Snapshotted { get; private set; }
 
@@ -127,8 +174,10 @@ internal sealed class MemScan
     /// <summary>Duur van de snapshot-opname in ms (alleen relevant als erom gevraagd is).</summary>
     public long SnapshotMs { get; private set; }
 
-    public MemScan(bool useSnapshot = false)
+    public MemScan(GameProcess game, bool useSnapshot = false)
     {
+        _game = game;
+        _proc = game.Handle;
         if (useSnapshot) TrySnapshot();   // zet _proc op de kloon; regio's en reads gaan dan uit de momentopname
         BuildRegions();
         FindModules();      // moduleadressen zijn identiek in de kloon
@@ -144,7 +193,15 @@ internal sealed class MemScan
         var sw = Stopwatch.StartNew();
         try
         {
-            uint rc = PssCaptureSnapshot(GetCurrentProcess(), PSS_CAPTURE_VA_CLONE, 0, out _snap);
+            nint cloneRights = _game.OpenCloneHandle();
+            if (cloneRights == 0)
+            {
+                SnapshotError = $"geen kloonrechten op fm.exe (Win32 {Marshal.GetLastWin32Error()})";
+                return;
+            }
+            uint rc;
+            try { rc = PssCaptureSnapshot(cloneRights, PSS_CAPTURE_VA_CLONE, 0, out _snap); }
+            finally { _game.ReleaseCloneHandle(cloneRights); }   // de kloon zelf leeft los van dit handle
             if (rc != 0)
             {
                 // Win32-code meelogen: 8 = ONOUGH_MEMORY, 1455 = COMMITMENT_LIMIT, 5 = ACCESS_DENIED.
@@ -175,11 +232,13 @@ internal sealed class MemScan
     /// wijzigt een copy-on-write-kopie. Reads vallen daarna terug op het live proces,
     /// zodat een nakomende lezer nooit tegen een dichte handle aanloopt.
     /// </summary>
+    // NB PssFreeSnapshot: het eerste argument is het proces dat de snapshot-handle bevat —
+    // dat zijn wijzelf (scanner of plugin), niet fm.exe.
     public void ReleaseSnapshot()
     {
         if (!Snapshotted) return;
         Snapshotted = false;
-        _proc = GetCurrentProcess();
+        _proc = _game.Handle;
         try { CloseHandle(_vaClone); } catch { }
         try { PssFreeSnapshot(GetCurrentProcess(), _snap); } catch { }
         _vaClone = 0; _snap = 0;
@@ -285,7 +344,8 @@ internal sealed class MemScan
 
     private void FindModules()
     {
-        foreach (ProcessModule m in Process.GetCurrentProcess().Modules)
+        _game.Process.Refresh();   // modulelijst kan sinds de vorige scan gewijzigd zijn (game_plugin laadt laat)
+        foreach (ProcessModule m in _game.Process.Modules)
         {
             ulong b = (ulong)m.BaseAddress.ToInt64();
             ulong e = b + (ulong)m.ModuleMemorySize;

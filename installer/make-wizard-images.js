@@ -6,12 +6,11 @@ const fs = require('fs');
 const path = require('path');
 
 // App-kleuren (style.css)
-const BG_TOP = [0x0e, 0x12, 0x18];      // --bg
-const BG_BOT = [0x1c, 0x24, 0x2f];      // --bg3
-const ACCENT = [0x38, 0xb2, 0x6a];      // --accent (groen)
-const TEXT = [0xe8, 0xee, 0xf5];
+const BG_TOP = [0x11, 0x13, 0x30];      // --bg
+const BG_BOT = [0x1f, 0x23, 0x52];      // --bg3
+const ACCENT = [0x5b, 0x46, 0xb8];      // --accent (gedempt violet)
+const TEXT = [0xe9, 0xeb, 0xfa];
 // Embleem-groen (zelfde als icon.ico)
-const GREEN_TOP = [63, 191, 116], GREEN_BOT = [44, 155, 86];
 
 const mix = (a, b, t) => a + (b - a) * t;
 const mix3 = (c1, c2, t) => [mix(c1[0], c2[0], t), mix(c1[1], c2[1], t), mix(c1[2], c2[2], t)];
@@ -21,20 +20,15 @@ function emblem(x, y, ox, oy, E) {
   const lx = x - ox, ly = y - oy;
   if (lx < 0 || ly < 0 || lx >= E || ly >= E) return null;
   const u = v => v / 64 * E;
-  const rr = u(15), m = u(2);
+  const rr = u(16), m = u(2);
   const inX = Math.min(Math.max(lx, m + rr), E - m - rr);
   const inY = Math.min(Math.max(ly, m + rr), E - m - rr);
   if (Math.hypot(lx - inX, ly - inY) > rr || lx < m || lx > E - m || ly < m || ly > E - m) return null;
-  let c = mix3(GREEN_TOP, GREEN_BOT, ly / E);
-  const cx = u(32), cy = u(32);
-  if (Math.abs(ly - cy) < u(0.7) && lx > u(10) && lx < u(54)) c = mix3(c, TEXT, 0.16);
-  if (Math.abs(Math.hypot(lx - cx, ly - cy) - u(9)) < u(0.7)) c = mix3(c, TEXT, 0.16);
-  const dl = Math.hypot(lx - u(28), ly - u(27));
-  if (Math.abs(dl - u(12.5)) < u(2.2)) c = [255, 255, 255];
-  else if (dl < u(5.2)) c = mix3([255, 255, 255], c, 0.08);
-  const hx = lx - u(37.5), hy = ly - u(36.5);
-  const rot = (hx + hy) / Math.SQRT2, perp = (hy - hx) / Math.SQRT2;
-  if (rot > 0 && rot < u(15.5) && Math.abs(perp) < u(3.1)) c = [255, 255, 255];
+  // Middencirkel (logo B), zelfde verloop als app/logo.svg.
+  let c = mix3([0x6e, 0x59, 0xcc], [0x3f, 0x2f, 0x8f], (lx + ly) / (2 * E));
+  const cx = u(32), cy = u(32), d = Math.hypot(lx - cx, ly - cy);
+  if (Math.abs(ly - cy) < u(1)) c = mix3(c, [255, 255, 255], 0.28);
+  if (Math.abs(d - u(14)) < u(2.5) || d < u(4.5)) c = [255, 255, 255];
   return c;
 }
 

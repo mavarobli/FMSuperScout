@@ -5,7 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const GREEN_TOP = [63, 191, 116], GREEN_BOT = [44, 155, 86], WHITE = [255, 255, 255];
+// Zelfde embleem en kleuren als app/logo.svg: de middencirkel (FM27-stijl, logo B).
+const LOGO_TOP = [110, 89, 204], LOGO_BOT = [63, 47, 143], WHITE = [255, 255, 255];
 
 // Teken het embleem op een SS×size canvas (RGBA), daarna downsamplen.
 function drawBase(N) {
@@ -13,7 +14,11 @@ function drawBase(N) {
   const set = (x, y, r, g, b, a) => { const i = (y * N + x) * 4; px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = a; };
   const S = N; // schaalfactor t.o.v. 64-grid
   const u = v => v / 64 * S;
-  const rr = u(15);                       // hoekradius
+  const rr = u(16);                       // hoekradius
+  // Op icoonformaat (16/32 px) zijn de middellijn en een dunne ring niet leesbaar: dan
+  // een dikkere ring zonder lijn, net als het favicon-ontwerp.
+  const small = N / 4 <= 32;
+  const ringR = small ? 15 : 14, ringW = small ? 4 : 2.5;
   for (let y = 0; y < N; y++) {
     for (let x = 0; x < N; x++) {
       // afgeronde vierkant-achtergrond (met rand-marge 2/64)
@@ -23,24 +28,16 @@ function drawBase(N) {
       const dCorner = Math.hypot(x - inX, y - inY);
       const inside = (x >= m && x <= S - m && y >= m && y <= S - m) && dCorner <= rr;
       if (!inside) { set(x, y, 0, 0, 0, 0); continue; }
-      const tg = y / N;
-      let r = GREEN_TOP[0] + (GREEN_BOT[0] - GREEN_TOP[0]) * tg;
-      let g = GREEN_TOP[1] + (GREEN_BOT[1] - GREEN_TOP[1]) * tg;
-      let b = GREEN_TOP[2] + (GREEN_BOT[2] - GREEN_TOP[2]) * tg;
-      // subtiele veldlijnen
+      const tg = (x + y) / (2 * N);           // diagonale verloop, zoals de SVG
+      let r = LOGO_TOP[0] + (LOGO_BOT[0] - LOGO_TOP[0]) * tg;
+      let g = LOGO_TOP[1] + (LOGO_BOT[1] - LOGO_TOP[1]) * tg;
+      let b = LOGO_TOP[2] + (LOGO_BOT[2] - LOGO_TOP[2]) * tg;
       const cx = u(32), cy = u(32);
-      if (Math.abs(y - cy) < u(0.7) && x > u(10) && x < u(54)) { r = mix(r, 255, .16); g = mix(g, 255, .16); b = mix(b, 255, .16); }
+      // middellijn (28% wit), alleen op groter formaat
+      if (!small && Math.abs(y - cy) < u(1)) { r = mix(r, 255, .28); g = mix(g, 255, .28); b = mix(b, 255, .28); }
       const dc = Math.hypot(x - cx, y - cy);
-      if (Math.abs(dc - u(9)) < u(0.7)) { r = mix(r, 255, .16); g = mix(g, 255, .16); b = mix(b, 255, .16); }
-      // vergrootglas: ring rond (28,27) r=12.5 dik 4.4; lens gevuld r=5.2; steel
-      const lx = u(28), ly = u(27);
-      const dl = Math.hypot(x - lx, y - ly);
-      if (Math.abs(dl - u(12.5)) < u(2.2)) { [r, g, b] = WHITE; }         // ring
-      else if (dl < u(5.2)) { r = mix(255, r, .08); g = mix(255, g, .08); b = mix(255, b, .08); } // lens
-      // steel: geroteerde balk van (37.5,36.5) richting rechtsonder
-      const hx = x - u(37.5), hy = y - u(36.5);
-      const rot = (hx + hy) / Math.SQRT2, perp = (hy - hx) / Math.SQRT2;
-      if (rot > 0 && rot < u(15.5) && Math.abs(perp) < u(3.1)) { [r, g, b] = WHITE; }
+      if (Math.abs(dc - u(ringR)) < u(ringW)) { [r, g, b] = WHITE; }   // middencirkel
+      else if (!small && dc < u(4.5)) { [r, g, b] = WHITE; }          // middenstip
       set(x, y, r, g, b, 255);
     }
   }
