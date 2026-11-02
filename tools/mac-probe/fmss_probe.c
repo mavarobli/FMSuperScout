@@ -101,7 +101,10 @@ static void find_images(FILE *f) {
     if (!nm || !strstr(nm, "fm.app")) continue;
     image_t im; image_range(i, &im);
     outf(f, "  %10.1f MB  %s\n", (im.hi - im.lo) / 1048576.0, nm);
-    if (strstr(nm, "game_plugin")) g_gp = im;
+    // Alleen de database zelf (…/game_plugin.bundle/Contents/MacOS/game_plugin), niet de
+    // andere onderdelen die in dezelfde bundle-map staan (EOS, Steam, PlayFab).
+    size_t L = strlen(nm);
+    if (L >= 18 && strcmp(nm + L - 18, "/MacOS/game_plugin") == 0) g_gp = im;
     if (strstr(nm, "GameAssembly")) g_ga = im;
   }
 }
@@ -109,13 +112,40 @@ static void find_images(FILE *f) {
 // ---------- telling per vtable ----------
 #define TBITS 21
 #define TSIZE (1u << TBITS)
-typedef struct { uint64_t vt, count; } slot_t;
+typedef struct { uint64_t vt, count, sample; } slot_t;
 static slot_t *g_tab;
-static void count_vt(uint64_t vt) {
+static void count_vt(uint64_t vt, uint64_t at) {
   uint64_t h = (vt >> 3) * 0x9E3779B97F4A7C15ull;
   for (uint32_t k = 0, i = (uint32_t)(h >> (64 - TBITS)); k < 64; k++, i = (i + 1) & (TSIZE - 1)) {
     if (g_tab[i].vt == vt) { g_tab[i].count++; return; }
-    if (g_tab[i].vt == 0) { g_tab[i].vt = vt; g_tab[i].count = 1; return; }
+    if (g_tab[i].vt == 0) { g_tab[i].vt = vt; g_tab[i].count = 1; g_tab[i].sample = at; return; }
+  }
+}
+
+// Naamhint uit een voorbeeldobject: zoek rond de vtable-pointer velden die (via één of twee
+// pointers) naar leesbare tekst wijzen. Op Windows staan namen "genest" ([veld]→[ptr]→tekst
+// op +4) of "indirect" ([veld]→tekst op +4).
+static int looks_like_text(const char *t) {
+  int n = 0, letters = 0;
+  for (; t[n]; n++) {
+    unsigned char c = (unsigned char)t[n];
+    if (c < 32 || c == 127) return 0;
+    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c >= 0xC0) letters++;
+  }
+  return n >= 3 && letters * 2 >= n;
+}
+static void name_hint(uint64_t obj, char *out, size_t cap) {
+  size_t used = 0;
+  out[0] = 0;
+  for (int o = -0x40; o <= 0x180 && used + 60 < cap; o += 8) {
+    uint64_t a = rd64(obj + o);
+    if (!a || (a & 3)) continue;
+    char t[48]; memset(t, 0, sizeof t);
+    uint64_t b = rd64(a);
+    const char *kind = NULL;
+    if (b && rd(b + 4, t, sizeof t - 1) && looks_like_text(t)) kind = "N";
+    else { memset(t, 0, sizeof t); if (rd(a + 4, t, sizeof t - 1) && looks_like_text(t)) kind = "I"; }
+    if (kind) used += snprintf(out + used, cap - used, "%s%s%+d:%s", used ? "  " : "", kind, o, t);
   }
 }
 static int by_count(const void *a, const void *b) {
@@ -163,7 +193,7 @@ static void scan(void) {
           uint64_t v = *(uint64_t *)(buf + i);
           if (v < g_gp.lo || v >= g_gp.hi || (v & 7)) continue;
           cands++;
-          count_vt(v);
+          count_vt(v, addr + off + i);
         }
       }
     }
@@ -173,30 +203,32 @@ static void scan(void) {
   outf(f, "Gescand: %.0f MB in %llu gebieden (%.0f MB onleesbaar), %llu kandidaten, %.1f s\n",
        scanned / 1048576.0, regions, unread / 1048576.0, cands, (now_ms() - t0) / 1000.0);
 
-  // Alleen echte vtables tellen: [vt-8] moet naar een type_info wijzen waarvan de naam
-  // leesbaar is. Sorteren op aantal; de grote klassen (personen) bovenaan.
+  // Overzicht van de vaakst voorkomende pointers naar game_plugin. Echte vtables hebben een
+  // kleine offset-to-top op [vt-16]; de klassenaam (als de build RTTI heeft) komt uit de
+  // type_info op [vt-8]. Per klasse een naamhint uit een voorbeeldobject, zodat ook zonder
+  // klassennamen te zien is welke klasse personen (spelers/staf) zijn.
   qsort(g_tab, TSIZE, sizeof(slot_t), by_count);
-  outf(f, "\n== Klassen (top 120): aantal · offset-to-top · vtable-offset in game_plugin · naam ==\n");
-  int shown = 0;
-  for (uint32_t i = 0; i < TSIZE && shown < 120 && g_tab[i].count >= 20; i++) {
+  outf(f, "\n== Top 80: aantal · offset-to-top · vtable-offset · klassenaam · naamhint (N=genest, I=indirect, +offset) ==\n");
+  int shown = 0, named = 0;
+  for (uint32_t i = 0; i < TSIZE && shown < 80 && g_tab[i].count >= 20; i++) {
     uint64_t vt = g_tab[i].vt;
     int64_t ott = (int64_t)rd64(vt - 16);
-    uint64_t ti = rd64(vt - 8);
-    if (!ti) continue;
-    uint64_t np = rd64(ti + 8);
-    char mangled[256] = {0};
-    if (!np || !rd(np, mangled, sizeof mangled - 1)) continue;
-    mangled[sizeof mangled - 1] = 0;
-    int ok = 1;
-    for (char *c = mangled; *c; c++) if (*c < 32 || *c > 126) { ok = 0; break; }
-    if (!ok || !mangled[0]) continue;
-    int st = -1; char *dem = g_demangle ? g_demangle(mangled, NULL, NULL, &st) : NULL;
-    outf(f, "%10llu  %6lld  0x%08llx  %s\n", g_tab[i].count, (long long)-ott,
-         (unsigned long long)(vt - g_gp.lo), st == 0 && dem ? dem : mangled);
-    free(dem);
+    char ottTxt[24] = "-";
+    if (ott <= 0 && ott > -0x10000) snprintf(ottTxt, sizeof ottTxt, "%lld", (long long)-ott);
+    char cls[256] = "-";
+    uint64_t ti = rd64(vt - 8), np = ti ? rd64(ti + 8) : 0;
+    char mangled[200]; memset(mangled, 0, sizeof mangled);
+    if (np && rd(np, mangled, sizeof mangled - 1) && looks_like_text(mangled)) {
+      int st = -1; char *dem = g_demangle ? g_demangle(mangled, NULL, NULL, &st) : NULL;
+      snprintf(cls, sizeof cls, "%s", st == 0 && dem ? dem : mangled);
+      free(dem); named++;
+    }
+    char hint[600]; name_hint(g_tab[i].sample, hint, sizeof hint);
+    outf(f, "%9llu  %6s  0x%08llx  %s  %s\n", g_tab[i].count, ottTxt,
+         (unsigned long long)(vt - g_gp.lo), cls, hint);
     shown++;
   }
-  if (!shown) outf(f, "Geen klassen met leesbare naam gevonden (build zonder RTTI?) — volgende stap: offset-to-top-histogram.\n");
+  outf(f, "(%d van %d met klassenaam)\n", named, shown);
   outf(f, "\nKlaar in %.1f s.\n", (now_ms() - t0) / 1000.0);
   fclose(f);
 }
