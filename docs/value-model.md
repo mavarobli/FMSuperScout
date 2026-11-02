@@ -19,7 +19,8 @@ unstable (coefficients flip between CA-heavy and reputation-heavy fits). So the 
 **reputation (saturating above ~7500) + age + contract length + a small youth correction, without CA.**
 Result: the mid-range is right (Bidstrup £17M, Beukema £14M), the top is tempered (Haaland ~£280M vs €274M).
 Limitation: a strong player with low fame tends to be underestimated. The truly accurate route is reading
-the value from memory (GenieScout does this via a memory agent), see `backlog.md`.
+the value from memory, which the scanner does for most players (`PLAO_GUIDE_VALUE`); this model only
+fills the gaps.
 
 ## Market value (estValue in app/app.js), historical (CA-driven, replaced)
 

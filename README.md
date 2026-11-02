@@ -23,9 +23,9 @@ of memory in about 6 seconds. Including what FM normally hides: **CA and PA**, h
 attributes and FM's **real transfer value**. After that everything is instant. Monster saves work
 too: 635k people across 100+ leagues loads in about 17 seconds.
 
-Two parts: a small **scanner** that reads the game's database from memory, and a **local web app**
-where you search, filter and compare. Nothing is installed into your game folder, no mod loader,
-no internet, no accounts, no ads, nothing leaves your PC.
+Two parts: a reader that pulls the database out of the game (on Windows a small scanner, on the
+Mac a module that loads with FM), and a **local app** where you search, filter and compare.
+Nothing goes into your game folder, no internet, no account, no ads, nothing leaves your machine.
 
 > Single-player use only. The scanner **only reads** memory, it never writes to the game.
 
@@ -72,38 +72,22 @@ Wonderkids get a gold card. Built for showing off that one insane regen.
 
 ## Everything else
 
-- **Filters that stack**: name/club, age, CA, PA, meta, PA meta, value, asking price, wage, nationality,
-  EU/EEA, contract, transfer status, division (smart search), **height**, **preferred foot**, and
-  a one-tick **wonderkid** filter. Pick positions on a clickable pitch.
-- **Attribute filter**: min/max on any attribute ("Pace 15+"), hidden characteristics and
-  personality included. Rules combine, show as removable chips and save into presets.
-- **Saved presets**: the complete filter setup, positions and role, under one name.
-- **Tactical role ratings**: 19 FM roles scored from the key attributes, as a sortable column and
-  a "best roles" panel per player.
-- **Player comparison**: up to 3 side by side with FM-style bars, hidden stats included.
-- **Squad analysis**: thin depth, aging and missing succession per position group, with one click
-  to scout candidates for the gap.
-- **Development charts** per player: CA/PA and value over time, with the change over the period.
-- **Loan-aware**: loaned players show in blue with their parent club, your own loaned-out players
-  in red under the My club filter.
-- **Market value from memory**: FM's actual transfer value for most players, a calibrated estimate
-  for the rest (see *Accuracy*).
-- **Asking price and transfer interest**: estimates from contract, transfer status, age,
-  reputation gap and wages, including the FIFA under-18 rule.
-- **Shortlist** (★) with its own tab and CSV export.
-- **Settings**: four languages (English, Dutch, French, German), GBP/EUR/USD, wage per
-  week/month/year, and one toggle to hide CA/PA and all hidden stats for people who consider
-  reading them cheating (the meta score has its own toggle). Nation names and the EU check are
-  language-independent (FM's own nation IDs), whatever language your game runs in.
-- **One-click update**: the app checks for a new release about once a day and shows a dismissible
-  notice, and the settings menu has a manual "Check for updates" action. One click downloads the
-  installer, verifies its SHA-256 against the release and starts it. Nothing installs without
-  your click, no tracking.
+- **Filters that stack**: age, CA/PA, meta, value, asking price, wage, nationality, EU/EEA,
+  contract, transfer status, division, height, foot, positions on a clickable pitch, and quick
+  filters (wonderkids, contract ending, for sale, my club).
+- **Attribute filter**: min/max on any attribute, hidden ones and personality included, for
+  players and staff. Saved presets keep the whole setup under one name.
+- **Role ratings** for 19 FM roles, **comparison** of up to 3 players, **squad analysis** per
+  position group, and **development charts** per player.
+- **Loans** shown with the parent club; **market value** from memory for most players, an
+  estimate for the rest; **asking price and transfer interest** estimates.
+- **Shortlist** with CSV export; **network saves**: pick which manager is you.
+- **Settings**: English, Dutch, French, German; GBP/EUR/USD; one toggle hides CA/PA and all
+  hidden stats if you consider them cheating.
+- **Updates**: a daily check with a dismissible notice. On Windows one click downloads the
+  installer, checks its SHA-256 and starts it.
 
-## Install (end users)
-
-One installer: the viewer app plus the scanner. No coding, nothing else to download, and nothing
-is added to your game folder.
+## Install
 
 ### Windows
 
@@ -115,6 +99,8 @@ is added to your game folder.
 3. Run it.
 4. Start FM27 (or FM26) and load your save.
 5. Open **FMSuperScout** from the Start menu and click **New data**, or press **F9** in the game.
+   The data loads by itself when the scan is done. F9 keeps working while FM runs, also after you
+   close the app.
 
 To remove it: *Apps and features* → FMSuperScout. Coming from 1.5.0 or older? The old BepInEx
 plugin is no longer needed; uninstalling removes the plugin DLL, BepInEx itself stays (other mods
@@ -142,6 +128,8 @@ reopen FMSuperScout as often as you like. There is no F9 on the Mac; use **New d
 To remove it: drag FMSuperScout from Applications to the Bin, and delete
 `~/Library/Application Support/FMSuperScout` if you want your data gone too.
 
+Your data lives in `%LOCALAPPDATA%\FMSuperScout\` (Windows) or
+`~/Library/Application Support/FMSuperScout/` (Mac): the dumps, `diagnostics.txt` and a log.
 Something not working? See [TROUBLESHOOTING.md](TROUBLESHOOTING.md), or use **Report a problem**
 in the app's settings menu.
 
@@ -176,21 +164,6 @@ A viewer-only zip package is also available via `installer/build-package.ps1`.
 built on a Mac. `bash mac/build.sh` builds the module from source and installs a test setup with
 `FMSuperScout.command`; the `mac` GitHub workflow builds the complete `FMSuperScout-Mac.dmg`.
 See [`mac/README.md`](mac/README.md).
-
-## Getting data out of Football Manager
-
-The app reads whatever the scanner last dumped from your **active save**:
-
-1. Start Football Manager and load your save (on the Mac: with **Start Football Manager** in
-   the app).
-2. Press **F9** in-game (Windows), or click **⬇ New data** in the app.
-3. The data loads by itself as soon as the dump is ready. If a read fails, the app shows what
-   went wrong instead of waiting forever.
-
-F9 is picked up by a small watcher that starts with the app and stays active while Football
-Manager runs, also after you close the app. Data lives in `%LOCALAPPDATA%\FMSuperScout\`
-(`dump*.json`, `status.json`, `diagnostics.txt`, `scanner.log`); on the Mac in
-`~/Library/Application Support/FMSuperScout/` (with `mac.log` instead of `scanner.log`).
 
 ## Accuracy
 

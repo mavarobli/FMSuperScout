@@ -1084,8 +1084,8 @@ const STAFF_COLS = [
 // bovendien zo gecorreleerd dat CA meenemen het model onstabiel maakt. Daarom: reputatie (met
 // verzadiging aan de top) + leeftijd + resterende contractduur, plus een lichte jeugd-correctie.
 // Gevolg/beperking: een sterke speler met lage faam (kleine club) wordt eerder onderschat.
-// De écht accurate route is de waarde rechtstreeks uit het geheugen lezen (zoals GenieScout);
-// zie docs/backlog.md.
+// Voor de meeste spelers leest de scanner de echte waarde uit het geheugen; dit model vult alleen
+// de rest. Zie docs/value-model.md.
 const VAL_B = { c0: 10.96, wRep: 0.997, age: -0.069, yhead: -0.041, lnC: 0.507 };
 function wSat(w) { return Math.min(w, 7500) + 0.30 * Math.max(0, w - 7500); }   // faam vlakt af aan de top
 // Écht clubloos = geen club én geen clubreputatie. (Club met wél rep maar zonder naam is een
