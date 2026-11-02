@@ -61,10 +61,15 @@ section() { printf '\n===== %s =====\n' "$1"; }
     echo "--- entitlements"; codesign -d --entitlements - --xml "$APP" 2>/dev/null | plutil -p - 2>/dev/null || codesign -d --entitlements - "$APP" 2>&1
     echo "--- Frameworks / PlugIns"
     ls -la "$APP/Contents/Frameworks" "$APP/Contents/PlugIns" 2>/dev/null
-    echo "--- Grote bibliotheken (>5 MB) in de app"
-    find "$APP" \( -name "*.dylib" -o -name "*.bundle" -o -name "*.so" \) -size +5M -exec ls -la {} \; 2>/dev/null
-    echo "--- Architectuur van die bibliotheken"
-    find "$APP" -name "*.dylib" -size +5M -exec lipo -info {} \; 2>/dev/null
+    echo "--- Programmacode in de app (dylibs en de binaries in Frameworks/PlugIns, >1 MB)"
+    # Alleen echte code; Unity's datapakketten heten ook .bundle maar zijn plaatjes/modellen.
+    find "$APP/Contents/Frameworks" "$APP/Contents/PlugIns" "$APP/Contents/MacOS" -type f -size +1M 2>/dev/null |
+      while IFS= read -r f; do
+        if file -b "$f" 2>/dev/null | grep -q 'Mach-O'; then
+          printf '%s  %s\n' "$(stat -f %z "$f")" "$f"
+          lipo -info "$f" 2>/dev/null | sed 's/^/    /'
+        fi
+      done
   done < <(printf '%s\n' "${CANDIDATES[@]+"${CANDIDATES[@]}"}" | sort -u)
 
   section "Draaiend Football Manager-proces"
@@ -75,8 +80,9 @@ section() { printf '\n===== %s =====\n' "$1"; }
     for P in $PIDS; do
       echo "--- pid $P"
       ps -o pid=,rss=,comm= -p "$P"
-      echo "Geladen onderdelen (alleen .dylib/.bundle, grootste eerst):"
-      lsof -p "$P" 2>/dev/null | awk '$5=="REG" && ($9 ~ /\.dylib$|\.bundle|\.so$/) {print $7, $9}' | sort -rn | head -40
+      echo "Geladen onderdelen van FM zelf (uit de app-map):"
+      # -Fn geeft één naam per regel ('n' + pad), ook als het pad spaties bevat.
+      lsof -Fn -p "$P" 2>/dev/null | sed -n 's/^n//p' | grep -E 'fm\.app/Contents/(Frameworks|PlugIns|MacOS)/' | sort -u
     done
   fi
 

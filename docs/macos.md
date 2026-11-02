@@ -1,8 +1,28 @@
 # FMSuperScout op macOS: haalbaarheid (november 2026)
 
 Onderzoek naar hoe Mac-gebruikers FMSuperScout met FM27 kunnen gebruiken. **[V]** = geverifieerd
-in een bron of de code, **[A]** = afleiding, nog niet getest. Niets hiervan is op een echte Mac
-uitgeprobeerd; de open vragen onderaan beslissen welke route kan.
+in een bron of de code, **[M]** = gemeten op een echte Mac met FM27, **[A]** = afleiding.
+
+## Gemeten op een Mac (2 november 2026, `tools/mac-diagnose.sh`)
+
+MacBook Pro M1 Pro (16 GB), macOS 27.0, SIP aan, geen Rosetta. FM27 27.0.0.2486716 via Steam.
+
+- **Route A (in-process) kan zonder SIP-aanpassing** [M]. FM27 is door SEGA gesigneerd
+  (Developer ID, genotariseerd, hardened runtime) en heeft precies de twee entitlements die
+  dat toestaan: `com.apple.security.cs.allow-dyld-environment-variables` en
+  `com.apple.security.cs.disable-library-validation`. Een eigen, ad-hoc gesigneerde
+  bibliotheek mag dus via `DYLD_INSERT_LIBRARIES` (Steam-startoptie) meeladen.
+- **Route B (externe scanner) valt af** [M]: geen `get-task-allow`, dus task_for_pid van
+  buitenaf vereist SIP-aanpassing.
+- **Opbouw** [M]: bundle-id `com.SportsInteractive.FootballManager27`, programma
+  `fm.app/Contents/MacOS/Football Manager 27`, universeel (x86_64 + arm64).
+  `Contents/Frameworks/GameAssembly.dylib` (212 MB) en `UnityPlayer.dylib`; de database zit in
+  **`Contents/PlugIns/game_plugin.bundle`** (de tegenhanger van `game_plugin.dll`).
+- Xcode-command-line-tools zijn aanwezig: de meetmodule kan op de Mac zelf gebouwd worden.
+
+Volgende stap: `tools/mac-probe/` — een kleine meetmodule die via de Steam-startoptie meelaadt
+en binnen FM het klassenoverzicht maakt (Itanium-RTTI: offset-to-top en klassenaam), de
+Mac-tegenhanger van het class-offset-histogram waarmee FM27 op Windows gepind is.
 
 ## Kort
 
