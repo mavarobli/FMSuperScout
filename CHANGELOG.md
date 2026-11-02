@@ -5,6 +5,25 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+FMSuperScout for Mac. Windows: same results, internals reorganised.
+
+### Added
+- **Mac version** (`FMSuperScout-Mac.dmg`, Apple Silicon + Intel, macOS 13+, Steam FM27).
+  A Mac app with its own window and icon; Node is built in. macOS does not let another
+  program read a running game without lowering its security, so on the Mac the scan runs
+  inside Football Manager: the app starts FM with a small read-only module
+  (`mac/`, .NET NativeAOT) via the **Start Football Manager** button. Verified on an M1 Mac
+  against the same save as Windows: identical staff, player-coaches, club, reputation and
+  date; a scan takes about 5 seconds.
+- On the Mac, classes are recognised by their C++ class names (RTTI) instead of offsets;
+  layouts that were not measured by hand are measured by the module itself and reported in
+  `diagnostics.txt`.
+
+### Changed
+- The scan core is split into a shared part and a Windows and a Mac part
+  (`core/MemScan*.cs`). Windows output was checked to be identical before and after
+  (same save, scanned back to back: 0 differences).
+
 ## [1.6.0] - 2026-11-02
 
 Scanner 1.6.0, plugin 0.2.0. Football Manager 27 support, without BepInEx.

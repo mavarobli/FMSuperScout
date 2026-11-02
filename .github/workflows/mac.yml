@@ -1,4 +1,4 @@
-# Bouwt de Mac-versie (NativeAOT en Swift kunnen alleen op macOS) en levert FMSuperScout.dmg op:
+# Bouwt de Mac-versie (NativeAOT en Swift kunnen alleen op macOS) en levert FMSuperScout-Mac.dmg op:
 # FMSuperScout.app met eigen venster en icoon, Node, de web-app, de scanmodule (fmss_core.dylib)
 # en de lader, alles universeel (Apple Silicon + Intel). Ondertekend zonder naam (ad-hoc).
 name: mac
@@ -68,16 +68,21 @@ jobs:
           cp build/FMSuperScout $APP/Contents/MacOS/
           cp build/AppIcon.icns build/node build/fmss_core.dylib build/fmss_loader.dylib $APP/Contents/Resources/
           cp -R app $APP/Contents/Resources/app
+          # --deep tekent niets in Resources: node en de dylibs elk apart (ad-hoc, alle slices).
+          for f in node fmss_core.dylib fmss_loader.dylib; do
+            codesign --force -s - $APP/Contents/Resources/$f
+            codesign --verify --strict $APP/Contents/Resources/$f
+          done
           codesign --force --deep -s - $APP
           codesign --verify --deep --strict $APP
           mkdir -p dmg && cp -R $APP dmg/ && ln -s /Applications dmg/Applications
-          hdiutil create -volname FMSuperScout -srcfolder dmg -ov -format UDZO dist/FMSuperScout.dmg
-          (cd dist && shasum -a 256 FMSuperScout.dmg > FMSuperScout.dmg.sha256 && cat FMSuperScout.dmg.sha256)
+          hdiutil create -volname FMSuperScout -srcfolder dmg -ov -format UDZO dist/FMSuperScout-Mac.dmg
+          (cd dist && shasum -a 256 FMSuperScout-Mac.dmg > FMSuperScout-Mac.dmg.sha256 && cat FMSuperScout-Mac.dmg.sha256)
           ls -la dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: FMSuperScout-mac
           path: |
-            dist/FMSuperScout.dmg
-            dist/FMSuperScout.dmg.sha256
+            dist/FMSuperScout-Mac.dmg
+            dist/FMSuperScout-Mac.dmg.sha256

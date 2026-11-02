@@ -12,7 +12,7 @@ namespace FMSuperScout;
 /// </summary>
 internal static class MacHost
 {
-    public const string Version = "1.7.0-mac";
+    public const string Version = "1.7.0";
 
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FMSuperScout");
@@ -47,11 +47,11 @@ internal static class MacHost
     {
         // Een verzoek van vóór deze FM-sessie is niet meer bedoeld voor deze save.
         try { File.Delete(RequestFile); } catch { }
-        long nextBeat = 0;
+        // Teken van leven op een eigen timer: ook tijdens een lange scan blijft het vers, anders
+        // denkt de app dat FM zonder module draait.
+        BeatTimer = new Timer(_ => Beat(), null, 0, 5000);
         for (; ;)
         {
-            long now = Environment.TickCount64;
-            if (now >= nextBeat) { Beat(); nextBeat = now + 5000; }
             if (TakeRequest())
             {
                 Log("INFO", "web-app → scan gestart.");
@@ -66,6 +66,8 @@ internal static class MacHost
             Thread.Sleep(400);
         }
     }
+
+    private static Timer BeatTimer;   // veld: houdt de timer in leven
 
     private static void Beat()
     {

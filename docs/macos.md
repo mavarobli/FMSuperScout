@@ -1,51 +1,72 @@
-# FMSuperScout op macOS: haalbaarheid (november 2026)
+# FMSuperScout op macOS: hoe het werkt en wat er gemeten is
 
-Onderzoek naar hoe Mac-gebruikers FMSuperScout met FM27 kunnen gebruiken. **[V]** = geverifieerd
-in een bron of de code, **[M]** = gemeten op een echte Mac met FM27, **[A]** = afleiding.
+Technische achtergrond bij de Mac-versie (voor gebruikers: README, sectie *Mac*). **[V]** =
+geverifieerd in een bron of de code, **[M]** = gemeten op een echte Mac met FM27, **[A]** = afleiding.
 
-## Gemeten op een Mac (2 november 2026, `tools/mac-diagnose.sh`)
+## Hoe het werkt
+
+Op de Mac mag een los programma een draaiende game niet uitlezen zonder dat de gebruiker de
+beveiliging verlaagt (SIP). Daarom draait de scan op de Mac ín Football Manager, net als de oude
+BepInEx-plugin op Windows deed:
+
+1. **FMSuperScout.app** (`mac/app/main.swift`) is een eigen venster om de web-app heen, met de
+   meegeleverde Node-server. Bij het openen zet de app de module en de lader klaar in
+   `~/Library/Application Support/FMSuperScout/mac`, zonder de quarantainemarkering van de
+   download.
+2. **Start Football Manager** in de app (`/api/start-fm` in `app/server.js`) start FM27 met
+   `DYLD_INSERT_LIBRARIES` naar de lader, `SteamAppId` gezet en Steam open en ingelogd. FM27
+   staat dat toe (zie hieronder). Vanuit Steam zelf kan het niet: Steam geeft zo'n instelling
+   op de Mac niet door.
+3. De **lader** (`mac/loader/fmss_loader.c`) doet alleen iets in FM zelf, start één thread en
+   laadt daarin de **module** `fmss_core.dylib` (.NET NativeAOT, `mac/MacHost.cs`; geen JIT, dus
+   geen extra entitlement nodig).
+4. De module wacht op "Nieuwe data" (request.flag) en scant met dezelfde kern als Windows
+   (`core/Dumper.cs`). Lezen gaat via `mach_vm_read_overwrite` (crasht niet op een ongeldig
+   adres), regio's via `mach_vm_region`, de modulekaart via dyld (`core/MemScan.Mac.cs`). Elke
+   5 s meldt de module zich (`mac-agent.json`), zodat de app ziet of FM mét of zonder module draait.
+
+Klassen worden op de Mac herkend aan hun **RTTI-naam** (Itanium-ABI: offset-to-top op
+`[vtable-16]`, type_info op `[vtable-8]`), niet aan de MSVC-offset-truc van Windows. De gemeten
+layouts staan als vaste waarden in de code; de module meet ze bij elke scan ook zelf na
+(`diagnostics.txt`: "= gemeten ✓"). Klassen zonder vaste waarden meet hij zelf op: het
+persoonsfacet is het deelobject waarvan de contractpointer naar een `db::FULL_CONTRACT` wijst, de
+DB-basis is het laatste deelobject.
+
+Geen F9 op de Mac: sneltoetsen buiten het eigen venster uitlezen vraagt een macOS-toestemming
+(Invoermonitoring) die op naam van FM zou komen te staan.
+
+## Gemeten op een Mac (2 november 2026)
 
 MacBook Pro M1 Pro (16 GB), macOS 27.0, SIP aan, geen Rosetta. FM27 27.0.0.2486716 via Steam.
+Gereedschap: `tools/mac-diagnose.sh` en de meetmodule `tools/mac-probe/`.
 
-- **Route A (in-process) kan zonder SIP-aanpassing** [M]. FM27 is door SEGA gesigneerd
-  (Developer ID, genotariseerd, hardened runtime) en heeft precies de twee entitlements die
-  dat toestaan: `com.apple.security.cs.allow-dyld-environment-variables` en
-  `com.apple.security.cs.disable-library-validation`. Een eigen, ad-hoc gesigneerde
-  bibliotheek mag dus via `DYLD_INSERT_LIBRARIES` (Steam-startoptie) meeladen.
-- **Route B (externe scanner) valt af** [M]: geen `get-task-allow`, dus task_for_pid van
-  buitenaf vereist SIP-aanpassing.
+- **Meeladen kan zonder SIP-aanpassing** [M]. FM27 is door SEGA gesigneerd (Developer ID,
+  genotariseerd, hardened runtime) met precies de twee entitlements die dat toestaan:
+  `com.apple.security.cs.allow-dyld-environment-variables` en
+  `com.apple.security.cs.disable-library-validation`.
+- **Een externe scanner valt af** [M]: geen `get-task-allow`, dus task_for_pid van buitenaf
+  vereist SIP-aanpassing.
 - **Opbouw** [M]: bundle-id `com.SportsInteractive.FootballManager27`, programma
   `fm.app/Contents/MacOS/Football Manager 27`, universeel (x86_64 + arm64).
-  `Contents/Frameworks/GameAssembly.dylib` (212 MB) en `UnityPlayer.dylib`; de database zit in
+  `Contents/Frameworks/GameAssembly.dylib` en `UnityPlayer.dylib`; de database zit in
   **`Contents/PlugIns/game_plugin.bundle`** (de tegenhanger van `game_plugin.dll`).
-- Xcode-command-line-tools zijn aanwezig: de meetmodule kan op de Mac zelf gebouwd worden.
+- **Niet via `nohup` of `env` starten** [M]: dat zijn door SIP beschermde systeemprogramma's, en
+  macOS wist alle `DYLD_`-variabelen bij alles wat zo'n programma start.
+- **Steam moet open en ingelogd zijn** [M], anders sluit FM zichzelf direct weer af.
+- **Lezen binnen het proces is snel** [M]: 2,9 GB heap in 1,3 s; een volledige scan (39.587
+  spelers, 24.058 staf) in 5,3 s.
+- **De Mac-build heeft RTTI** [M]: 77 van de top-80 klassen met leesbare naam, o.a.
+  `db::ACTUAL_PLAYER` (39.452), `db::ACTUAL_NON_PLAYER` (24.058), `db::CLUB`, `db::TEAM`,
+  `db::COMP`, `db::FULL_CONTRACT`.
 
-### Meetmodule in FM27 (2 november 2026, `tools/mac-probe/`)
+## Veldkaart Mac ↔ Windows
 
-- **Meeladen werkt met SIP aan** [M]: FM gestart vanuit Terminal met `SteamAppId=4530370
-  SteamGameId=4530370 DYLD_INSERT_LIBRARIES=… "…/fm.app/Contents/MacOS/Football Manager 27"`
-  (Steam open). De Steam-startoptie zelf werkt níet op de Mac (OS error 260/0): Steam start
-  de app daar niet via de opdrachtregel. Voor gebruikers wordt dit dus een eigen starter.
-- **Lezen binnen het proces is snel en veilig** [M]: 2,9 GB heap in 1,3 s via
-  `mach_vm_read_overwrite`, 0 MB onleesbaar.
-- **De Mac-build heeft RTTI** [M]: 77 van de top-80 klassen met leesbare naam. Klassen zijn
-  dus op naam te herkennen in plaats van op magische offsets — robuuster dan op Windows.
-  - `db::ACTUAL_PLAYER` 39.452 objecten, sub-objecten op offset 0, 632 (0x278, met de
-    persoonsnamen: indirect +16 volledige naam, genest +32 voornaam, +40 achternaam) en 904.
-  - `db::ACTUAL_NON_PLAYER` 24.058 (offsets 0, 248, 520); `db::NON_PLAYING_DATA` 24.196.
-  - Verder o.a. `db::CLUB`, `db::TEAM`, `db::COMP`, `db::FULL_CONTRACT`, `db::CITY`,
-    `db::STADIUM`, `db::NATIONAL_TEAM`, `db::LOAN_CONTRACT`, `MANAGER_DETAILS`.
-- Aantallen komen overeen met Windows op dezelfde save (24.058 vs. 24.057 staf).
+Objectdumps van twee spelers en twee stafleden op dezelfde save als Windows, naast de
+Windows-waarden gelegd. Alles hieronder klopt byte-exact (waarde, CA/PA, posities, attributen,
+persoonlijkheid, geboortedatum, UID, salaris, contracteinde, clubreputatie) [M].
 
-### Veldkaart Mac ↔ Windows (gemeten, 2 november 2026)
-
-Objectdumps van Givairo Read, Luciano Valente (spelers), Oscar Moens en Zeb Jacobs (staf) op
-dezelfde save als Windows, naast de Windows-waarden gelegd. Alles hieronder klopt byte-exact
-(waarde £65.812.584, CA/PA, posities, attributen, persoonlijkheid, geboortedatum, UID,
-salaris, contracteinde, clubreputatie) [M].
-
-Het verschil zit alléén in hoe de persoonsobjecten zijn opgebouwd (MSVC vs. Itanium plaatst
-de basisklassen anders). De velden zelf liggen in vaste blokken die één-op-één verschuiven:
+Het verschil zit alléén in hoe de persoonsobjecten zijn opgebouwd (MSVC en Itanium plaatsen de
+basisklassen anders). De velden zelf liggen in vaste blokken die één-op-één verschuiven:
 
 | Blok | Windows | Mac (`db::ACTUAL_PLAYER`, 0x3A8 groot, begin S) |
 |---|---|---|
@@ -59,123 +80,46 @@ de basisklassen anders). De velden zelf liggen in vaste blokken die één-op-é�
 | Persoon (`PERO_*`) | persoon + offset | **M + 0xF8 + (offset − 0x30)** |
 | DB-basis (UID, geslacht) | persoon + 0x0C / + 0x19 | **M + 0x208** + 0x0C / + 0x19 |
 
+Door de module zelf opgemeten en bevestigd [M]:
+
+| Klasse | Persoonsfacet | DB-basis | Blok |
+|---|---|---|---|
+| `db::ACTUAL_PLAYER_AND_NON_PLAYER` (speler-coach, 135) | 0x370 | 0x480 | speler, S − 8 |
+| `db::HUMAN_NON_PLAYER` (menselijke manager) | 0x438 | 0x548 | staf, H + 0 |
+
 **Ongewijzigd t.o.v. Windows** [M]: `db::FULL_CONTRACT` (team +0x10, salaris +0x20, functie
 +0x26, einddatum +0x48), `db::TEAM` (teamtype +0x28, club +0x30, spelerslijst +0x38/+0x40,
-competitie +0x50/+0x60, manager +0x80, schema +0xA0, reputatie +0xA8), `db::CLUB` (teams
-+0x18/+0x20, naam +0xC0/+0xC8), `db::COMP` (naam +0x40/+0x48), `db::NATION` (UID +0x0C,
-naam +0x20). Datums gebruiken dezelfde codering (jaar << 16 | dag-van-jaar).
+competitie +0x50/+0x60, manager +0x80, schema +0xA0 → in-game datum +0x94, reputatie +0xA8),
+`db::CLUB` (teams +0x18/+0x20, naam +0xC0/+0xC8), `db::COMP` (naam +0x40/+0x48), `db::NATION`
+(UID +0x0C, naam +0x20). Datums gebruiken dezelfde codering (jaar << 16 | dag-van-jaar).
 
-Klassen worden op de Mac herkend aan hun RTTI-naam in plaats van aan de MSVC-offset-truc.
-Nog niet gemeten: de klasse voor spelers die ook staf zijn (Windows 0x380), het menselijke
-manager-object (`db::HUMAN_NON_PLAYER` staat in TEAM+0x80) en de in-game datum (TEAM+0xA0 →
-+0x94, vrijwel zeker gelijk).
+Uitkomst op dezelfde save als Windows: staf, speler-coaches, club, clubreputatie en datum
+identiek [M].
 
-### Stand van de Mac-versie (branch `mac-support`, zie `mac/README.md`)
+## Na een FM-patch
 
-Gebouwd, nog niet op de Mac getest:
-1. **Mac-backend in `core/`**: `MemScan.Mac.cs` naast `MemScan.Win.cs`, met een gedeelde
-   `MemScan.cs` en dezelfde `Dumper`. Lezen via `mach_vm_read_overwrite` binnen het proces,
-   modulekaart via dyld, klassen op RTTI-naam. De gemeten layouts hierboven staan als vaste
-   waarden in de code; de module meet ze bij elke scan ook zelf na (diagnostics: "= gemeten ✓").
-   Niet-gemeten klassen (speler-staf, `db::HUMAN_NON_PLAYER`) meet de module zelf op: het
-   persoonsfacet is het deelobject waarvan de contractpointer naar een `db::FULL_CONTRACT`
-   wijst, de DB-basis het laatste deelobject. Gebouwd met .NET NativeAOT als dylib.
-   Op Windows is de uitkomst na de ombouw identiek (zelfde save direct na elkaar gescand:
-   40.143 spelers, 24.058 staf, 0 verschillen).
-2. **Starter**: `mac/FMSuperScout.command` start de app en FM met de lader
-   (`mac/loader/fmss_loader.c`), die de module op een eigen thread start. Geen F9 op de Mac
-   (sneltoetsen uitlezen vraagt een macOS-toestemming voor FM); "Nieuwe data" in de app werkt
-   via request.flag. De module meldt zich elke 5 s (`mac-agent.json`), zodat de app ziet of FM
-   mét of zonder module draait.
-3. **Web-app**: datamap, procesdetectie (`pgrep`), venster (Chrome/Edge/Brave als app-venster,
-   anders de standaardbrowser), zelf-update alleen op Windows.
-4. **Bouwen**: `mac/build.sh` op de Mac zelf, of de workflow `mac.yml` (universeel artifact).
+1. Scan en kijk in `diagnostics.txt` onder "Mac: persoonsklassen": staat er bij
+   `db::ACTUAL_PLAYER` en `db::ACTUAL_NON_PLAYER` nog "= gemeten ✓"? Dan klopt de opbouw nog.
+2. Zo niet: de meting ernaast geeft de nieuwe facet- en DB-offsets; pas de tabel `Measured` in
+   `core/MemScan.Mac.cs` aan.
+3. Verschuiven velden binnen de blokken, dan geldt dat op Windows ook: zie `docs/repin-guide.md`.
+   Met `tools/mac-probe/` zijn objecten van met naam genoemde personen te dumpen.
 
-Nog te doen: testen op de MacBook met dezelfde save als Windows (de uitkomst moet gelijk
-zijn), de in-game datum controleren, en daarna een downloadbare Mac-uitgave.
+## Vooronderzoek (vóór de bouw)
 
-## Kort
+Onderzochte routes, met de keuze voor A:
 
-- De **web-app** is grotendeels platformneutraal; een handvol Windows-afhankelijkheden is in
-  2-4 dagen te vervangen (zie "Web-app").
-- Het **uitlezen** is het probleem. Een externe scanner zoals op Windows vraagt op de Mac dat
-  de gebruiker SIP gedeeltelijk uitzet (Recovery, `csrutil enable --without debug`, op Apple
-  Silicon ook "Reduced Security") [V]. Dat is precies waar MacAssistant RT en FMRTE ≤26 op
-  vastliepen [V]. Root helpt niet tegen hardened runtime [V].
-- **FMRTE 27 werkt op de Mac zónder SIP-aanpassing**: een kleine plugin die het spel zelf bij
-  het starten laadt (Steam-startopties, startscript voor Epic, snelkoppeling-app) [V]. Dat is
-  het haalbare model voor ons: de scan draait ín het FM-proces, net als de oude BepInEx-plugin
-  op Windows.
-- De classificatietruc van de scanner (`[vtable-8]` → MSVC-RTTI → offset op +4) bestaat op de
-  Mac niet; Itanium heeft offset-to-top op `vtable-16` [V]. De veld-offsets moeten voor de Mac
-  opnieuw gepind worden; Intel- en ARM-Mac delen vrijwel zeker één layout [A].
+- **A. In de game laden** (zoals FMRTE 27 op de Mac doet [V]): werkt met SIP aan, want FM27 heeft
+  de entitlements daarvoor [M]. Gekozen.
+- **B. Externe scanner** (task_for_pid): vereist dat de gebruiker SIP gedeeltelijk uitzet via
+  Recovery [V]; daar liepen MacAssistant RT en FMRTE ≤26 op vast [V]. Afgevallen.
+- **C. Parallels / D. CrossOver**: Windows-versie onder emulatie. Betaald, zwaar, en voor FM27
+  ongetest [V]. Niet nodig gebleken.
+- **E. Alleen de viewer op de Mac**: werkt, maar vraagt een Windows-pc met dezelfde save.
 
-## FM27 op de Mac
-
-- FM27: pc en Mac, via Steam en Epic (Xbox PC-app alleen Windows) [V]. macOS 13-26, Apple M1
-  of Intel [V].
-- FM26-Mac is Unity IL2CPP: `fm.app/Contents/MacOS/Football Manager 26`, `GameAssembly.dylib`,
-  bundle-id `com.SportsInteractive.FootballManager26` [V]. Procesnaam is dus niet `fm` [V];
-  voor FM27 verwacht "Football Manager 27" [A]. Hoe de native database (`game_plugin.dll`) op
-  de Mac heet, is nergens openbaar gevonden.
-- De binary is door SEGA gesigneerd zonder JIT-entitlement; vrijwel zeker hardened runtime [A].
-
-## Opties
-
-| Optie | Werkt? | Gebruiker moet | Ontwikkelwerk | Risico's |
-|---|---|---|---|---|
-| **A. In-process plugin (FMRTE 27-model)** | Waarschijnlijk; FMRTE bewijst dat injectie met SIP aan kan [V], onze aanpak is ongetest | Eenmalig: installer zet startoptie/script; Gatekeeper "Open Anyway" | 20-35 dagen | Entitlements van FM27 onbekend; game-updates draaien setup terug; per patch twee layouts bijhouden |
-| **B. Externe scanner (task_for_pid)** | Ja, mits SIP-debug uit [V] | Recovery + `csrutil`, Reduced Security | 15-25 dagen | Veiligheid, support, toekomst van gedeeltelijke SIP onzeker [V] |
-| **C. Parallels + Windows 11 ARM** | Waarschijnlijk; DX11.1 ondersteund [V], geen FM-meldingen gevonden | Betaalde Parallels + Windows, veel RAM | 1-3 dagen (testen, docs) | Prestaties onder x64-emulatie |
-| **D. CrossOver (Wine)** | Onzeker: FM26 "Limited Functionality" [V]; ReadProcessMemory in dezelfde bottle werkt volgens de Wine-bron [V] | Betaalde CrossOver, Windows-Steam in een bottle | 2-4 dagen | Speelbaarheid FM27; Rosetta wordt na macOS 27 afgebouwd [V] |
-| **E. Alleen viewer op de Mac** | Ja | Een Windows-pc met dezelfde save | 2-4 dagen (= fase 1) | Beperkte waarde |
-
-## Aanbevolen volgorde
-
-1. **Fase 0 (1-2 dagen, met een Mac-tester):** de open vragen hieronder beantwoorden, plus een
-   hello-world-dylib via Steam-startopties met SIP aan. Dit beslist of optie A kan.
-   Vragen 1-3 beantwoordt `tools/mac-diagnose.sh` (alleen lezen, geen sudo, persoonlijke
-   paden worden weggepoetst): FM27 starten met een save, dan `bash mac-diagnose.sh`; de
-   uitkomst staat als `fmss-mac-diagnose.txt` op het bureaublad.
-2. **Fase 1 (2-4 dagen):** web-app cross-platform. Maakt E mogelijk en C/D documenteerbaar als
-   "experimenteel, door de community getest".
-3. **Fase 2 (5-8 dagen):** Mac-backend in `core/` achter een abstractie (geheugenbron +
-   modulekaart), classificatie via `-[vtable-16]` en waar mogelijk de RTTI-typenaam; eerst
-   alleen het class-offset-histogram om de Mac-tegenhangers van 0x288/0x100 te vinden.
-   NativeAOT voor osx-arm64 en osx-x64 (geen JIT nodig) [V], samengevoegd tot één dylib.
-4. **Fase 3 (8-15 dagen):** Mac-repin (`Fields.FM27Mac`) volgens `docs/repin-guide.md`.
-5. **Fase 4 (3-5 dagen):** `.app`-launcher, installer die de startoptie/het script zet (met
-   backup, zoals FMRTE), quarantaine verwijderen; notarisatie optioneel (betaald
-   Apple Developer-lidmaatschap).
-
-Optie B alleen als terugval als A niet kan.
-
-## Web-app: wat Windows-specifiek is (`app/server.js`)
-
-- Datamap via `LOCALAPPDATA` → op de Mac `~/Library/Application Support/FMSuperScout`
-  (dat geeft .NET 8 daar ook voor `LocalApplicationData`) [V].
-- Scanner-exe, `windowsHide`, zelf-update via `FMSuperScout-Setup.exe` → op de Mac anders of uit.
-- `reg query` voor het spelpad → overslaan (geen BepInEx).
-- `tasklist` → `pgrep -x "Football Manager 27"`.
-- Venster via `msedge.exe --app` → `open -na "Google Chrome" --args --app=…`, anders `open URL`.
-- `installer/FMSuperScout.vbs` → `.command`-script of kleine `.app` met node voor darwin.
-
-## Open vragen (alleen op een echte Mac met FM27 te beantwoorden)
-
-1. `codesign -dv --verbose=4` en `codesign -d --entitlements -` op `fm.app`: hardened runtime,
-   `allow-dyld-environment-variables`, `disable-library-validation`, `allow-jit`, `get-task-allow`?
-2. `lipo -info` en de inhoud van `Contents/Frameworks` en `Contents/PlugIns`: hoe heet de
-   database-module en hoe groot is hij?
-3. Exacte procesnaam en bundle-id van FM27.
-4. Laadt een ad-hoc gesigneerde dylib via `DYLD_INSERT_LIBRARIES` met SIP aan, native arm64 én
-   onder Rosetta?
-5. Is de Mac-build met RTTI gecompileerd (leesbare typenaam via `[vtable-8]`)? Welke
-   offset-to-top-waarden horen bij speler, staf en manager?
-6. Geeft `mach_vm_read_overwrite` op een ongeldig adres netjes een fout, zonder crash?
-7. Hoeveel offsets uit `core/Fields.cs` kloppen ongewijzigd?
-8. Scansnelheid en geheugengebruik in het proces op een M1 met 8 GB.
-9. Parallels: start FM27 onder Windows 11 ARM, en ziet de scanner de modules?
-10. CrossOver: speelbaarheid FM27; werken `VirtualQueryEx` en `Process.Modules` in een bottle?
+Ondertekening: de app is ad-hoc ondertekend, zonder naam. Ondertekenen met een persoonlijk Apple
+Developer-account zou de volledige naam van de ontwikkelaar in elke download zetten; daarom niet.
+Gevolg: gebruikers kiezen bij de eerste start eenmalig "Open toch" in Systeeminstellingen.
 
 ## Bronnen
 

@@ -41,7 +41,7 @@ try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.r
 // $: xe.com-koers uit diezelfde periode; verifieer tegen FM's eigen USD-weergave.
 const CUR_RATE = { '£': 1, '€': 1.16, '$': 1.35 };
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -4605,8 +4605,14 @@ async function startFm() {
   const b = $('banner');
   b.className = 'scanning'; b.innerHTML = bannerMsg('hourglass', t('fmStarting')); b.onclick = null;
   try {
-    const r = await (await fetch('/api/start-fm', { method: 'POST' })).json();
-    if (r.ok) {
+    // De server start FM op de achtergrond (Steam opstarten kan ruim een minuut duren).
+    let r = await (await fetch('/api/start-fm', { method: 'POST' })).json();
+    for (let i = 0; i < 90 && r.phase === 'starting'; i++) {
+      await new Promise(res => setTimeout(res, 2000));
+      r = await (await fetch('/api/start-fm')).json();
+    }
+    if (r.phase === 'starting') r = { phase: 'error', reason: 'timeout' };
+    if (r.phase === 'done') {
       b.className = 'done'; b.innerHTML = bannerMsg('check', t('fmStarted'));
       b.onclick = () => { b.className = 'hidden'; };
       setTimeout(() => { if (b.className === 'done') b.className = 'hidden'; }, 20000);

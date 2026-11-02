@@ -43,6 +43,10 @@ static void logf_(const char *fmt, ...) {
 
 static void *worker(void *arg) {
   (void)arg;
+  // Pas laden als FM zelf is opgestart. De .NET-runtime zet bij het starten een eigen
+  // signaalafhandeling neer (voor NullReferenceException) die doorgeeft aan wat er al stond.
+  // Komt Unity's crashafhandeling ná ons, dan kan die de onze wegdrukken; daarom wachten.
+  sleep(20);
   // De module staat naast de lader.
   Dl_info info;
   if (!dladdr((const void *)worker, &info) || !info.dli_fname) { logf_("eigen pad onbekend"); return NULL; }

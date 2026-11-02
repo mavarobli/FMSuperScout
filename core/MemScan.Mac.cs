@@ -49,6 +49,8 @@ internal sealed partial class MemScan
 
     /// <summary>Bovengrens voor het aantal leesthreads: de reads zijn in-process al snel.</summary>
     public const int MaxWorkers = 4;
+    /// <summary>Leesblok per worker. De buffers blijven in FM's geheugen staan, dus klein houden.</summary>
+    public const int ChunkBytes = 8 * 1024 * 1024;
 
     public bool ClubsByShape => false;   // clubs komen als db::CLUB uit de klassenherkenning
     public bool Snapshotted => false;
@@ -265,31 +267,29 @@ internal sealed partial class MemScan
     /// speler- of stafblok staat vooraan, zoals bij de gemeten klassen. Voor gemeten klassen
     /// alleen ter controle (diagnostics); voor de rest bepaalt dit de layout.
     /// </summary>
-    private unsafe void Calibrate(MacClass mc, ulong s, Fields f)
+    private void Calibrate(MacClass mc, ulong s, Fields f)
     {
         if (++mc.Tries > 50) { mc.Pending = false; mc.Calibration ??= "niet gelukt na 50 exemplaren"; return; }
         ulong ti = Ptr(Ptr(s) - 8);
-        const int span = 0x1000;
-        byte* obj = stackalloc byte[span];
-        int len = span;
-        while (len >= 0x100 && !ReadRaw(s, obj, len)) len /= 2;
-        if (len < 0x100) return;
-
+        // Woord voor woord lezen, niet als blok: een kopie van het object op onze stack zou de
+        // scan (die ook onze eigen stacks doorloopt) als tweede exemplaar kunnen vinden.
         var subs = new List<long>();
-        for (int o = 8; o + 8 <= len; o += 8)
+        for (int o = 8; o < 0x1000; o += 8)
         {
-            ulong v = *(ulong*)(obj + o);
+            ulong v = Ptr(s + (ulong)o);
             if (InGp(v) && I64(v - 16) == -o && Ptr(v - 8) == ti) subs.Add(o);
         }
-        // Kopie wissen: de scan loopt ook langs onze eigen stack en zou het object anders
-        // daar nog een keer vinden.
-        new Span<byte>(obj, len).Clear();
+        // Persoonsfacet: zijn contractpointer wijst naar een db::FULL_CONTRACT. Zonder contract
+        // (een werkloze manager) het deelobject met een leesbare voornaam.
         long facet = -1;
         foreach (long o in subs)
         {
             ulong con = Ptr(s + (ulong)o + f.PERO_FULL_CONTRACT - 0x30);
             if (con != 0 && ClassNameOfObject(con) == "db::FULL_CONTRACT") { facet = o; break; }
         }
+        if (facet < 0 && (mc.Tries >= 5 || mc.Name.Contains("HUMAN")))   // manager: maar 1-2 exemplaren
+            foreach (long o in subs)
+                if (PlausibleName(NestedString(s + (ulong)o + f.PERO_FIRST_NAME - 0x30))) { facet = o; break; }
         long db = subs.Count > 0 ? subs[^1] : -1;
         if (facet < 0 || db <= facet) return;            // dit exemplaar zegt niets: volgende
         uint uid = U32(s + (ulong)db + f.OBJ_DUNI);
@@ -316,6 +316,9 @@ internal sealed partial class MemScan
         mc.Cls = cls;          // eerst de layout, dan pas Pending uit: andere threads lezen zonder slot
         mc.Pending = false;
     }
+
+    private static bool PlausibleName(string s) =>
+        !string.IsNullOrEmpty(s) && s.Length is >= 2 and <= 40 && s.All(c => char.IsLetter(c) || c is ' ' or '-' or '\'' or '.');
 
     public string HistLabel(int key)
     {

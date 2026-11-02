@@ -158,6 +158,8 @@ internal sealed partial class MemScan
 
     /// <summary>Bovengrens voor het aantal parallelle leesthreads.</summary>
     public const int MaxWorkers = 8;
+    /// <summary>Leesblok per worker: ReadProcessMemory is per aanroep duur, dus grote blokken.</summary>
+    public const int ChunkBytes = 32 * 1024 * 1024;
 
     /// <summary>Klassen worden op Windows aan hun vorm herkend: clubs via de teamvector.</summary>
     public bool ClubsByShape => true;

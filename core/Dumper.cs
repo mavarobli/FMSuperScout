@@ -37,7 +37,7 @@ internal static class Dumper
     internal static HashSet<uint> MultiClub = new();
     internal static List<string> MultiClubSample = new();
 
-    private const int ChunkSize = 32 * 1024 * 1024; // 32 MB leesblokken
+    private const int ChunkSize = MemScan.ChunkBytes; // leesblokken per worker (Windows 32 MB, Mac 8 MB)
 
     // Herbruikbare leesbuffers over scans heen (max 8 workers × 32 MB). Per scan vers
     // alloceren liet de LOH groeien — zie de toelichting bij MemScan._gpPool.

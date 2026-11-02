@@ -72,6 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         var env = ProcessInfo.processInfo.environment
         env["PORT"] = String(port)
         if let loader = loader { env["FMSS_LOADER"] = loader }
+        // De server stopt zelf als deze app weg is, ook na een crash of geforceerd stoppen.
+        env["FMSS_PARENT_PID"] = String(ProcessInfo.processInfo.processIdentifier)
         p.environment = env
         try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
         let log = support.appendingPathComponent("server.log")

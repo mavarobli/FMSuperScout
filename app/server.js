@@ -35,6 +35,14 @@ if (APP_MODE) {
     if (Date.now() - lastBeat > 90000) { console.log('Venster gesloten (geen heartbeat), server stopt.'); process.exit(0); }
   }, 5000);
 }
+// Mac-app: de app geeft zijn pid mee. Is die weg (ook na een crash of geforceerd stoppen),
+// dan stopt de server ook, zodat een volgende start niet op een oude server blijft hangen.
+const PARENT_PID = Number(process.env.FMSS_PARENT_PID) || 0;
+if (PARENT_PID) {
+  setInterval(() => {
+    try { process.kill(PARENT_PID, 0); } catch { console.log('App gestopt, server stopt.'); process.exit(0); }
+  }, 3000);
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -79,7 +87,7 @@ const FM27_APPID = '4530370';
 const MAC_LOADER = process.env.FMSS_LOADER || path.join(APP_DIR, '..', 'fmss_loader.dylib');
 const pexec = (cmd, args) => new Promise(r => execFile(cmd, args, (err, out) => r(err ? '' : String(out))));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let startingFm = null;   // lopende startpoging
+let fmStart = { phase: 'idle' };   // stand van de laatste startpoging: idle | starting | done | error
 
 // fm.app in de standaard-Steambibliotheek of een andere Steambibliotheek, anders via Spotlight.
 async function findFmApp() {
@@ -117,10 +125,12 @@ async function startFmMac() {
     env: { ...process.env, SteamAppId: FM27_APPID, SteamGameId: FM27_APPID, DYLD_INSERT_LIBRARIES: MAC_LOADER },
   });
   // Stopt FM binnen een paar seconden, dan weigerde Steam (meestal: niet klaar of niet ingelogd).
-  let exited = false;
+  let exited = false, spawnError = null;
   child.on('exit', () => { exited = true; });
+  child.on('error', e => { spawnError = e; });   // bv. programma niet op die plek: anders een uncaught error
   child.unref();
   await sleep(12000);
+  if (spawnError) return { ok: false, reason: 'error', error: spawnError.message };
   if (exited && !(await pexec('pgrep', ['-x', 'Football Manager 27'])).trim()) return { ok: false, reason: 'fmexited' };
   return { ok: true };
 }
@@ -492,14 +502,18 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/api/start-fm' && req.method === 'POST') {
-    // Mac: FM starten mét de FMSuperScout-module. Moet Steam eerst nog opstarten, dan duurt
-    // het antwoord ruim een minuut; de app toont zolang een melding.
+  if (url.pathname === '/api/start-fm') {
+    // Mac: FM starten mét de FMSuperScout-module. Dat kan ruim een minuut duren (Steam
+    // opstarten en inloggen), dus POST start het op de achtergrond en GET geeft de stand.
     const reply = (code, o) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
-    if (!IS_MAC) return reply(404, { ok: false, reason: 'platform' });
-    startingFm = startingFm || startFmMac().finally(() => { startingFm = null; });   // dubbelklik = één FM
-    startingFm.then(r => reply(200, r), e => reply(200, { ok: false, reason: 'error', error: String(e.message || e) }));
-    return;
+    if (!IS_MAC) return reply(404, { phase: 'error', reason: 'platform' });
+    if (req.method === 'POST' && fmStart.phase !== 'starting') {   // dubbelklik = één FM
+      fmStart = { phase: 'starting' };
+      startFmMac().then(
+        r => { fmStart = r.ok ? { phase: 'done' } : { phase: 'error', reason: r.reason, error: r.error }; },
+        e => { fmStart = { phase: 'error', reason: 'error', error: String(e.message || e) }; });
+    }
+    return reply(200, fmStart);
   }
 
   if (url.pathname === '/api/setup') {
