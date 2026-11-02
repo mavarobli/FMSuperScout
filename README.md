@@ -30,9 +30,9 @@ no internet, no accounts, no ads, nothing leaves your PC.
 > Single-player use only. The scanner **only reads** memory, it never writes to the game.
 
 <p align="center">
-  <img src="docs/img/players.jpg" alt="Player list sorted by the growth column, with the development and physical filters in the sidebar" width="90%">
+  <img src="docs/img/players.png" alt="Player list with the Wonderkids quick filter on: 328 of 39,536 players, with CA, PA, growth, meta score, value and wage" width="90%">
 </p>
-<p align="center"><sub>Sorted by growth: who gained the most CA since your chosen reference date.</sub></p>
+<p align="center"><sub>One click on Wonderkids: 328 of 39,536 players, real CA/PA, growth since your last scans, value and wage.</sub></p>
 
 ## What it does that other tools do not
 
@@ -61,9 +61,14 @@ current and potential ability, the full attribute grid in FM colours, best roles
 Wonderkids get a gold card. Built for showing off that one insane regen.
 
 <p align="center">
-  <img src="docs/img/profile.jpg" alt="Player profile with CA/PA and value development charts" width="90%">
+  <img src="docs/img/profile.png" alt="Player profile with CA/PA, value and asking price, development charts, best roles and all attributes" width="90%">
 </p>
-<p align="center"><sub>A player profile, with how his ability and value moved across the save.</sub></p>
+<p align="center"><sub>A player profile: CA/PA, value and asking price, how ability and value moved across the save, best roles and every attribute.</sub></p>
+
+<p align="center">
+  <img src="docs/img/analysis.png" alt="Squad needs analysis per position group, flagging a position without young succession" width="90%">
+</p>
+<p align="center"><sub>Squad analysis: depth, average CA and age per position, and where you have no successor coming through.</sub></p>
 
 ## Everything else
 

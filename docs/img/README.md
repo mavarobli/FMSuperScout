@@ -1,12 +1,11 @@
-# Screenshots voor de README
+# Screenshots for the README
 
-Drop hier JPG-bestanden met exact deze namen, dan verschijnen ze vanzelf in de README:
-
-| Bestand | Wat erop moet |
+| File | Shows |
 |---|---|
-| `players.jpg` | Spelerslijst, gesorteerd op de **Groei**-kolom (de +47/+44/+41 shot). Laat de zijbalk meelopen zodat Ontwikkeling en Fysiek zichtbaar zijn. |
-| `profile.jpg` | Spelersprofiel open met de **ontwikkelgrafieken** (CA/PA + waarde) en de groene delta erboven. |
-| `card.jpg` | Optioneel: een opgeslagen spelerskaart-PNG, liefst een gouden wonderkid. |
+| `players.png` | Player list with the Wonderkids quick filter on. |
+| `profile.png` | Player profile with development charts, best roles and attributes. |
+| `analysis.png` | Squad needs analysis. |
+| `staff.png` | Staff list. |
 
-Tips: venster op ~1600 breed, donker thema, geen persoonlijke gegevens in beeld
-(de clubnaam en managernaam in de balk staan bovenaan, die zijn prima).
+Made at 1600x1000 from a copy of the data with the manager name removed (no personal data in
+the images). The old FM26 screenshots (`*.jpg`) are kept for older release notes.
