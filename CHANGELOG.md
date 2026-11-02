@@ -48,6 +48,9 @@ Working towards 1.6.0: Football Manager 27 support, without BepInEx.
   highlighted, saved filters always at the bottom, and a slim rail with a filter count when
   the panel is collapsed. The results line reads "145 of 40,246 players".
 - New logo: the centre circle.
+- The coffee icon opens a small support panel instead of jumping straight to Ko-fi: buy a
+  coffee, star the project on GitHub (free), or copy the download link to share it.
+  "Already donated?" is always there.
 - The attribute filter works on staff too, with staff attributes, and keeps separate rules
   for the players and staff lists.
 - Network/multiplayer saves: when a save has more than one human manager, a picker next

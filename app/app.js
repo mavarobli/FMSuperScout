@@ -61,6 +61,7 @@ const I18N = {
     alreadyDonated: 'Al gedoneerd?', neverAsk: 'Vraag het niet meer',
     supporterThanks: 'Dank je wel! Je hoort er niets meer over.',
     donateCta: '☕ Trakteer', donateLater: 'Later',
+    spTitle: 'Steun FMSuperScout', spIntro: 'FMSuperScout is gratis, open source en zonder advertenties. Vind je het handig? Zo kun je helpen:', spKofi: 'Trakteer op een koffie', spKofiSub: 'Via Ko-fi, elk bedrag is welkom', spStar: 'Geef een ster op GitHub', spStarSub: 'Gratis, en helpt anderen de tool te vinden', spShare: 'Deel met een vriend', spShareSub: 'Kopieert de downloadlink', spCopied: 'Downloadlink gekopieerd', spThanks: 'Je bent supporter. Bedankt!',
     position: 'Positie', clear: 'wis', staffrole: 'Staf-rol', quality: 'Kwaliteit & leeftijd',
     age: 'Leeftijd', financial: 'Financieel', maxvalue: 'Max. waarde', maxfee: 'Max. vraagprijs', maxwage: 'Max. loon',
     esSetupTitle: 'Start Football Manager eerst een keer',
@@ -191,6 +192,7 @@ const I18N = {
     alreadyDonated: 'Already donated?', neverAsk: 'Don\'t ask again',
     supporterThanks: 'Thank you! You won\'t hear about this again.',
     donateCta: '☕ Buy me a coffee', donateLater: 'Maybe later',
+    spTitle: 'Support FMSuperScout', spIntro: 'FMSuperScout is free, open source and ad-free. Find it useful? Here is how you can help:', spKofi: 'Buy me a coffee', spKofiSub: 'Through Ko-fi, any amount is welcome', spStar: 'Star it on GitHub', spStarSub: 'Free, and helps others find the tool', spShare: 'Share with a friend', spShareSub: 'Copies the download link', spCopied: 'Download link copied', spThanks: 'You are a supporter. Thank you!',
     position: 'Position', clear: 'clear', staffrole: 'Staff role', quality: 'Quality & age',
     age: 'Age', financial: 'Financial', maxvalue: 'Max. value', maxfee: 'Max. asking price', maxwage: 'Max. wage',
     esSetupTitle: 'Start Football Manager once first',
@@ -321,6 +323,7 @@ const I18N = {
     alreadyDonated: 'Déjà donné ?', neverAsk: 'Ne plus demander',
     supporterThanks: 'Merci ! Vous n\'en entendrez plus parler.',
     donateCta: '☕ Offrir un café', donateLater: 'Plus tard',
+    spTitle: 'Soutenir FMSuperScout', spIntro: 'FMSuperScout est gratuit, open source et sans publicité. Il vous est utile ? Voici comment aider :', spKofi: 'Offrir un café', spKofiSub: 'Via Ko-fi, tout montant est bienvenu', spStar: 'Mettre une étoile sur GitHub', spStarSub: 'Gratuit, et aide d\'autres joueurs à le trouver', spShare: 'Partager avec un ami', spShareSub: 'Copie le lien de téléchargement', spCopied: 'Lien de téléchargement copié', spThanks: 'Vous êtes supporter. Merci !',
     position: 'Poste', clear: 'effacer', staffrole: 'Rôle du staff', quality: 'Qualité et âge',
     age: 'Âge', financial: 'Finances', maxvalue: 'Valeur max.', maxfee: 'Prix demandé max.', maxwage: 'Salaire max.',
     esSetupTitle: 'Lancez d\'abord Football Manager une fois',
@@ -451,6 +454,7 @@ const I18N = {
     alreadyDonated: 'Schon gespendet?', neverAsk: 'Nicht mehr fragen',
     supporterThanks: 'Danke! Du hörst nichts mehr davon.',
     donateCta: '☕ Kaffee spendieren', donateLater: 'Später',
+    spTitle: 'FMSuperScout unterstützen', spIntro: 'FMSuperScout ist kostenlos, Open Source und werbefrei. Nützlich? So kannst du helfen:', spKofi: 'Einen Kaffee spendieren', spKofiSub: 'Über Ko-fi, jeder Betrag ist willkommen', spStar: 'Auf GitHub einen Stern geben', spStarSub: 'Kostenlos, und hilft anderen, das Tool zu finden', spShare: 'Mit Freunden teilen', spShareSub: 'Kopiert den Download-Link', spCopied: 'Download-Link kopiert', spThanks: 'Du bist Unterstützer. Danke!',
     position: 'Position', clear: 'leeren', staffrole: 'Mitarbeiterrolle', quality: 'Qualität & Alter',
     age: 'Alter', financial: 'Finanzen', maxvalue: 'Max. Wert', maxfee: 'Max. Forderung', maxwage: 'Max. Gehalt',
     esSetupTitle: 'Starte Football Manager zuerst einmal',
@@ -589,6 +593,9 @@ const ICON_PATHS = {
   arrowRight: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   card: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  star: '<path d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55-4.76-4.64 6.58-.96z"/>',
   // Voetbal: gevulde vijfhoek in het midden, vijf dunne naden naar de rand en korte
   // hints van de randvlakken. Bewust een eigen, dunne lijndikte (1.1): met dikke naden
   // leest dit als een stuurwiel in plaats van een bal (varianten vergeleken 26-07).
@@ -3608,6 +3615,66 @@ async function reportBug() {
 // het permanent stil; donateurs krijgen een goudkleurig koffie-icoon als bedankje.
 const KOFI = 'https://ko-fi.com/fmsuperscout';
 function openKofi() { window.open(KOFI, '_blank', 'noopener'); }
+
+// ---------- steunvenster ----------
+// Het koffie-icoon opent eerst dit venstertje in plaats van direct Ko-fi: drie manieren om
+// te helpen, waarvan twee gratis (een ster op GitHub, de tool delen). Wie niet wil of kan
+// betalen kan zo toch iets terugdoen, en niemand belandt onverwacht op een betaalpagina.
+// "Al gedoneerd?" staat hier altijd, niet alleen in het seizoenskaartje.
+const GITHUB_URL = 'https://github.com/mavarobli/FMSuperScout';
+const DOWNLOAD_URL = 'https://github.com/mavarobli/FMSuperScout/releases/latest';
+function closeSupport() {
+  $('support-pop').classList.add('hidden');
+  document.removeEventListener('keydown', supportKey, true);
+  document.removeEventListener('mousedown', supportOutside, true);
+}
+const supportKey = e => { if (e.key === 'Escape') { e.stopPropagation(); closeSupport(); $('btn-coffee').focus(); } };
+const supportOutside = e => { if (!e.target.closest('#support-pop, #btn-coffee')) closeSupport(); };
+async function copyText(txt) {
+  try { await navigator.clipboard.writeText(txt); return true; }
+  catch {
+    // Vangnet (bv. geen klembordrechten): via een tijdelijk tekstveld.
+    const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch { }
+    ta.remove(); return ok;
+  }
+}
+function openSupport() {
+  const el = $('support-pop');
+  if (!el.classList.contains('hidden')) { closeSupport(); return; }
+  const sup = localStorage.getItem('fmss_supporter') === '1';
+  const act = (id, ico, title, sub, href) => {
+    const inner = `<span class="sp-ico">${ico}</span><span class="sp-txt"><b>${escHtml(t(title))}</b><span>${escHtml(t(sub))}</span></span>`;
+    return href ? `<a class="sp-act" data-sp="${id}" href="${href}" target="_blank" rel="noopener">${inner}</a>`
+                : `<button type="button" class="sp-act" data-sp="${id}">${inner}</button>`;
+  };
+  el.innerHTML = `<button type="button" class="sp-x" aria-label="${escHtml(t('donateLater'))}">${icon('x', 12)}</button>
+    <div class="sp-title" id="sp-title">${icon('heart', 15)} ${escHtml(t('spTitle'))}</div>
+    <p class="sp-intro">${escHtml(t('spIntro'))}</p>
+    ${act('kofi', '<span aria-hidden="true">☕</span>', 'spKofi', 'spKofiSub', KOFI)}
+    ${act('star', icon('star', 16), 'spStar', 'spStarSub', GITHUB_URL)}
+    ${act('share', icon('link', 16), 'spShare', 'spShareSub', null)}
+    <div class="sp-foot">${sup ? `<span class="sp-thanks">${icon('check', 12)} ${escHtml(t('spThanks'))}</span>`
+                               : `<button type="button" class="sp-donated">${escHtml(t('alreadyDonated'))}</button>`}</div>`;
+  el.classList.remove('hidden');
+  el.querySelector('.sp-x').onclick = closeSupport;
+  el.querySelector('[data-sp="kofi"]').addEventListener('click', () => closeSupport());
+  el.querySelector('[data-sp="star"]').addEventListener('click', () => closeSupport());
+  el.querySelector('[data-sp="share"]').onclick = async () => {
+    const ok = await copyText(DOWNLOAD_URL);
+    showToast(ok ? t('spCopied') : DOWNLOAD_URL, ok ? 'check' : 'link');
+    closeSupport();
+  };
+  const d = el.querySelector('.sp-donated');
+  if (d) d.onclick = () => {
+    localStorage.setItem('fmss_kofi_off', '1'); localStorage.setItem('fmss_supporter', '1');
+    $('btn-coffee').classList.add('supporter');
+    showToast(t('supporterThanks'), 'check'); closeSupport();
+  };
+  document.addEventListener('keydown', supportKey, true);
+  document.addEventListener('mousedown', supportOutside, true);
+  el.querySelector('.sp-act').focus();
+}
 const kofiOff = () => localStorage.getItem('fmss_kofi_off') === '1';
 // Gebruikstellers voor het rapport; de baseline wordt bij elk rapport verschoven zodat
 // de cijfers per seizoen zijn, niet cumulatief.
@@ -4057,7 +4124,7 @@ $('btn-clear').onclick = () => {
 $('btn-sidebar').onclick = () => document.body.classList.toggle('sidebar-collapsed');
 $('rail-open').onclick = () => document.body.classList.remove('sidebar-collapsed');
 $('btn-export').onclick = exportShortlist;
-$('btn-coffee').onclick = openKofi;
+$('btn-coffee').onclick = openSupport;
 $('btn-report').onclick = reportBug;
 $('es-report').onclick = reportBug;
 // Handmatige update-check in Instellingen, naast de stille 20-uurs autocheck.

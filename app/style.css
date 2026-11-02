@@ -868,3 +868,32 @@ path.dvl-v { stroke: var(--accent2); }
   #topbar h1 { display: none; }
   #game-date { display: none; }
 }
+
+/* ---------- steunvenster (koffie-icoon) ---------- */
+#support-pop {
+  position: fixed; top: 54px; right: 56px; z-index: 300; width: 330px; max-width: calc(100vw - 24px);
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .55);
+}
+#support-pop.hidden { display: none; }
+#support-pop .sp-x { position: absolute; top: 10px; right: 10px; display: inline-flex; background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 6px; }
+#support-pop .sp-x:hover { color: var(--text); background: var(--bg3); }
+#support-pop .sp-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 16px; font-weight: 700; margin: 0 24px 6px 0; }
+#support-pop .sp-title .ic { color: #e46b8b; }
+#support-pop .sp-intro { font-size: 12.5px; line-height: 1.5; color: var(--text2); margin-bottom: 12px; }
+.sp-act {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 10px; margin-bottom: 6px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 9px; color: var(--text);
+  text-decoration: none; text-align: left; cursor: pointer; font: inherit;
+}
+.sp-act:hover, .sp-act:focus-visible { border-color: var(--accent-hi); background: var(--bg-hi); outline: none; }
+.sp-ico { flex: 0 0 auto; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--bg-deep); font-size: 16px; }
+.sp-act[data-sp="star"] .sp-ico { color: var(--star); }
+.sp-act[data-sp="share"] .sp-ico { color: var(--accent2); }
+.sp-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sp-txt b { font-size: 13px; }
+.sp-txt span { font-size: 11.5px; color: var(--muted); }
+.sp-foot { margin-top: 8px; font-size: 11.5px; }
+.sp-donated { background: none; border: 0; padding: 2px 0; color: var(--muted); cursor: pointer; font-size: 11.5px; text-decoration: underline; text-underline-offset: 2px; }
+.sp-donated:hover { color: var(--text); }
+.sp-thanks { display: inline-flex; align-items: center; gap: 6px; color: var(--star); }

@@ -44,6 +44,9 @@ uitgeprobeerd; de open vragen onderaan beslissen welke route kan.
 
 1. **Fase 0 (1-2 dagen, met een Mac-tester):** de open vragen hieronder beantwoorden, plus een
    hello-world-dylib via Steam-startopties met SIP aan. Dit beslist of optie A kan.
+   Vragen 1-3 beantwoordt `tools/mac-diagnose.sh` (alleen lezen, geen sudo, persoonlijke
+   paden worden weggepoetst): FM27 starten met een save, dan `bash mac-diagnose.sh`; de
+   uitkomst staat als `fmss-mac-diagnose.txt` op het bureaublad.
 2. **Fase 1 (2-4 dagen):** web-app cross-platform. Maakt E mogelijk en C/D documenteerbaar als
    "experimenteel, door de community getest".
 3. **Fase 2 (5-8 dagen):** Mac-backend in `core/` achter een abstractie (geheugenbron +
