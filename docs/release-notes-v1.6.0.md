@@ -64,3 +64,5 @@ Thank you to everyone who already did.
 
 Not in this release, but on its way. We confirmed on a real Mac with FM27 that FMSuperScout
 can run there without touching macOS security settings. See `docs/macos.md`.
+
+**SHA-256** `FMSuperScout-Setup.exe`: `60deac8bb9199fbd98686d7b6dc3d9d842515e77be5ccc096f31128db35931bc`
