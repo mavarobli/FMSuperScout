@@ -102,19 +102,37 @@ async function startFmMac() {
   if (!fs.existsSync(MAC_LOADER)) return { ok: false, reason: 'noloader' };
   const app = await findFmApp();
   if (!app) return { ok: false, reason: 'notfound' };
-  // Steam moet draaien (en ingelogd zijn), anders weigert FM te starten of start het
-  // zichzelf opnieuw via Steam, zonder module.
-  if (!(await pexec('pgrep', ['-x', 'steam_osx'])).trim()) {
-    spawn('open', ['-g', '-a', 'Steam'], { detached: true, stdio: 'ignore' }).unref();
-    for (let i = 0; i < 60 && !(await pexec('pgrep', ['-x', 'steam_osx'])).trim(); i++) await sleep(1000);
-    await sleep(8000);
-  }
+  // Steam moet draaien én ingelogd zijn: anders sluit FM zichzelf meteen weer af (gezien op de
+  // MacBook, 02-11-2026). Draait Steam niet, dan starten we het en wachten we op de login.
+  const steamUp = async () => !!(await pexec('pgrep', ['-x', 'steam_osx'])).trim();
+  const wasUp = await steamUp();
+  if (!wasUp) spawn('open', ['-g', '-a', 'Steam'], { detached: true, stdio: 'ignore' }).unref();
+  for (let i = 0; i < 90 && !(await steamUp() && steamLoggedIn() !== false); i++) await sleep(1000);
+  if (!(await steamUp())) return { ok: false, reason: 'nosteam' };
+  if (steamLoggedIn() === false) return { ok: false, reason: 'steamlogin' };
+  if (!wasUp) await sleep(8000);   // vers gestart: Steam is na de login nog even bezig
   const exe = path.join(app, 'Contents', 'MacOS', 'Football Manager 27');
-  spawn(exe, [], {
+  const child = spawn(exe, [], {
     detached: true, stdio: 'ignore',
     env: { ...process.env, SteamAppId: FM27_APPID, SteamGameId: FM27_APPID, DYLD_INSERT_LIBRARIES: MAC_LOADER },
-  }).unref();
+  });
+  // Stopt FM binnen een paar seconden, dan weigerde Steam (meestal: niet klaar of niet ingelogd).
+  let exited = false;
+  child.on('exit', () => { exited = true; });
+  child.unref();
+  await sleep(12000);
+  if (exited && !(await pexec('pgrep', ['-x', 'Football Manager 27'])).trim()) return { ok: false, reason: 'fmexited' };
   return { ok: true };
+}
+
+// Ingelogd bij Steam? Steam houdt dat bij in registry.vdf (ActiveProcess → ActiveUser, 0 =
+// niemand). null = niet te bepalen; dan gaan we op het draaiende proces af.
+function steamLoggedIn() {
+  try {
+    const vdf = fs.readFileSync(path.join(os.homedir(), 'Library', 'Application Support', 'Steam', 'registry.vdf'), 'utf8');
+    const m = /"ActiveUser"\s+"(\d+)"/i.exec(vdf);
+    return m ? m[1] !== '0' : null;
+  } catch { return null; }
 }
 
 // ---------- zelf-update ----------

@@ -121,6 +121,8 @@ const I18N = {
     fmStarted: 'Football Manager start op. Laad je save en haal dan nieuwe data op.',
     fmNotFoundMac: 'Football Manager 27 niet gevonden. Op de Mac werkt FMSuperScout voorlopig alleen met de Steam-versie.',
     fmStartFail: 'Football Manager starten lukte niet ({e}).',
+    fmSteamLogin: 'Log in bij Steam en probeer het dan opnieuw.', fmNoSteam: 'Steam start niet. Open Steam zelf, log in en probeer het opnieuw.',
+    fmExited: 'Football Manager stopte meteen weer. Is Steam open en ben je ingelogd? Probeer het dan opnieuw.',
     dumpIncomplete: 'De dump is onvolledig (FM was er waarschijnlijk nog mee bezig). Probeer het zo opnieuw.',
     reqNoPickup: 'Het verzoek wordt niet opgepikt. Is je save geladen? Probeer F9 in de game, of herstart FMSuperScout.',
     reqNoPickupMore: 'Blijft dit terugkomen? Lees de fix',
@@ -258,6 +260,8 @@ const I18N = {
     fmStarted: 'Football Manager is starting. Load your save, then fetch new data.',
     fmNotFoundMac: 'Football Manager 27 not found. On the Mac, FMSuperScout currently works with the Steam version only.',
     fmStartFail: 'Could not start Football Manager ({e}).',
+    fmSteamLogin: 'Log in to Steam, then try again.', fmNoSteam: 'Steam does not start. Open Steam yourself, log in and try again.',
+    fmExited: 'Football Manager closed right away. Is Steam open and are you logged in? Then try again.',
     dumpIncomplete: 'The dump is incomplete (FM was probably still writing it). Try again in a moment.',
     reqNoPickup: 'The request is not being picked up. Is your save loaded? Try F9 in the game, or restart FMSuperScout.',
     reqNoPickupMore: 'Keeps coming back? Read the fix',
@@ -395,6 +399,8 @@ const I18N = {
     fmStarted: 'Football Manager démarre. Chargez votre sauvegarde, puis récupérez de nouvelles données.',
     fmNotFoundMac: 'Football Manager 27 introuvable. Sur Mac, FMSuperScout ne fonctionne pour l\'instant qu\'avec la version Steam.',
     fmStartFail: 'Impossible de lancer Football Manager ({e}).',
+    fmSteamLogin: 'Connectez-vous à Steam, puis réessayez.', fmNoSteam: 'Steam ne démarre pas. Ouvrez Steam vous-même, connectez-vous et réessayez.',
+    fmExited: 'Football Manager s\'est fermé aussitôt. Steam est-il ouvert et êtes-vous connecté ? Réessayez ensuite.',
     dumpIncomplete: 'Le dump est incomplet (FM était sans doute encore occupé). Réessayez dans un instant.',
     reqNoPickup: 'La demande n\'est pas prise en compte. Sauvegarde chargée ? Essayez F9 dans le jeu, ou relancez FMSuperScout.',
     reqNoPickupMore: 'Ça revient sans cesse ? Lisez le correctif',
@@ -532,6 +538,8 @@ const I18N = {
     fmStarted: 'Football Manager startet. Lade deinen Spielstand und rufe dann neue Daten ab.',
     fmNotFoundMac: 'Football Manager 27 nicht gefunden. Auf dem Mac funktioniert FMSuperScout vorerst nur mit der Steam-Version.',
     fmStartFail: 'Football Manager konnte nicht gestartet werden ({e}).',
+    fmSteamLogin: 'Melde dich bei Steam an und versuche es dann erneut.', fmNoSteam: 'Steam startet nicht. Öffne Steam selbst, melde dich an und versuche es erneut.',
+    fmExited: 'Football Manager wurde sofort wieder beendet. Ist Steam geöffnet und bist du angemeldet? Dann erneut versuchen.',
     dumpIncomplete: 'Der Dump ist unvollständig (FM war vermutlich noch beschäftigt). Versuche es gleich noch einmal.',
     reqNoPickup: 'Die Anfrage wird nicht angenommen. Spielstand geladen? Versuche F9 im Spiel oder starte FMSuperScout neu.',
     reqNoPickupMore: 'Kommt das immer wieder? Lies den Fix',
@@ -4604,9 +4612,13 @@ async function startFm() {
       setTimeout(() => { if (b.className === 'done') b.className = 'hidden'; }, 20000);
     } else if (r.reason === 'running') showMacFmBanner('nomodule');
     else {
+      const key = { notfound: 'fmNotFoundMac', steamlogin: 'fmSteamLogin', nosteam: 'fmNoSteam', fmexited: 'fmExited' }[r.reason];
       b.className = 'scanning error';
-      b.innerHTML = bannerMsg('warning', r.reason === 'notfound' ? t('fmNotFoundMac') : tf('fmStartFail', { e: r.error || r.reason }));
-      b.onclick = () => { b.className = 'hidden'; };
+      b.innerHTML = bannerMsg('warning', key ? t(key) : tf('fmStartFail', { e: r.error || r.reason }))
+        + (r.reason === 'notfound' ? '' : ` <button class="bn-act" id="btn-start-fm">${escHtml(t('startFm'))}</button>`);
+      b.onclick = null;
+      const again = $('btn-start-fm');
+      if (again) again.onclick = e => { e.stopPropagation(); startFm(); };
     }
   } catch (e) {
     b.className = 'scanning error'; b.innerHTML = bannerMsg('warning', tf('fmStartFail', { e: String(e.message || e) }));
