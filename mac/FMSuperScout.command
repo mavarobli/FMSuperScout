@@ -60,6 +60,9 @@ if ! pgrep -xq steam_osx; then
   sleep 5   # Steam moet ingelogd zijn voordat FM start
 fi
 echo "Football Manager starten met FMSuperScout…"
-SteamAppId=$APPID SteamGameId=$APPID DYLD_INSERT_LIBRARIES="$HERE/fmss_loader.dylib" nohup "$EXE" >/dev/null 2>&1 &
+# Niet via nohup of env: dat zijn door SIP beschermde systeemprogramma's, en macOS haalt alle
+# DYLD_-variabelen weg als zo'n programma iets start. Dus rechtstreeks vanuit bash, met
+# SIGHUP genegeerd zodat FM blijft draaien als dit Terminal-venster dichtgaat.
+( trap '' HUP; SteamAppId=$APPID SteamGameId=$APPID DYLD_INSERT_LIBRARIES="$HERE/fmss_loader.dylib" exec "$EXE" ) >/dev/null 2>&1 &
 disown
 echo "Klaar. Laad je save en klik in FMSuperScout op 'Nieuwe data'. Dit venster mag dicht."
