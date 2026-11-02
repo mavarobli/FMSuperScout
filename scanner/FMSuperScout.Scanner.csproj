@@ -14,7 +14,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <AssemblyName>FMSuperScout.Scanner</AssemblyName>
     <RootNamespace>FMSuperScout</RootNamespace>
-    <Version>1.6.0</Version>
+    <Version>1.7.0</Version>
     <Product>FMSuperScout</Product>
     <Description>FMSuperScout scanner - reads Football Manager's database (read-only)</Description>
     <LangVersion>latest</LangVersion>
@@ -40,7 +40,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\core\*.cs" />
+    <Compile Include="..\core\*.cs" Exclude="..\core\*.Mac.cs" />
   </ItemGroup>
 
 </Project>

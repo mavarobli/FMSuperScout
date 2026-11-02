@@ -15,8 +15,11 @@ const APP_DIR = __dirname;
 // De plugin schrijft dumps hierheen. Zelfde bron als de plugin (%LOCALAPPDATA%): bij een
 // verplaatst/redirected profiel wijkt homedir+AppData af en keken app en plugin naar
 // verschillende mappen ("F9 werkt, app blijft leeg").
-const DATA_DIR = path.join(
-  process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'FMSuperScout');
+// Op de Mac: ~/Library/Application Support (daar schrijft de module in FM, = .NET's LocalApplicationData).
+const IS_MAC = process.platform === 'darwin';
+const DATA_DIR = IS_MAC
+  ? path.join(os.homedir(), 'Library', 'Application Support', 'FMSuperScout')
+  : path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'FMSuperScout');
 
 // App-modus (standalone venster): server sluit zichzelf af zodra het venster dicht is.
 // Het sluiten van het venster wordt betrouwbaar gemeld via /api/bye (pagehide-beacon).
@@ -31,6 +34,14 @@ if (APP_MODE) {
   setInterval(() => {
     if (Date.now() - lastBeat > 90000) { console.log('Venster gesloten (geen heartbeat), server stopt.'); process.exit(0); }
   }, 5000);
+}
+// Mac-app: de app geeft zijn pid mee. Is die weg (ook na een crash of geforceerd stoppen),
+// dan stopt de server ook, zodat een volgende start niet op een oude server blijft hangen.
+const PARENT_PID = Number(process.env.FMSS_PARENT_PID) || 0;
+if (PARENT_PID) {
+  setInterval(() => {
+    try { process.kill(PARENT_PID, 0); } catch { console.log('App gestopt, server stopt.'); process.exit(0); }
+  }, 3000);
 }
 
 const MIME = {
@@ -65,6 +76,73 @@ function startScanWatcher() {
     child.unref();
     console.log(`Scanner-wachter: ${SCANNER}`);
   } catch (e) { console.error('Scanner-wachter start niet:', e.message); }
+}
+
+// ---------- Football Manager starten (Mac) ----------
+// Op de Mac leest FMSuperScout ín FM: de lader (mac/loader) moet meeladen bij het starten,
+// via DYLD_INSERT_LIBRARIES. Dat kan alleen als wíj FM starten (Steam geeft zo'n instelling op
+// de Mac niet door). Node zelf is geen door SIP beschermd programma, dus de variabele komt aan.
+// De Mac-app geeft het pad van zijn lader mee (FMSS_LOADER); vanuit de broncode ligt hij naast app/.
+const FM27_APPID = '4530370';
+const MAC_LOADER = process.env.FMSS_LOADER || path.join(APP_DIR, '..', 'fmss_loader.dylib');
+const pexec = (cmd, args) => new Promise(r => execFile(cmd, args, (err, out) => r(err ? '' : String(out))));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let fmStart = { phase: 'idle' };   // stand van de laatste startpoging: idle | starting | done | error
+
+// fm.app in de standaard-Steambibliotheek of een andere Steambibliotheek, anders via Spotlight.
+async function findFmApp() {
+  const steam = path.join(os.homedir(), 'Library', 'Application Support', 'Steam');
+  const libs = [steam];
+  try {
+    const vdf = fs.readFileSync(path.join(steam, 'steamapps', 'libraryfolders.vdf'), 'utf8');
+    for (const m of vdf.matchAll(/"path"\s+"([^"]+)"/g)) libs.push(m[1]);
+  } catch { /* geen extra bibliotheken */ }
+  for (const lib of libs) {
+    const app = path.join(lib, 'steamapps', 'common', 'Football Manager 27', 'fm.app');
+    if (fs.existsSync(app)) return app;
+  }
+  const found = (await pexec('mdfind', ["kMDItemCFBundleIdentifier == 'com.SportsInteractive.FootballManager27'"])).split('\n')[0].trim();
+  return found || null;
+}
+
+async function startFmMac() {
+  if ((await pexec('pgrep', ['-x', 'Football Manager 27'])).trim()) return { ok: false, reason: 'running' };
+  if (!fs.existsSync(MAC_LOADER)) return { ok: false, reason: 'noloader' };
+  const app = await findFmApp();
+  if (!app) return { ok: false, reason: 'notfound' };
+  // Steam moet draaien én ingelogd zijn: anders sluit FM zichzelf meteen weer af (gezien op de
+  // MacBook, 02-11-2026). Draait Steam niet, dan starten we het en wachten we op de login.
+  const steamUp = async () => !!(await pexec('pgrep', ['-x', 'steam_osx'])).trim();
+  const wasUp = await steamUp();
+  if (!wasUp) spawn('open', ['-g', '-a', 'Steam'], { detached: true, stdio: 'ignore' }).unref();
+  for (let i = 0; i < 90 && !(await steamUp() && steamLoggedIn() !== false); i++) await sleep(1000);
+  if (!(await steamUp())) return { ok: false, reason: 'nosteam' };
+  if (steamLoggedIn() === false) return { ok: false, reason: 'steamlogin' };
+  if (!wasUp) await sleep(8000);   // vers gestart: Steam is na de login nog even bezig
+  const exe = path.join(app, 'Contents', 'MacOS', 'Football Manager 27');
+  const child = spawn(exe, [], {
+    detached: true, stdio: 'ignore',
+    env: { ...process.env, SteamAppId: FM27_APPID, SteamGameId: FM27_APPID, DYLD_INSERT_LIBRARIES: MAC_LOADER },
+  });
+  // Stopt FM binnen een paar seconden, dan weigerde Steam (meestal: niet klaar of niet ingelogd).
+  let exited = false, spawnError = null;
+  child.on('exit', () => { exited = true; });
+  child.on('error', e => { spawnError = e; });   // bv. programma niet op die plek: anders een uncaught error
+  child.unref();
+  await sleep(12000);
+  if (spawnError) return { ok: false, reason: 'error', error: spawnError.message };
+  if (exited && !(await pexec('pgrep', ['-x', 'Football Manager 27'])).trim()) return { ok: false, reason: 'fmexited' };
+  return { ok: true };
+}
+
+// Ingelogd bij Steam? Steam houdt dat bij in registry.vdf (ActiveProcess → ActiveUser, 0 =
+// niemand). null = niet te bepalen; dan gaan we op het draaiende proces af.
+function steamLoggedIn() {
+  try {
+    const vdf = fs.readFileSync(path.join(os.homedir(), 'Library', 'Application Support', 'Steam', 'registry.vdf'), 'utf8');
+    const m = /"ActiveUser"\s+"(\d+)"/i.exec(vdf);
+    return m ? m[1] !== '0' : null;
+  } catch { return null; }
 }
 
 // ---------- zelf-update ----------
@@ -268,7 +346,8 @@ function checkSetup(cb) {
     setupCache = { at: Date.now(), val };
     cb(val);
   };
-  execFile('reg', ['query', 'HKLM\\Software\\FMSuperScout', '/v', 'GamePath'],
+  if (process.platform !== 'win32') return done(null);   // geen register, geen BepInEx
+  execFile('reg', ['query','HKLM\\Software\\FMSuperScout', '/v', 'GamePath'],
     { windowsHide: true }, (err, out) => {
       const m = !err && /GamePath\s+REG_SZ\s+(.+)/i.exec(out || '');
       done(m ? m[1].trim() : null);
@@ -316,6 +395,7 @@ const server = http.createServer((req, res) => {
       dumpTime: dump ? dump.mtime : null,
       dumpSize: dump ? dump.size : null,   // uit latestDump: geen losse stat die kan racen met een F9-herschrijf
       appMode: APP_MODE,
+      platform: process.platform,
       scanner: !!SCANNER,
       plugin,
     }));
@@ -399,12 +479,41 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/fmstatus') {   // zie checkSetup hieronder voor de installatiestaat
     // Draait Football Manager? Zonder draaiende game valt er niets te scannen (scanner)
     // en wordt een data-verzoek nooit opgepikt (plugin).
+    if (IS_MAC) {
+      // Mac: draait FM, en draait het mét onze module? Die schrijft elke 5 s een teken van
+      // leven (mac-agent.json) met zijn pid; FM via Steam gestart heeft geen module.
+      execFile('pgrep', ['-x', 'Football Manager 27'], (err, out) => {
+        const pids = String(out || '').split(/\s+/).filter(Boolean).map(Number);
+        let module = false;
+        try {
+          const a = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'mac-agent.json'), 'utf8'));
+          module = pids.includes(a.pid) && Date.now() - a.at < 20000;
+        } catch { /* geen module actief */ }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ running: pids.length > 0, module }));
+      });
+      return;
+    }
     execFile('tasklist', ['/FI', 'IMAGENAME eq fm.exe', '/NH'], { windowsHide: true }, (err, out) => {
       const running = !err && /fm\.exe/i.test(out || '');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ running }));
     });
     return;
+  }
+
+  if (url.pathname === '/api/start-fm') {
+    // Mac: FM starten mét de FMSuperScout-module. Dat kan ruim een minuut duren (Steam
+    // opstarten en inloggen), dus POST start het op de achtergrond en GET geeft de stand.
+    const reply = (code, o) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+    if (!IS_MAC) return reply(404, { phase: 'error', reason: 'platform' });
+    if (req.method === 'POST' && fmStart.phase !== 'starting') {   // dubbelklik = één FM
+      fmStart = { phase: 'starting' };
+      startFmMac().then(
+        r => { fmStart = r.ok ? { phase: 'done' } : { phase: 'error', reason: r.reason, error: r.error }; },
+        e => { fmStart = { phase: 'error', reason: 'error', error: String(e.message || e) }; });
+    }
+    return reply(200, fmStart);
   }
 
   if (url.pathname === '/api/setup') {
@@ -487,6 +596,11 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/update-install' && req.method === 'POST') {
+    if (process.platform !== 'win32') {   // de installer is Windows-only; de app linkt op de Mac naar de release
+      res.writeHead(501, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'not supported on this platform' }));
+      return;
+    }
     if (updState.phase === 'idle' || updState.phase === 'error')
       runUpdate().catch(e => { updState = { phase: 'error', error: String(e.message || e) }; });
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -543,7 +657,17 @@ process.on('uncaughtException', e => console.error('Onverwachte fout (server dra
 const URL_LOCAL = `http://localhost:${PORT}`;
 
 // Open de app in een chromeless Edge-venster (app-modus); anders in de standaardbrowser.
+// Mac: Chrome, Edge of Brave als app-venster als die er zijn, anders de standaardbrowser.
 function openApp() {
+  if (IS_MAC) {
+    const browser = ['Google Chrome', 'Microsoft Edge', 'Brave Browser']
+      .find(b => fs.existsSync(path.join('/Applications', `${b}.app`)));
+    const args = browser
+      ? ['-na', browser, '--args', `--app=${URL_LOCAL}`, `--user-data-dir=${path.join(DATA_DIR, 'window')}`, '--window-size=1440,900', '--no-first-run']
+      : [URL_LOCAL];
+    try { spawn('open', args, { detached: true, stdio: 'ignore' }).unref(); } catch { /* handmatig openen */ }
+    return;
+  }
   const edge = [
     path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
     path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),

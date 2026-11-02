@@ -4,10 +4,12 @@
 
 <h1 align="center">FMSuperScout</h1>
 
-<p align="center">A fast, open source scouting tool for <strong>Football Manager 27</strong> and <strong>26</strong> (Windows).</p>
+<p align="center">A fast, open source scouting tool for <strong>Football Manager 27</strong> and <strong>26</strong> (Windows and Mac).</p>
 
 <p align="center">
-  <a href="https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Setup.exe"><strong>Download the installer</strong></a>
+  <a href="https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Setup.exe"><strong>Download for Windows</strong></a>
+  ·
+  <a href="https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Mac.dmg"><strong>Download for Mac</strong></a>
   ·
   <a href="CHANGELOG.md">Changelog</a>
   ·
@@ -16,7 +18,7 @@
 
 ---
 
-Press **F9** in your save and the full loaded database, 60,000+ players and staff, is pulled out
+Press **F9** in your save (or click **New data**) and the full loaded database, 60,000+ players and staff, is pulled out
 of memory in about 6 seconds. Including what FM normally hides: **CA and PA**, hidden personality
 attributes and FM's **real transfer value**. After that everything is instant. Monster saves work
 too: 635k people across 100+ leagues loads in about 17 seconds.
@@ -98,6 +100,8 @@ Wonderkids get a gold card. Built for showing off that one insane regen.
 One installer: the viewer app plus the scanner. No coding, nothing else to download, and nothing
 is added to your game folder.
 
+### Windows
+
 1. Download **[FMSuperScout-Setup.exe](https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Setup.exe)**
    (or pick a version from the [Releases](https://github.com/mavarobli/FMSuperScout/releases) page).
 2. Windows SmartScreen may warn about an unknown publisher, since the installer isn't code-signed.
@@ -110,6 +114,27 @@ is added to your game folder.
 To remove it: *Apps and features* → FMSuperScout. Coming from 1.5.0 or older? The old BepInEx
 plugin is no longer needed; uninstalling removes the plugin DLL, BepInEx itself stays (other mods
 may use it).
+
+### Mac
+
+FMSuperScout for Mac works with the **Steam version of FM27** on macOS 13 or newer, on Apple
+Silicon and Intel Macs (Intel is built but not yet tested; reports welcome).
+
+1. Download **[FMSuperScout-Mac.dmg](https://github.com/mavarobli/FMSuperScout/releases/latest/download/FMSuperScout-Mac.dmg)**,
+   open it and drag FMSuperScout to Applications.
+2. Open FMSuperScout. The first time macOS says it cannot check the app, because it is not
+   signed with an Apple developer certificate. Go to **System Settings → Privacy & Security**,
+   scroll down and click **Open Anyway**, then confirm.
+3. Make sure Steam is open and you are logged in.
+4. Click **Start Football Manager** in the app, load your save and click **New data**.
+
+On the Mac, Football Manager has to be **started from FMSuperScout** (not from Steam): macOS
+only lets FMSuperScout read the game when it loads together with it. Started FM from Steam
+anyway? The app tells you; save, quit FM and use the button. Once FM runs, you can close and
+reopen FMSuperScout as often as you like. There is no F9 on the Mac; use **New data**.
+
+To remove it: drag FMSuperScout from Applications to the Bin, and delete
+`~/Library/Application Support/FMSuperScout` if you want your data gone too.
 
 Something not working? See [TROUBLESHOOTING.md](TROUBLESHOOTING.md), or use **Report a problem**
 in the app's settings menu.
@@ -141,18 +166,25 @@ powershell -ExecutionPolicy Bypass -File installer/build-exe.ps1
 
 A viewer-only zip package is also available via `installer/build-package.ps1`.
 
+**Mac.** The Mac module (`mac/`, .NET NativeAOT) and the app (`mac/app`, Swift) can only be
+built on a Mac. `bash mac/build.sh` builds the module from source and installs a test setup with
+`FMSuperScout.command`; the `mac` GitHub workflow builds the complete `FMSuperScout-Mac.dmg`.
+See [`mac/README.md`](mac/README.md).
+
 ## Getting data out of Football Manager
 
 The app reads whatever the scanner last dumped from your **active save**:
 
-1. Start Football Manager and load your save.
-2. Press **F9** in-game, or click **⬇ New data** in the app.
+1. Start Football Manager and load your save (on the Mac: with **Start Football Manager** in
+   the app).
+2. Press **F9** in-game (Windows), or click **⬇ New data** in the app.
 3. The data loads by itself as soon as the dump is ready. If a read fails, the app shows what
    went wrong instead of waiting forever.
 
 F9 is picked up by a small watcher that starts with the app and stays active while Football
 Manager runs, also after you close the app. Data lives in `%LOCALAPPDATA%\FMSuperScout\`
-(`dump*.json`, `status.json`, `diagnostics.txt`, `scanner.log`).
+(`dump*.json`, `status.json`, `diagnostics.txt`, `scanner.log`); on the Mac in
+`~/Library/Application Support/FMSuperScout/` (with `mac.log` instead of `scanner.log`).
 
 ## Accuracy
 
@@ -185,11 +217,13 @@ by the model tests in [`test/`](test/).
 |---|---|
 | `app/` | Local web app (Node, zero dependencies) |
 | `core/` | Shared C# scan core: memory reader, dumper, per-version memory layouts |
-| `scanner/` | External scanner (reads `fm.exe` from the outside; FM27 and FM26) |
-| `plugin/` | Legacy FM26 BepInEx plugin host (same core) |
-| `installer/` | Icon generator, launcher, PowerShell installer, package builder |
+| `scanner/` | Windows: external scanner (reads `fm.exe` from the outside; FM27 and FM26) |
+| `mac/` | Mac: module that runs inside FM (NativeAOT), its loader, the Mac app (Swift) and build scripts |
+| `plugin/` | Legacy FM26 BepInEx plugin host (same core; no longer shipped) |
+| `installer/` | Windows installer (Inno Setup), icon generator, launcher, package builder |
 | `test/` | Zero-dependency model tests (`npm test`) |
-| `docs/` | Value model, .fmf format, release notes and backlog |
+| `tools/` | Calibration scripts and the Mac measuring tools (`mac-diagnose.sh`, `mac-probe/`) |
+| `docs/` | Value model, re-pin guide, Mac research, .fmf format, release notes and backlog |
 
 ## Where this fits
 

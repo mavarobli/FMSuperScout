@@ -60,6 +60,20 @@ garbage or nothing until it is updated. Check for a newer FMSuperScout release.
 - **Epic / Xbox Game Pass**: the scanner does not depend on the store, so these should work;
   we could not test them end to end. Reports (working or not) are very welcome.
 
+## 8. Mac
+
+- **"FMSuperScout can't be opened" / "was blocked"**: the app is not signed with an Apple
+  developer certificate. Open **System Settings → Privacy & Security**, scroll down, click
+  **Open Anyway** and confirm with your password or Touch ID. You only do this once.
+- **"Football Manager is running without FMSuperScout"**: FM was started from Steam or the
+  Dock. On the Mac FMSuperScout can only read the game when FM is started from FMSuperScout.
+  Save your game, quit FM and click **Start Football Manager** in the app.
+- **Football Manager closes right away, or does not start**: open Steam yourself, wait until
+  you are logged in and see your Library, then click **Start Football Manager** again.
+- **Only the Steam version of FM27 is supported on the Mac** for now.
+- Logs: `~/Library/Application Support/FMSuperScout/mac.log` (the module in FM) and
+  `server.log` (the app). Attach them, plus `diagnostics.txt`, when you report a problem.
+
 ## Coming from 1.5.0 or older (FM26 with the BepInEx plugin)
 
 The plugin is no longer needed: the scanner reads FM26 too. An installed plugin keeps

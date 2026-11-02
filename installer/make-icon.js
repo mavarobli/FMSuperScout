@@ -107,6 +107,24 @@ function toIco(frames) {
   return Buffer.concat([head, dir, ...datas]);
 }
 
+// Mac: `node make-icon.js --mac <map>` schrijft een AppIcon.iconset (voor iconutil). Het
+// embleem staat op ~80% van het vlak met marge rondom, zoals het macOS-icoonraster vraagt.
+if (process.argv[2] === '--mac') {
+  const dir = process.argv[3] || path.join(__dirname, 'AppIcon.iconset');
+  fs.mkdirSync(dir, { recursive: true });
+  const set = [['16x16', 16], ['16x16@2x', 32], ['32x32', 32], ['32x32@2x', 64], ['128x128', 128],
+    ['128x128@2x', 256], ['256x256', 256], ['256x256@2x', 512], ['512x512', 512], ['512x512@2x', 1024]];
+  for (const [name, px] of set) {
+    const inner = Math.round(px * 0.8), pad = Math.floor((px - inner) / 2);
+    const img = render(inner, inner >= 512 ? 2 : 4);
+    const canvas = Buffer.alloc(px * px * 4);   // transparant
+    for (let y = 0; y < inner; y++) img.copy(canvas, ((y + pad) * px + pad) * 4, y * inner * 4, (y + 1) * inner * 4);
+    fs.writeFileSync(path.join(dir, `icon_${name}.png`), toPng(canvas, px));
+  }
+  console.log('AppIcon.iconset geschreven:', dir);
+  process.exit(0);
+}
+
 const sizes = [256, 64, 48, 32, 16];
 const frames = sizes.map(s => ({ size: s, png: toPng(render(s), s) }));
 const out = path.join(__dirname, 'icon.ico');

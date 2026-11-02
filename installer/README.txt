@@ -16,8 +16,8 @@ Close the window and the background server stops automatically.
 
 DATA FROM FOOTBALL MANAGER
 -------------------------
-FMSuperScout reads the data the FMSuperScout plugin dumps from your active save.
-Start FM26, load your save and press F9 (or click "New data" in the tool).
+FMSuperScout reads the database of your active save straight from Football Manager.
+Start FM27 or FM26, load your save and press F9 (or click "New data" in the tool).
 
 UNINSTALL
 -----------

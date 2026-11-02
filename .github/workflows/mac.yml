@@ -1,0 +1,88 @@
+# Bouwt de Mac-versie (NativeAOT en Swift kunnen alleen op macOS) en levert FMSuperScout-Mac.dmg op:
+# FMSuperScout.app met eigen venster en icoon, Node, de web-app, de scanmodule (fmss_core.dylib)
+# en de lader, alles universeel (Apple Silicon + Intel). Ondertekend zonder naam (ad-hoc).
+name: mac
+on:
+  push:
+    paths: ['core/**', 'mac/**', 'app/**', 'installer/make-icon.js', '.github/workflows/mac.yml']
+  pull_request:
+    paths: ['core/**', 'mac/**']
+  workflow_dispatch: {}
+permissions:
+  contents: read
+env:
+  NODE_MAJOR: '22'
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Scanmodule (NativeAOT, arm64 + x64)
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+        run: |
+          for rid in osx-arm64 osx-x64; do
+            dotnet publish mac/FMSuperScout.Mac.csproj -c Release -r $rid -o out/$rid
+          done
+          mkdir -p build
+          lipo -create out/osx-arm64/fmss_core.dylib out/osx-x64/fmss_core.dylib -output build/fmss_core.dylib
+          nm -gU build/fmss_core.dylib | grep -q fmss_run
+
+      - name: Lader en app (C, Swift)
+        run: |
+          clang -dynamiclib -O2 -Wall -arch arm64 -arch x86_64 -o build/fmss_loader.dylib mac/loader/fmss_loader.c
+          for a in arm64 x86_64; do
+            swiftc -O -target $a-apple-macos12.0 mac/app/main.swift -o build/FMSuperScout-$a
+          done
+          lipo -create build/FMSuperScout-arm64 build/FMSuperScout-x86_64 -output build/FMSuperScout
+
+      - name: Node (officiële build, SHA-256 gecontroleerd)
+        run: |
+          base=https://nodejs.org/dist/latest-v$NODE_MAJOR.x
+          curl -fsSL $base/SHASUMS256.txt -o build/SHASUMS256.txt
+          for a in arm64 x64; do
+            f=$(grep -o "node-v[0-9.]*-darwin-$a.tar.gz" build/SHASUMS256.txt | head -1)
+            curl -fsSL $base/$f -o build/$f
+            (cd build && grep " $f\$" SHASUMS256.txt | shasum -a 256 -c -)
+            tar -xzf build/$f -C build
+            cp build/${f%.tar.gz}/bin/node build/node-$a
+          done
+          lipo -create build/node-arm64 build/node-x64 -output build/node
+          build/node --version
+
+      - name: Icoon
+        run: |
+          node installer/make-icon.js --mac build/AppIcon.iconset
+          iconutil -c icns build/AppIcon.iconset -o build/AppIcon.icns
+
+      - name: FMSuperScout.app en .dmg
+        run: |
+          VERSION=$(sed -n "s/^const APP_VERSION = '\(.*\)';/\1/p" app/app.js)
+          APP=dist/FMSuperScout.app
+          mkdir -p $APP/Contents/MacOS $APP/Contents/Resources
+          sed "s/@VERSION@/$VERSION/g" mac/app/Info.plist > $APP/Contents/Info.plist
+          cp build/FMSuperScout $APP/Contents/MacOS/
+          cp build/AppIcon.icns build/node build/fmss_core.dylib build/fmss_loader.dylib $APP/Contents/Resources/
+          cp -R app $APP/Contents/Resources/app
+          # --deep tekent niets in Resources: node en de dylibs elk apart (ad-hoc, alle slices).
+          for f in node fmss_core.dylib fmss_loader.dylib; do
+            codesign --force -s - $APP/Contents/Resources/$f
+            codesign --verify --strict $APP/Contents/Resources/$f
+          done
+          codesign --force --deep -s - $APP
+          codesign --verify --deep --strict $APP
+          mkdir -p dmg && cp -R $APP dmg/ && ln -s /Applications dmg/Applications
+          hdiutil create -volname FMSuperScout -srcfolder dmg -ov -format UDZO dist/FMSuperScout-Mac.dmg
+          (cd dist && shasum -a 256 FMSuperScout-Mac.dmg > FMSuperScout-Mac.dmg.sha256 && cat FMSuperScout-Mac.dmg.sha256)
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FMSuperScout-mac
+          path: |
+            dist/FMSuperScout-Mac.dmg
+            dist/FMSuperScout-Mac.dmg.sha256

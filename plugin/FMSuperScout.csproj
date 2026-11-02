@@ -22,7 +22,7 @@
 
   <!-- Gedeelde scan-kern (ook gebruikt door de externe scanner in ../scanner). -->
   <ItemGroup>
-    <Compile Include="..\core\*.cs" />
+    <Compile Include="..\core\*.cs" Exclude="..\core\*.Mac.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -221,6 +221,8 @@ body.hide-meta .meta-row { display: none; }
 #banner .pbar { display: inline-block; vertical-align: middle; width: 160px; height: 8px; margin: 0 6px 0 10px; border-radius: 4px; background: rgba(0, 0, 0, 0.35); overflow: hidden; }
 #banner .pfill { display: block; height: 100%; border-radius: 4px; background: currentColor; opacity: 0.85; transition: width 0.4s ease; }
 #banner .ppct { font-variant-numeric: tabular-nums; opacity: 0.85; }
+#banner .bn-act { margin-left: 10px; padding: 4px 12px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+#banner .bn-act:hover { filter: brightness(1.15); }
 
 /* versie-waarschuwing: dump komt uit een andere FM-versie dan waarop de offsets zijn gepind */
 #ver-warn { flex: 0 0 auto; padding: 7px 14px; font-size: 12.5px; font-weight: 600; text-align: center; background: #443a14; color: var(--warn); border-bottom: 1px solid var(--border); }

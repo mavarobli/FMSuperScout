@@ -15,3 +15,13 @@ node tools/<script>.js
 - **value-calib.js**: compares the extracted market value (×1.16 £→€) against in-game
   transfer value bands; fill in a calibration set by hand. For checking the value
   estimation.
+
+## Mac measuring tools
+
+Used to measure the Mac memory layout (see `docs/macos.md`); needed again after a big FM patch.
+
+- **mac-diagnose.sh**: read-only overview of the Mac and the FM installation (signing,
+  entitlements, modules). Replaces your user name and home folder with placeholders.
+- **mac-probe/**: a small measuring module loaded into FM (`build.sh` builds it and prints
+  how to start FM with it). Writes a class histogram with RTTI names and, on request,
+  object dumps of named people to `~/Library/Application Support/FMSuperScout/mac-probe.txt`.
