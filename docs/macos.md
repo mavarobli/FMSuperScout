@@ -20,9 +20,24 @@ MacBook Pro M1 Pro (16 GB), macOS 27.0, SIP aan, geen Rosetta. FM27 27.0.0.24867
   **`Contents/PlugIns/game_plugin.bundle`** (de tegenhanger van `game_plugin.dll`).
 - Xcode-command-line-tools zijn aanwezig: de meetmodule kan op de Mac zelf gebouwd worden.
 
-Volgende stap: `tools/mac-probe/` — een kleine meetmodule die via de Steam-startoptie meelaadt
-en binnen FM het klassenoverzicht maakt (Itanium-RTTI: offset-to-top en klassenaam), de
-Mac-tegenhanger van het class-offset-histogram waarmee FM27 op Windows gepind is.
+### Meetmodule in FM27 (2 november 2026, `tools/mac-probe/`)
+
+- **Meeladen werkt met SIP aan** [M]: FM gestart vanuit Terminal met `SteamAppId=4530370
+  SteamGameId=4530370 DYLD_INSERT_LIBRARIES=… "…/fm.app/Contents/MacOS/Football Manager 27"`
+  (Steam open). De Steam-startoptie zelf werkt níet op de Mac (OS error 260/0): Steam start
+  de app daar niet via de opdrachtregel. Voor gebruikers wordt dit dus een eigen starter.
+- **Lezen binnen het proces is snel en veilig** [M]: 2,9 GB heap in 1,3 s via
+  `mach_vm_read_overwrite`, 0 MB onleesbaar.
+- **De Mac-build heeft RTTI** [M]: 77 van de top-80 klassen met leesbare naam. Klassen zijn
+  dus op naam te herkennen in plaats van op magische offsets — robuuster dan op Windows.
+  - `db::ACTUAL_PLAYER` 39.452 objecten, sub-objecten op offset 0, 632 (0x278, met de
+    persoonsnamen: indirect +16 volledige naam, genest +32 voornaam, +40 achternaam) en 904.
+  - `db::ACTUAL_NON_PLAYER` 24.058 (offsets 0, 248, 520); `db::NON_PLAYING_DATA` 24.196.
+  - Verder o.a. `db::CLUB`, `db::TEAM`, `db::COMP`, `db::FULL_CONTRACT`, `db::CITY`,
+    `db::STADIUM`, `db::NATIONAL_TEAM`, `db::LOAN_CONTRACT`, `MANAGER_DETAILS`.
+- Aantallen komen overeen met Windows op dezelfde save (24.058 vs. 24.057 staf).
+- Volgende stap: de veld-offsets binnen deze objecten vastleggen door objecten van bekende
+  personen te dumpen en naast de Windows-waarden te leggen.
 
 ## Kort
 

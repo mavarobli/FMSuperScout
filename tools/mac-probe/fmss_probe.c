@@ -153,6 +153,167 @@ static int by_count(const void *a, const void *b) {
   return x->count < y->count ? 1 : x->count > y->count ? -1 : 0;
 }
 
+// ---------- objectdump voor opgegeven namen ----------
+// Staan er namen in mac-probe.flag (gescheiden door ';'), dan zoekt de scan die personen
+// op en schrijft hun complete object uit, met per veld of het naar tekst of naar een ander
+// database-object wijst. Naast de bekende Windows-waarden (CA, PA, posities, attributen,
+// contract) gelegd, levert dat de Mac-veldoffsets: meten, niet gissen.
+#define MAXN 8
+static char g_names[MAXN][96];
+static int g_nn;
+static void read_flag_names(void) {
+  g_nn = 0;
+  FILE *fl = fopen(g_flag, "r");
+  if (!fl) return;
+  char line[1024];
+  size_t n = fread(line, 1, sizeof line - 1, fl);
+  line[n] = 0;
+  fclose(fl);
+  char *save = NULL;
+  for (char *tok = strtok_r(line, ";\n", &save); tok && g_nn < MAXN; tok = strtok_r(NULL, ";\n", &save)) {
+    while (*tok == ' ') tok++;
+    size_t L = strlen(tok);
+    while (L && (tok[L - 1] == ' ' || tok[L - 1] == '\r')) tok[--L] = 0;
+    if (L) snprintf(g_names[g_nn++], sizeof g_names[0], "%s", tok);
+  }
+}
+
+// Wijst deze waarde naar tekst? 'N' = genest ([a]→[b]→tekst op b+4), 'I' = indirect (tekst op a+4).
+static char field_text(uint64_t a, char *t, size_t cap) {
+  if (a < 0x100000000ull || (a & 3)) return 0;
+  memset(t, 0, cap);
+  uint64_t b = rd64(a);
+  if (b >= 0x100000000ull && !(b & 3) && rd(b + 4, t, cap - 1) && looks_like_text(t)) return 'N';
+  memset(t, 0, cap);
+  if (rd(a + 4, t, cap - 1) && looks_like_text(t)) return 'I';
+  t[0] = 0;
+  return 0;
+}
+static int class_name_vt(uint64_t vt, char *out, size_t cap) {
+  if (vt < g_gp.lo || vt >= g_gp.hi) return 0;
+  uint64_t ti = rd64(vt - 8), np = ti ? rd64(ti + 8) : 0;
+  char m[200]; memset(m, 0, sizeof m);
+  if (!np || !rd(np, m, sizeof m - 1) || !looks_like_text(m)) return 0;
+  int st = -1; char *d = g_demangle ? g_demangle(m, NULL, NULL, &st) : NULL;
+  snprintf(out, cap, "%s", st == 0 && d ? d : m);
+  free(d);
+  return 1;
+}
+
+// Hexdump met per 8 bytes: bytes, vier u16's, en wat de waarde als pointer betekent.
+static void dump_obj(FILE *f, uint64_t start, size_t len, const char *indent, uint64_t *subs, int *nsub, int maxsub) {
+  uint8_t b[0x600];
+  if (len > sizeof b) len = sizeof b;
+  while (len >= 0x40 && !rd(start, b, len)) len /= 2;
+  if (len < 0x40) { outf(f, "%s(onleesbaar)\n", indent); return; }
+  for (size_t o = 0; o + 8 <= len; o += 8) {
+    uint64_t q; memcpy(&q, b + o, 8);
+    uint16_t w[4]; memcpy(w, b + o, 8);
+    char t[48], what[220] = "";
+    char kind = field_text(q, t, sizeof t);
+    if (kind) snprintf(what, sizeof what, "  %c:%s", kind, t);
+    else if (q >= g_gp.lo && q < g_gp.hi) { char c[160]; if (class_name_vt(q, c, sizeof c)) snprintf(what, sizeof what, "  [vtable %s]", c); }
+    else if (q >= 0x100000000ull && !(q & 7)) {
+      char c[160];
+      if (class_name_vt(rd64(q), c, sizeof c)) {
+        snprintf(what, sizeof what, "  → %s", c);
+        if (subs && *nsub < maxsub && strncmp(c, "db::", 4) == 0) subs[(*nsub)++] = q;
+      }
+    }
+    outf(f, "%s+0x%03zx  %02x %02x %02x %02x %02x %02x %02x %02x  u16 %5u %5u %5u %5u%s\n", indent, o,
+         b[o], b[o + 1], b[o + 2], b[o + 3], b[o + 4], b[o + 5], b[o + 6], b[o + 7], w[0], w[1], w[2], w[3], what);
+  }
+}
+
+static int name_matches(const char *want, char texts[][48], int nt) {
+  for (int i = 0; i < nt; i++) if (strcmp(texts[i], want) == 0) return 1;
+  const char *sp = strrchr(want, ' ');
+  if (!sp) return 0;
+  char first[96]; size_t fl = (size_t)(sp - want);
+  if (fl >= sizeof first) return 0;
+  memcpy(first, want, fl); first[fl] = 0;
+  int hf = 0, hl = 0;
+  for (int i = 0; i < nt; i++) { if (!strcmp(texts[i], first)) hf = 1; if (!strcmp(texts[i], sp + 1)) hl = 1; }
+  return hf && hl;
+}
+
+static void dump_named(FILE *f) {
+  // Doelklassen: alle vtables (sub-objecten) van spelers en staf, op naam herkend.
+  uint64_t tv[32]; int64_t to[32]; char tn[32][48]; int nt = 0;
+  for (uint32_t i = 0; i < TSIZE && g_tab[i].count >= 20 && nt < 32; i++) {
+    char c[160];
+    if (!class_name_vt(g_tab[i].vt, c, sizeof c)) continue;
+    if (!strcmp(c, "db::ACTUAL_PLAYER") || !strcmp(c, "db::ACTUAL_NON_PLAYER")) {
+      tv[nt] = g_tab[i].vt; to[nt] = (int64_t)rd64(g_tab[i].vt - 16);
+      snprintf(tn[nt], sizeof tn[0], "%s", c); nt++;
+    }
+  }
+  outf(f, "\n== Objectdump: %d naam/namen, %d doel-vtables ==\n", g_nn, nt);
+  if (!nt) return;
+  const size_t SEEN = 1u << 19, CH = 8u << 20;
+  uint64_t *seen = calloc(SEEN, 8);
+  uint8_t *buf = malloc(CH);
+  if (!seen || !buf) { free(seen); free(buf); outf(f, "geen geheugen\n"); return; }
+  int found[MAXN] = {0}, left = g_nn;
+  uintptr_t skip[5][2] = {
+    { (uintptr_t)g_tab, (uintptr_t)g_tab + TSIZE * sizeof(slot_t) }, { (uintptr_t)buf, (uintptr_t)buf + CH },
+    { (uintptr_t)seen, (uintptr_t)seen + SEEN * 8 }, { g_gp.lo, g_gp.hi }, { g_ga.lo, g_ga.hi } };
+  mach_vm_address_t addr = 0; mach_vm_size_t size = 0;
+  for (; left > 0;) {
+    vm_region_basic_info_data_64_t info; mach_msg_type_number_t cnt = VM_REGION_BASIC_INFO_COUNT_64; mach_port_t obj;
+    if (mach_vm_region(mach_task_self(), &addr, &size, VM_REGION_BASIC_INFO_64, (vm_region_info_t)&info, &cnt, &obj) != KERN_SUCCESS) break;
+    int rw = (info.protection & (VM_PROT_READ | VM_PROT_WRITE)) == (VM_PROT_READ | VM_PROT_WRITE), skipme = 0;
+    for (int s = 0; s < 5; s++) if (skip[s][1] && addr < skip[s][1] && addr + size > skip[s][0]) skipme = 1;
+    if (rw && !skipme && size <= (1ull << 30)) {
+      for (mach_vm_size_t off = 0; off < size && left > 0; off += CH) {
+        size_t want = (size - off) < CH ? (size_t)(size - off) : CH;
+        if (!rd(addr + off, buf, want)) continue;
+        for (size_t i = 0; i + 8 <= want && left > 0; i += 8) {
+          uint64_t v = *(uint64_t *)(buf + i);
+          if (v < g_gp.lo || v >= g_gp.hi) continue;
+          int ti = -1;
+          for (int k = 0; k < nt; k++) if (tv[k] == v) { ti = k; break; }
+          if (ti < 0) continue;
+          uint64_t start = addr + off + i + to[ti];          // offset-to-top ≤ 0: terug naar objectbegin
+          // al gezien?
+          uint64_t h = (start >> 3) * 0x9E3779B97F4A7C15ull; uint32_t j = (uint32_t)(h >> 45) & (SEEN - 1);
+          int dup = 0;
+          for (int k = 0; k < 32; k++, j = (j + 1) & (SEEN - 1)) {
+            if (seen[j] == start) { dup = 1; break; }
+            if (!seen[j]) { seen[j] = start; break; }
+          }
+          if (dup) continue;
+          // Teksten in het object verzamelen (namen) en vergelijken.
+          uint8_t ob[0x600]; size_t ol = sizeof ob;
+          while (ol >= 0x40 && !rd(start, ob, ol)) ol /= 2;
+          if (ol < 0x40) continue;
+          char texts[96][48]; int ntx = 0;
+          for (size_t o = 0; o + 8 <= ol && ntx < 96; o += 8) {
+            uint64_t q; memcpy(&q, ob + o, 8);
+            if (field_text(q, texts[ntx], sizeof texts[0])) ntx++;
+          }
+          for (int n = 0; n < g_nn; n++) {
+            if (found[n] || !name_matches(g_names[n], texts, ntx)) continue;
+            found[n] = 1; left--;
+            outf(f, "\n### %s · %s · object 0x%llx (vtable +0x%llx, offset-to-top %lld)\n", g_names[n], tn[ti],
+                 (unsigned long long)start, (unsigned long long)(v - g_gp.lo), (long long)-to[ti]);
+            uint64_t subs[8]; int ns = 0;
+            dump_obj(f, start, sizeof ob, "", subs, &ns, 8);
+            for (int s = 0; s < ns; s++) {
+              char c[160] = "?"; class_name_vt(rd64(subs[s]), c, sizeof c);
+              outf(f, "  -- onderliggend object %s op 0x%llx --\n", c, (unsigned long long)subs[s]);
+              dump_obj(f, subs[s], 0x180, "    ", NULL, NULL, 0);
+            }
+          }
+        }
+      }
+    }
+    addr += size;
+  }
+  for (int n = 0; n < g_nn; n++) if (!found[n]) outf(f, "\nNiet gevonden: %s\n", g_names[n]);
+  free(seen); free(buf);
+}
+
 // ---------- de scan ----------
 static void scan(void) {
   FILE *f = fopen(g_out, "a");
@@ -229,6 +390,7 @@ static void scan(void) {
     shown++;
   }
   outf(f, "(%d van %d met klassenaam)\n", named, shown);
+  if (g_nn > 0) dump_named(f);
   outf(f, "\nKlaar in %.1f s.\n", (now_ms() - t0) / 1000.0);
   fclose(f);
 }
@@ -238,7 +400,7 @@ static void *worker(void *arg) {
   for (;;) {
     sleep(2);
     struct stat st;
-    if (stat(g_flag, &st) == 0) { unlink(g_flag); scan(); }
+    if (stat(g_flag, &st) == 0) { read_flag_names(); unlink(g_flag); scan(); }
   }
   return NULL;
 }
