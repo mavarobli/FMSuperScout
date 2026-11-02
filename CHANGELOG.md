@@ -5,7 +5,9 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
-Working towards 1.6.0: Football Manager 27 support, without BepInEx.
+## [1.6.0] - 2026-11-02
+
+Scanner 1.6.0, plugin 0.2.0. Football Manager 27 support, without BepInEx.
 
 ### Added
 - **Football Manager 27.** FMSuperScout reads FM27 (game_plugin 27.0, Unity 6000.3). The
