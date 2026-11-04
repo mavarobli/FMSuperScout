@@ -56,6 +56,9 @@ internal sealed class Fields
     public uint PERO_NATION { get; private set; } = 0x68;      // ptr → nation
     public uint PERO_DOB { get; private set; } = 0x88;         // u32 FM-datum
     public uint PERO_FULL_CONTRACT { get; private set; } = 0xA8; // ptr → contract-object
+    // ptr → 15 bytes (1..20): voorkeur per functiegroep, hoogste = FM's "Voorkeursbaan".
+    // Gepind 04-11-2026 op FM27 (zie Dumper.ReadJobPrefs); op FM26 niet geverifieerd.
+    public uint PERO_JOB_PREFS { get; private set; } = 0xD0;
 
     // Verborgen persoonlijkheid (pero.Pada), bytes 1..20:
     public uint PERO_ADAPTABILITY { get; private set; } = 0x70;
@@ -201,4 +204,12 @@ internal sealed class Fields
         ("KV_distributie", 0x2A), ("KV_vangen", 0x29), ("KV_reflexen", 0x1B),
     };
     public static readonly HashSet<string> StaffAttrsRaw = new() { "Jeugd" };
+
+    // Functiegroepen van de voorkeurstabel (PERO_JOB_PREFS), afgeleid uit 26k FM27-stafleden
+    // (hoogste groep tegen de functie-byte van het contract): 0 manager, 1 assistent-manager,
+    // 2 trainer, 3 fysio, 4 scout, 5 keeperstrainer, 6 conditietrainer, 7 functie 22,
+    // 8 bestuur (voorzitter/directeur/eigenaar), 9 directeur voetbalzaken, 10 hoofd
+    // jeugdopleiding, 11 (ver)huurmanager, 12 analist (rekrutering én prestatie: FM slaat
+    // geen subtype op), 13 sportwetenschap, 14 technisch directeur. De app vertaalt.
+    public const int JobPrefGroups = 15;
 }
