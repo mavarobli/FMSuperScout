@@ -5,6 +5,33 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-11-04
+
+Staff search fixed: free agents get their preferred job, plus reputation, personality and a
+suitability score.
+
+### Added
+- **Preferred job** for staff, read from FM's job-preference table (a 1-20 score per job
+  group, `person+0xD0`). Free agents have no contract and used to show as "Staff member";
+  they now show "–" as role and their real preferred job, like FM's staff search. Verified
+  on FM27: 23/23 staff from FM's staff search, and over 27k staff the top group matches the
+  current job. FM stores no recruitment/performance subtype for analysts, so those show as
+  "Analyst".
+- **Role filter on preference**: picking a role also finds staff with a preference of 15+
+  for it (current role or not), so a free fitness coach or a coach who would also like the
+  fitness job shows up.
+- **Suitability** (1-20) column and profile line: a weighted average of the staff attributes
+  that matter for the role (e.g. Fitness and Sports Science for a fitness coach). Our own
+  estimate, not FM's stars; checked on 27k staff (people in a job score 3-5 points higher on
+  their own role). Choosing a role sorts on it.
+- **Staff reputation** (world, current, club) in the dump; the World rep column is now
+  visible by default for staff and the profile shows it.
+- **Staff personality** (ambition, professionalism, loyalty, pressure, temperament,
+  sportsmanship, controversy) in the profile and the attribute filter.
+
+### Fixed
+- Staff no longer get a player-model "estimated value" and asking price in the profile.
+
 ## [1.7.0] - 2026-11-02
 
 FMSuperScout for Mac. Windows: same results, internals reorganised.

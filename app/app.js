@@ -41,7 +41,7 @@ try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.r
 // $: xe.com-koers uit diezelfde periode; verifieer tegen FM's eigen USD-weergave.
 const CUR_RATE = { '£': 1, '€': 1.16, '$': 1.35 };
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -71,6 +71,7 @@ const I18N = {
     c_growth: 'Groei', grNew: 'nieuw', development: 'Ontwikkeling', histPeriod: 'Periode',
     hp_last: 'Sinds vorige dump', hp_m6: 'Afgelopen 6 maanden', hp_y1: 'Afgelopen jaar',
     hp_season: 'Dit seizoen', hp_all: 'Sinds we meten', growthRange: 'Groei', onlyNew: 'Alleen nieuwe spelers',
+    fitHint: 'Hoe goed past iemand bij de rol (1-20)? Gewogen gemiddelde van de staf-attributen die voor die rol tellen, bv. Conditie en Sportwetenschap bij een conditietrainer. Een eigen benadering, niet de FM-sterren. Geldt voor de gefilterde rol, anders de huidige functie of de voorkeursbaan.',
     growthHint: 'CA-verandering sinds de gekozen peildatum, gemeten uit je eigen dumps. Groen = groei, rood = verlies, "nieuw" = bestond toen nog niet.\n\nElke F9 voegt een meetpunt toe: hoe langer je de tool gebruikt, hoe verder je terugkijkt.',
     onlyNewHint: 'Spelers die er op de peildatum nog niet waren. Meestal jeugdspelers uit een intake, soms iemand die vanuit een niet-geladen competitie jouw database in komt.',
     intakeTitle: 'Jeugdintake: {n} nieuwe spelers wereldwijd', intakeBest: 'Beste vooruitzicht: {p}',
@@ -95,7 +96,7 @@ const I18N = {
     nodata: 'Nog geen data geladen', exportcsv: 'Shortlist exporteren (CSV)',
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Waarde', c_fee: 'Vraagprijs', c_wage: 'Salaris', c_expires: 'Contract tot', c_interest: 'Interesse',
-    c_status: 'Status', c_role: 'Rol', foot: 'Voet', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Lengte', repLabel: 'Reputatie',
+    c_status: 'Status', c_role: 'Rol', c_prefjob: 'Voorkeursbaan', c_fit: 'Geschiktheid', foot: 'Voet', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Lengte', repLabel: 'Reputatie',
     c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.', c_div: 'Divisie',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
     int_big: 'Groot', int_ok: 'Redelijk', int_small: 'Klein', int_no: 'Nee', interestTitle: 'Interesse-inschatting',
@@ -210,6 +211,7 @@ const I18N = {
     c_growth: 'Growth', grNew: 'new', development: 'Development', histPeriod: 'Period',
     hp_last: 'Since last dump', hp_m6: 'Last 6 months', hp_y1: 'Last year',
     hp_season: 'This season', hp_all: 'Since tracking began', growthRange: 'Growth', onlyNew: 'Only new players',
+    fitHint: 'How well does someone fit the role (1-20)? Weighted average of the staff attributes that matter for it, e.g. Fitness and Sports Science for a fitness coach. Our own estimate, not the FM stars. Uses the filtered role, else the current job or the preferred job.',
     growthHint: 'CA change since the chosen reference date, measured from your own dumps. Green = growth, red = decline, "new" = did not exist yet.\n\nEvery F9 adds a data point: the longer you use the tool, the further back you can look.',
     onlyNewHint: 'Players who did not exist at the reference date. Usually youth intake players, sometimes someone arriving in your database from a league you had not loaded.',
     intakeTitle: 'Youth intake: {n} new players worldwide', intakeBest: 'Best prospect: {p}',
@@ -234,7 +236,7 @@ const I18N = {
     nodata: 'No data loaded yet', exportcsv: 'Export shortlist (CSV)',
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Value', c_fee: 'Asking price', c_wage: 'Wage', c_expires: 'Contract until', c_interest: 'Interest',
-    c_status: 'Status', c_role: 'Role', foot: 'Foot', footR: 'Right', footL: 'Left', footB: 'Both', height: 'Height', repLabel: 'Reputation',
+    c_status: 'Status', c_role: 'Role', c_prefjob: 'Preferred job', c_fit: 'Suitability', foot: 'Foot', footR: 'Right', footL: 'Left', footB: 'Both', height: 'Height', repLabel: 'Reputation',
     c_clubrep: 'Club rep', c_worldrep: 'World rep', c_div: 'Division',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
     int_big: 'High', int_ok: 'Fair', int_small: 'Low', int_no: 'No', interestTitle: 'Interest estimate',
@@ -349,6 +351,7 @@ const I18N = {
     c_growth: 'Progrès', grNew: 'nouveau', development: 'Progression', histPeriod: 'Période',
     hp_last: 'Depuis le dernier dump', hp_m6: '6 derniers mois', hp_y1: 'Dernière année',
     hp_season: 'Cette saison', hp_all: 'Depuis le début', growthRange: 'Progrès', onlyNew: 'Nouveaux joueurs uniquement',
+    fitHint: 'Adéquation au poste (1-20) : moyenne pondérée des attributs du staff utiles pour ce poste, p. ex. Condition physique et Sciences du sport pour un préparateur physique. Notre estimation, pas les étoiles de FM. Porte sur le rôle filtré, sinon le poste actuel ou le poste préféré.',
     growthHint: 'Évolution de la CA depuis la date de référence, mesurée dans vos propres dumps. Vert = progrès, rouge = recul, "nouveau" = n\'existait pas encore.\n\nChaque F9 ajoute un point de mesure : plus vous utilisez l\'outil, plus vous remontez loin.',
     onlyNewHint: 'Joueurs absents à la date de référence. En général des jeunes issus d\'une intake, parfois un joueur arrivé d\'un championnat non chargé.',
     intakeTitle: 'Intake : {n} nouveaux joueurs dans le monde', intakeBest: 'Meilleur espoir : {p}',
@@ -373,7 +376,7 @@ const I18N = {
     nodata: 'Aucune donnée chargée', exportcsv: 'Exporter la shortlist (CSV)',
     results: 'résultats', c_name: 'Nom', c_age: 'Âge', c_pos: 'Poste', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Valeur', c_fee: 'Prix demandé', c_wage: 'Salaire', c_expires: 'Contrat jusqu\'au', c_interest: 'Intérêt',
-    c_status: 'Statut', c_role: 'Rôle', foot: 'Pied', footR: 'Droit', footL: 'Gauche', footB: 'Les deux', height: 'Taille', repLabel: 'Réputation',
+    c_status: 'Statut', c_role: 'Rôle', c_prefjob: 'Poste préféré', c_fit: 'Adéquation', foot: 'Pied', footR: 'Droit', footL: 'Gauche', footB: 'Les deux', height: 'Taille', repLabel: 'Réputation',
     c_clubrep: 'Rép. club', c_worldrep: 'Rép. mondiale', c_div: 'Division',
     estval: 'Valeur est.', wageLabel: 'Salaire', contractLabel: 'Contrat jusqu\'au', free_l: 'libre',
     int_big: 'Fort', int_ok: 'Correct', int_small: 'Faible', int_no: 'Non', interestTitle: 'Estimation d\'intérêt',
@@ -488,6 +491,7 @@ const I18N = {
     c_growth: 'Wachstum', grNew: 'neu', development: 'Entwicklung', histPeriod: 'Zeitraum',
     hp_last: 'Seit letztem Dump', hp_m6: 'Letzte 6 Monate', hp_y1: 'Letztes Jahr',
     hp_season: 'Diese Saison', hp_all: 'Seit Beginn', growthRange: 'Wachstum', onlyNew: 'Nur neue Spieler',
+    fitHint: 'Wie gut passt jemand zur Rolle (1-20)? Gewichteter Schnitt der dafür wichtigen Mitarbeiter-Attribute, z. B. Fitness und Sportwissenschaft beim Fitnesstrainer. Eigene Schätzung, nicht die FM-Sterne. Gilt für die gefilterte Rolle, sonst die aktuelle oder bevorzugte Tätigkeit.',
     growthHint: 'CA-Veränderung seit dem gewählten Stichtag, gemessen aus deinen eigenen Dumps. Grün = Wachstum, Rot = Verlust, "neu" = existierte damals noch nicht.\n\nJedes F9 fügt einen Messpunkt hinzu: Je länger du das Tool nutzt, desto weiter blickst du zurück.',
     onlyNewHint: 'Spieler, die es am Stichtag noch nicht gab. Meist Jugendspieler aus einer Intake, manchmal jemand aus einer nicht geladenen Liga.',
     intakeTitle: 'Jugend-Intake: {n} neue Spieler weltweit', intakeBest: 'Bestes Talent: {p}',
@@ -512,7 +516,7 @@ const I18N = {
     nodata: 'Noch keine Daten geladen', exportcsv: 'Shortlist exportieren (CSV)',
     results: 'Treffer', c_name: 'Name', c_age: 'Alter', c_pos: 'Position', c_club: 'Verein', c_nat: 'Nat',
     c_value: 'Wert', c_fee: 'Forderung', c_wage: 'Gehalt', c_expires: 'Vertrag bis', c_interest: 'Interesse',
-    c_status: 'Status', c_role: 'Rolle', foot: 'Fuß', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Größe', repLabel: 'Reputation',
+    c_status: 'Status', c_role: 'Rolle', c_prefjob: 'Bevorzugte Tätigkeit', c_fit: 'Eignung', foot: 'Fuß', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Größe', repLabel: 'Reputation',
     c_clubrep: 'Vereinsrep.', c_worldrep: 'Weltrep.', c_div: 'Liga',
     estval: 'Gesch. Wert', wageLabel: 'Gehalt', contractLabel: 'Vertrag bis', free_l: 'ablösefrei',
     int_big: 'Hoch', int_ok: 'Ordentlich', int_small: 'Gering', int_no: 'Nein', interestTitle: 'Interesse-Einschätzung',
@@ -1066,7 +1070,9 @@ const STAFF_COLS = [
   { key: 'sl', label: '★', star: true, w: 34 },
   { key: 'name', label: 'c_name', get: p => p.name, name: true, w: 180 },
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p), w: 50 },
-  { key: 'job', label: 'c_role', get: p => jobLabel(p), w: 150 },
+  { key: 'job', label: 'c_role', get: p => staffJobless(p) ? '' : jobLabel(p), render: p => staffJobless(p) ? '<span class="dim">–</span>' : escHtml(jobLabel(p)), w: 150 },
+  { key: 'prefJob', label: 'c_prefjob', get: p => prefJobLabel(p), render: p => prefJobLabel(p) ? escHtml(prefJobLabel(p)) : '<span class="dim">–</span>', w: 150 },
+  { key: 'fit', label: 'c_fit', num: true, help: 'fitHint', get: p => fitOf(p) ?? -1, render: p => { const v = fitOf(p); return v == null ? '<span class="dim">–</span>' : `<span class="${roleClass(v)}">${v.toFixed(1)}</span>`; }, w: 90 },
   { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
   { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
@@ -1074,7 +1080,7 @@ const STAFF_COLS = [
   { key: 'wage', label: 'c_wage', num: true, get: p => p.wage, fmt: fmtWage, w: 100 },
   { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls, w: 110 },
   { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true, w: 85 },
-  { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true, w: 85 },
+  { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, w: 85 },
 ];
 
 // ---------- geschatte marktwaarde (GBP) ----------
@@ -1106,7 +1112,8 @@ function estValue(p) {
 }
 function estValueCalc(p) {
   if (p.value != null && p.value > 0) return { v: p.value, est: false, lo: Math.round(p.value * 0.85), hi: Math.round(p.value * 1.15) };
-  if (!p.ca || p.ca < 1) return { v: null, est: false };
+  // Het model is op spelers gekalibreerd; staf heeft geen transferwaarde.
+  if (!p.ca || p.ca < 1 || (p.staffAttrs && !p.attrs)) return { v: null, est: false };
   if (isFree(p)) return { v: 0, est: true };
   const a = getAge(p) || 25;
   const m = monthsUntil(p.expires);
@@ -1378,7 +1385,9 @@ const advValue = (p, k) => isStaffAttr(k) ? (p.staffAttrs ? p.staffAttrs[k] : nu
   : ADV_PERS_KEYS.includes(k) ? (p[k] || null) : (p.attrs ? p.attrs[k] : null);
 // Alleen regels van de soort die bij de modus hoort: een preset uit de spelersmodus mag de
 // staflijst niet leegfilteren, en andersom.
-const activeAdvRules = () => state.advF.filter(r => r.k && (r.min || r.max) && isStaffAttr(r.k) === (state.mode === 'staff')
+// Persoonlijkheid bestaat bij beide (staf sinds scanner 1.7.1), dus die geldt in elke modus.
+const activeAdvRules = () => state.advF.filter(r => r.k && (r.min || r.max)
+  && (ADV_PERS_KEYS.includes(r.k) || isStaffAttr(r.k) === (state.mode === 'staff'))
   && !(state.hideCapa && advIsHidden(r.k)));
 const advChipTxt = r => `${advLabel(r.k)} ${r.min && r.max ? r.min + '–' + r.max : r.min ? '≥ ' + r.min : '≤ ' + r.max}`;
 // Spelers en staf hebben elk hun eigen regelset; state.advF is die van de huidige modus.
@@ -1406,10 +1415,13 @@ function advDialog() {
       for (const k of [...keys].sort((a, b) => staffAttrName(a).localeCompare(staffAttrName(b), state.lang))) catalog.push({ k, label: staffAttrName(k), group: t(g) });
   } else for (const [g, keys] of [...ATTR_GROUPS_OUTFIELD, ['g_goalkeeping', gkOnly]])
     for (const k of sortByLabel(keys)) catalog.push({ k, label: attrName(k), group: t(g) });
-  if (!state.hideCapa && state.mode !== 'staff') {
+  if (!state.hideCapa) {
     const byT = (a, b) => a.localeCompare(b, state.lang);
-    for (const k of [...ADV_HIDDEN_KEYS].sort((a, b) => byT(t('a_' + a), t('a_' + b)))) catalog.push({ k, label: t('a_' + k), group: t('hiddenTitle') });
-    for (const k of [...ADV_PERS_KEYS].sort((a, b) => byT(t(a), t(b)))) catalog.push({ k, label: t(k), group: t('personaTitle') });
+    if (state.mode !== 'staff')
+      for (const k of [...ADV_HIDDEN_KEYS].sort((a, b) => byT(t('a_' + a), t('a_' + b)))) catalog.push({ k, label: t('a_' + k), group: t('hiddenTitle') });
+    // Staf: aanpassingsvermogen staat al als staf-attribuut onder Mentaal.
+    for (const k of [...ADV_PERS_KEYS].filter(k => state.mode !== 'staff' || k !== 'adaptability').sort((a, b) => byT(t(a), t(b))))
+      catalog.push({ k, label: t(k), group: t('personaTitle') });
   }
   // Escape sluit eerst een open attributen-dropdown, daarna pas de popup zelf.
   const esc = e => {
@@ -1553,6 +1565,77 @@ const jobLabel = p => {
   if (p && p.job === 'Staflid') return t('jobStaff');
   return (p && p.job) || '–';
 };
+// Voorkeursbaan (FM's "Voorkeursbaan"): de scanner levert prefJob = groepsindex(en) 0..14
+// uit FM's voorkeurstabel. Elke groep hoort bij één functie-id (label via JOB_LABEL);
+// bestuur (8) en analist (12) zijn verzamelgroepen: FM slaat bij analisten geen subtype op.
+const PREF_JOB = [16, 20, 2, 12, 14, 34, 26, 22, null, 10, 64, 86, null, 48, 88];
+const PREF_GROUP_LABEL = {
+  nl: { 8: 'Bestuur', 12: 'Analist' }, en: { 8: 'Board', 12: 'Analyst' },
+  fr: { 8: 'Direction', 12: 'Analyste' }, de: { 8: 'Vorstand', 12: 'Analyst' },
+};
+// Functie-id → voorkeursgroep, voor de rolfilter (transfervrije staf matcht op voorkeur).
+const JOB_PREF_GROUP = { 16: 0, 52: 0, 144: 0, 20: 1, 2: 2, 54: 2, 12: 3, 50: 3, 14: 4, 44: 4, 34: 5, 26: 6, 22: 7,
+  4: 8, 6: 8, 8: 8, 24: 8, 66: 8, 70: 8, 10: 9, 64: 10, 86: 11, 58: 12, 60: 12, 62: 12, 40: 13, 48: 13, 88: 14 };
+const prefGroupLabel = g => {
+  const id = PREF_JOB[g];
+  if (id) return (JOB_LABEL[state.lang] || JOB_LABEL.en)[id] || JOB_LABEL.en[id];
+  return (PREF_GROUP_LABEL[state.lang] || PREF_GROUP_LABEL.en)[g] || '';
+};
+const prefJobLabel = p => (p && p.prefJob && p.prefJob.length) ? p.prefJob.map(prefGroupLabel).filter(Boolean).join(' / ') : '';
+// Geen baan bij een club: transfervrij, of een functie-byte die we niet kennen zonder club.
+const staffJobless = p => !p.club && (!p.jobId || p.job === 'Staflid');
+// Rolfilter: naast de huidige functie telt ook de voorkeur. jobPrefs = FM's 15 voorkeurs-
+// scores (1-20); 15+ is een serieuze voorkeur, ook als het niet de hoogste is (een trainer
+// met conditietrainer 15/20 komt dus mee bij "Conditietrainer"). Oudere dumps hebben alleen
+// prefJob (de hoogste groep).
+const PREF_MIN = 15;
+const roleGroup = job => JOB_PREF_GROUP[state.jobIdByJob?.get(job)];
+const staffPrefMatch = (p, job) => {
+  const g = roleGroup(job);
+  if (g == null) return false;
+  if (p.jobPrefs) return p.jobPrefs[g] >= PREF_MIN;
+  return !!p.prefJob && p.prefJob.includes(g);
+};
+
+// Geschiktheid (1-20): gewogen gemiddelde van de staf-attributen die voor een functiegroep
+// tellen. Eigen benadering, niet FM's sterren: getoetst op 27k FM27-stafleden, waar mensen
+// in een functie op hún groep gemiddeld 3-5 punten hoger scoren dan op de andere groepen.
+// Groepen 7 en 8 (functie 22, bestuur) hebben geen zinnige attribuutmaat.
+const STAFF_FIT_W = {
+  0: { Tactische_kennis: 2, 'Man-management': 2, Motiveren: 1, Vastberadenheid: 1, KV_distributie: 1, Oordeel_vermogen: 1, Oordeel_potentie: 1 },
+  1: { Tactische_kennis: 2, 'Man-management': 1, Motiveren: 1, Oordeel_vermogen: 1, Oordeel_potentie: 1, Tactisch: 1 },
+  2: { Aanvallen: 1, Verdedigen: 1, Balbezit: 1, Technisch: 1, Tactisch: 1, Motiveren: 1, Vastberadenheid: 1, KV_distributie: 1 },
+  3: { Fysiotherapie: 4, Sportwetenschap: 1 },
+  4: { Oordeel_vermogen: 2, Oordeel_potentie: 2, Aanpassingsvermogen: 1 },
+  5: { KV_reflexen: 3, Motiveren: 1, Vastberadenheid: 1 },
+  6: { Fitheid: 3, Sportwetenschap: 1, Motiveren: 1, Vastberadenheid: 1 },
+  9: { Onderhandelen: 2, Oordeel_staf: 2, Oordeel_vermogen: 1, Oordeel_potentie: 1 },
+  10: { Jeugd: 2, Oordeel_potentie: 2, Oordeel_staf: 1, Motiveren: 1 },
+  11: { 'Man-management': 2, Onderhandelen: 1, Oordeel_potentie: 1, Oordeel_vermogen: 1 },
+  12: { Data_analyse: 3, Tactische_kennis: 1, Oordeel_vermogen: 1 },
+  13: { Sportwetenschap: 4, Fysiotherapie: 1 },
+  14: { Oordeel_staf: 2, Onderhandelen: 1, Tactische_kennis: 1, Oordeel_potentie: 1 },
+};
+function staffFit(p, g) {
+  const w = STAFF_FIT_W[g];
+  if (!w || !p.staffAttrs) return null;
+  let s = 0, n = 0;
+  for (const k in w) {
+    const v = p.staffAttrs[k];
+    if (!(v > 0) || !staffAttrUsable(k)) continue;
+    s += v * w[k]; n += w[k];
+  }
+  return n ? s / n : null;
+}
+// Voor welke groep tonen we de geschiktheid? De gefilterde rol; anders de huidige functie;
+// anders (transfervrij) de voorkeursbaan.
+function fitGroup(p) {
+  const role = state.mode === 'staff' ? $('f-staffrole').value : '';
+  if (role && roleGroup(role) != null) return roleGroup(role);
+  if (!staffJobless(p) && JOB_PREF_GROUP[p.jobId] != null) return JOB_PREF_GROUP[p.jobId];
+  return p.prefJob && p.prefJob.length ? p.prefJob[0] : null;
+}
+const fitOf = p => { const g = fitGroup(p); return g == null ? null : staffFit(p, g); };
 const ROLE_BY_ID = Object.fromEntries(ROLES.map(r => [r.id, r]));
 // Rolscore op de 1-20 schaal; key-attributen tellen dubbel. Vereist attributen (spelers).
 function roleScore(p, role) {
@@ -2028,6 +2111,7 @@ function buildStaffRoles() {
   const cur = $('f-staffrole').value;
   const byJob = new Map();
   for (const s of state.staff) if (s.job && !byJob.has(s.job)) byJob.set(s.job, s);
+  state.jobIdByJob = new Map([...byJob].map(([j, s]) => [j, s.jobId || 0]));
   const items = [...byJob.values()].map(s => ({ v: s.job, l: jobLabel(s) }))
     .sort((a, b) => a.l.localeCompare(b.l, uiLocale()));
   $('f-staffrole').innerHTML = `<option value="">${t('all')}</option>` +
@@ -2293,7 +2377,7 @@ function applyFilters() {
       if (r.max && av > r.max) return false;
     }
     if (activePos.size && !(p.posArr || []).some(x => activePos.has(x))) return false;
-    if (state.mode === 'staff' && staffRole && p.job !== staffRole) return false;
+    if (state.mode === 'staff' && staffRole && p.job !== staffRole && !staffPrefMatch(p, staffRole)) return false;
     if (gsel === 'm' && p.gender === 1) return false;
     if (gsel === 'v' && p.gender !== 1) return false;
     if (divVal && !(p.div || '').toLowerCase().includes(divVal)) return false;
@@ -2614,6 +2698,9 @@ function colCfg() {
     if (defHidden.has(kk) && !saved.hidden.includes(kk)) saved.hidden.push(kk);   // standaard verborgen
   }
   saved.order = saved.order.filter(kk => keys.includes(kk));                    // verdwenen eruit
+  // Staf-reputatie zat tot 1.7.1 niet in de dump (kolom stond standaard verborgen en leeg);
+  // nu wel, dus eenmalig zichtbaar maken. Wie hem daarna weer verbergt, houdt dat.
+  if (k === 'staff' && !saved.repV1) { saved.hidden = saved.hidden.filter(kk => kk !== 'worldRep'); saved.repV1 = true; }
   return saved;
 }
 function saveColCfg() { localStorage.setItem('fmss_cols', JSON.stringify(state.colCfg)); }
@@ -2999,6 +3086,14 @@ function closeDetail() {
   $('detail-backdrop').classList.add('hidden');
   state.selected = null; renderVisible();
 }
+// Persoonlijkheid (verborgen kenmerken, ruw 1-20) als eigenschappengroep; skip = weg te laten sleutels.
+function personaHtml(p, skip = []) {
+  const pd = [['ambition', p.ambition], ['professionalism', p.professionalism], ['loyalty', p.loyalty],
+    ['pressure', p.pressure], ['temperament', p.temperament], ['sportsmanship', p.sportsmanship],
+    ['adaptability', p.adaptability], ['controversy', p.controversy]].filter(x => x[1] > 0 && !skip.includes(x[0]));
+  return pd.length ? `<div class="attr-col"><h3>${t('personaTitle')}</h3>` + pd.map(([k, v], idx) =>
+    `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
+}
 function showDetail(p) {
   state.selected = p;
   renderVisible();
@@ -3022,9 +3117,9 @@ function showDetail(p) {
   <div class="sub">${getAge(p)} · ${escHtml(natsLabel(p))}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
   ${gauge}
   <div class="kv">
-    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${posHtml(p)}</div><div><b>${t('foot')}</b> ${escHtml(footLabel(p))}</div>` : `<div><b>${t('c_role')}</b> ${escHtml(jobLabel(p))}</div>`}
-    <div><b>${t('estval')}</b> ${valTxt}</div>
-    ${!state.hideCapa && feeEstimate(p).v > 0 ? `<div><b>${t('c_fee')}</b> ${fmtMoney(feeEstimate(p).v * 0.85)} – ${fmtMoney(feeEstimate(p).v * 1.15)}</div>` : ''}
+    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${posHtml(p)}</div><div><b>${t('foot')}</b> ${escHtml(footLabel(p))}</div>` : `<div><b>${t('c_role')}</b> ${staffJobless(p) ? '–' : escHtml(jobLabel(p))}</div>${prefJobLabel(p) ? `<div><b>${t('c_prefjob')}</b> ${escHtml(prefJobLabel(p))}</div>` : ''}${fitOf(p) != null ? `<div data-help="fitHint"><b>${t('c_fit')}</b> <span class="${roleClass(fitOf(p))}">${fitOf(p).toFixed(1)}</span> <span class="dim">(${escHtml(prefGroupLabel(fitGroup(p)))})</span> <span class="col-help">?</span></div>` : ''}`}
+    ${isPlayer ? `<div><b>${t('estval')}</b> ${valTxt}</div>` : ''}
+    ${isPlayer && !state.hideCapa && feeEstimate(p).v > 0 ? `<div><b>${t('c_fee')}</b> ${fmtMoney(feeEstimate(p).v * 0.85)} – ${fmtMoney(feeEstimate(p).v * 1.15)}</div>` : ''}
     <div><b>${t('wageLabel')}</b> ${fmtWage(p.wage)}${p.wage > 0 ? ` <span class="dim">${wageSuf()}</span>` : ''}</div>
     ${p.worldRep ? `<div><b>${t('repLabel')}</b> ${p.worldRep}</div>` : ''}
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
@@ -3082,12 +3177,7 @@ function showDetail(p) {
         return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${attrName(k)}</span><span class="v ${attrClass(shown)}${grew ? ' grew' : ''}">${shown}</span></div>`;
       }).join('') + '</div>';
     }
-    // Persoonlijkheid (verborgen kenmerken) — net als een normale eigenschappengroep.
-    const pd = [['ambition', p.ambition], ['professionalism', p.professionalism], ['loyalty', p.loyalty],
-      ['pressure', p.pressure], ['temperament', p.temperament], ['sportsmanship', p.sportsmanship],
-      ['adaptability', p.adaptability], ['controversy', p.controversy]].filter(x => x[1] > 0);
-    const persHtml = pd.length ? `<div class="attr-col"><h3>${t('personaTitle')}</h3>` + pd.map(([k, v], idx) =>
-      `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${t(k)}</span><span class="v ${attrClass(v)}">${v}</span></div>`).join('') + '</div>' : '';
+    const persHtml = personaHtml(p);
     // Overige verborgen kenmerken. Bij InjuryProneness/Dirtiness is HOOG slecht → kleur omkeren.
     const hd = [['Consistency', true], ['ImportantMatches', true], ['Versatility', true],
       ['InjuryProneness', false], ['Dirtiness', false]]
@@ -3115,7 +3205,8 @@ function showDetail(p) {
         return `<div class="attr-row ${idx % 2 ? 'odd' : ''}"><span>${escHtml(staffAttrName(k))}</span><span class="v ${attrClass(v)}">${v}</span></div>`;
       }).join('') + '</div>' : '';
     }).join('');
-    html += `<div class="attr-cols staff-cols">${cols}</div>`;
+    // Persoonlijkheid (sinds scanner 1.7.1 ook bij staf); aanpassingsvermogen staat al onder Mentaal.
+    html += `<div class="attr-cols staff-cols">${cols}${state.hideCapa ? '' : personaHtml(p, ['adaptability'])}</div>`;
   }
   $('detail-body').innerHTML = html;
   document.querySelector('.detail-star').onclick = () => toggleShortlist(p.id);
@@ -4113,7 +4204,12 @@ $('f-hist-period').addEventListener('change', async () => {
   applyFilters();
 });
 $('btn-adv').onclick = advDialog;
-$('f-staffrole').addEventListener('change', applyFilters);
+$('f-staffrole').addEventListener('change', () => {
+  // Rol gekozen: meteen op geschiktheid sorteren (zoals de spelersrolfilter op rolscore).
+  if ($('f-staffrole').value) { state.sortKey = 'fit'; state.sortDir = -1; }
+  else if (state.sortKey === 'fit') { state.sortKey = 'wage'; state.sortDir = -1; }
+  applyFilters();
+});
 $('f-gender').addEventListener('change', applyFilters);
 // Divisie-zoekbalk: filter terwijl je typt + eigen suggestie-dropdown (app-stijl, i.p.v.
 // de native datalist die als lichte "wolk" uit de donkere UI viel).

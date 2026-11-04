@@ -810,9 +810,47 @@ internal static class Dumper
         }
         if (string.IsNullOrEmpty(e.Job)) e.Job = "Staflid";
         e.Gender = (m.U8(db + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
-        var (sclub, _, sdiv) = ResolveClub(m, person);
-        e.Club = sclub; e.Div = sdiv;
+        var (sclub, srep, sdiv) = ResolveClub(m, person);
+        e.Club = sclub; e.Div = sdiv; e.ClubRep = srep;
+        e.CurRep = Rep(m.U16(st + F.NPLO_CUR_REP));
+        e.WorldRep = Rep(m.U16(st + F.NPLO_WORLD_REP));
+        (e.PrefJobs, e.JobPrefs) = ReadJobPrefs(m, person);
+        // Persoonlijkheid (pero, ruw 1-20) staat bij staf op dezelfde plek als bij spelers.
+        e.Ambition = ClampAttr(m.U8(person + F.PERO_AMBITION));
+        e.Loyalty = ClampAttr(m.U8(person + F.PERO_LOYALTY));
+        e.Professionalism = ClampAttr(m.U8(person + F.PERO_PROFESSIONALISM));
+        e.Adaptability = ClampAttr(m.U8(person + F.PERO_ADAPTABILITY));
+        e.Pressure = ClampAttr(m.U8(person + F.PERO_PRESSURE));
+        e.Sportsmanship = ClampAttr(m.U8(person + F.PERO_SPORTSMANSHIP));
+        e.Temperament = ClampAttr(m.U8(person + F.PERO_TEMPERAMENT));
+        e.Controversy = ClampAttr(m.U8(person + F.PERO_CONTROVERSY));
         return e;
+    }
+
+    private static int Rep(int v) => v is >= 1 and <= 10000 ? v : 0;
+
+    // Voorkeursbaan: [person+PERO_JOB_PREFS] wijst naar 15 bytes (1..20), één score per
+    // functiegroep (Fields.JobPrefGroups). De hoogste score is wat FM als "Voorkeursbaan"
+    // toont — ook bij transfervrije staf, die geen contract en dus geen functie-byte heeft.
+    // Geverifieerd 04-11-2026 (FM27): 23/23 stafleden uit FM's stafzoekscherm, en over 26k
+    // stafleden valt de hoogste groep samen met de huidige functie. Bij een gelijke stand
+    // komen alle hoogste groepen mee; geen duidelijke voorkeur (max < 10) = leeg.
+    // Tweede waarde: alle 15 scores (de app filtert op "voorkeur >= 15" per groep); null als
+    // de tabel ontbreekt of onleesbaar is.
+    private static (List<int> top, byte[] all) ReadJobPrefs(MemScan m, ulong person)
+    {
+        var res = new List<int>();
+        ulong arr = m.Ptr(person + F.PERO_JOB_PREFS);
+        if (arr == 0) return (res, null);
+        var b = new byte[Fields.JobPrefGroups];
+        if (!m.ReadBlock(arr, b, b.Length)) return (res, null);
+        int max = 0;
+        foreach (byte v in b) { if (v > 20) return (res, null); if (v > max) max = v; }
+        if (max == 0) return (res, null);
+        if (max < 10) return (res, b);
+        for (int i = 0; i < b.Length; i++) if (b[i] == max) res.Add(i);
+        if (res.Count > 3) res.Clear();
+        return (res, b);
     }
 
     private static int Attr(MemScan m, ulong addr)
@@ -1211,6 +1249,20 @@ internal static class Dumper
         {
             j.Prop("job", p.Job);
             if (p.JobId > 0) j.Prop("jobId", p.JobId);   // taalonafhankelijk; app vertaalt
+            if (p.PrefJobs.Count > 0)                     // voorkeursbaan: groepsindex(en) 0..14
+            { j.Key("prefJob"); j.BeginArr(); foreach (var x in p.PrefJobs) j.Val((long)x); j.EndArr(); }
+            if (p.JobPrefs != null)                       // alle voorkeursscores per groep (1..20)
+            { j.Key("jobPrefs"); j.BeginArr(); foreach (var x in p.JobPrefs) j.Val((long)x); j.EndArr(); }
+            if (p.ClubRep > 0) j.Prop("clubRep", p.ClubRep);
+            if (p.CurRep > 0) j.Prop("curRep", p.CurRep);
+            if (p.WorldRep > 0) j.Prop("worldRep", p.WorldRep);
+            if (p.Ambition > 0)                            // persoonlijkheid (ruw 1-20)
+            {
+                j.Prop("ambition", p.Ambition); j.Prop("loyalty", p.Loyalty);
+                j.Prop("professionalism", p.Professionalism); j.Prop("adaptability", p.Adaptability);
+                j.Prop("pressure", p.Pressure); j.Prop("sportsmanship", p.Sportsmanship);
+                j.Prop("temperament", p.Temperament); j.Prop("controversy", p.Controversy);
+            }
             j.Key("staffAttrs"); j.BeginObj();
             foreach (var kv in p.StaffAttrs) { j.Key(kv.Key); j.Val((long)kv.Value); }
             j.EndObj();
@@ -1365,4 +1417,6 @@ internal sealed class Person
     public string Job;
     public Dictionary<string, int> Attrs = new();
     public Dictionary<string, int> StaffAttrs = new();
+    public List<int> PrefJobs = new();   // staf: voorkeursbaan-groep(en), zie Fields.JobPrefGroups
+    public byte[] JobPrefs;              // staf: alle 15 voorkeursscores (null = onbekend)
 }
