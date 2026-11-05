@@ -5,6 +5,25 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.7.3] - 2026-11-05
+
+Agreed transfers: players who already have a deal with another club are labelled and left out
+of the player list by default.
+
+### Added
+- **Agreed transfers** read from FM's deal table: the club a player has agreed to join and the
+  date the move happens. FM keeps these deals in a table of its own, not on the player; the
+  scanner finds the records by their shape and keeps those with status "agreed, not yet done"
+  (0x13). Checked on FM27 against 3/3 known deals (including one where FM also had a rejected
+  bid from another club) and a census of ~3,400 deals: every deal with a future date had this
+  status. The fee in the record is not reliable (often exactly the market value), so it is
+  not shown.
+- Shown as "Club → New club" in the club column, a tag in the status column and a line on the
+  player card.
+- **Hidden by default** in the player list; the "Incl. agreed transfers" box brings them back.
+  Players from, to or owned by your club always stay visible. Shortlist and staff are not
+  affected.
+
 ## [1.7.2] - 2026-11-05
 
 My club: loaned-out players sit under the right squad, and the club button opens the first team.

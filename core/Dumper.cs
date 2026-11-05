@@ -586,6 +586,9 @@ internal static class Dumper
             { p.Club = sc.club; if (sc.rep > 0) p.ClubRep = sc.rep; if (sc.div != null) p.Div = sc.div; p.TeamType = sc.tt; }
 
         Dumper.LinkedViaSquad = squadClub.Count;
+
+        ScanAgreedTransfers(mem, players, personToUid, clubObjs.Concat(clubAddrs), mem.ScanRegions.Where(r => r.size >= 0x60).ToList(), maxDop);
+        Phase("transferakkoorden");
         Dumper.ClubCount = clubObjs.Count;
 
         // Mijn team via de manager-keten (person→contract→team) — hieruit leest FindGameDate
@@ -1032,6 +1035,83 @@ internal static class Dumper
     private static string JobName(int v) => Jobs.TryGetValue(v, out var s) ? s : null;
 
     // FM-datum: u32, jaar = raw>>16, dag-van-jaar = raw & 0x1ff
+    // Transferakkoorden: spelers die al rond zijn met een andere club maar nog niet zijn
+    // overgestapt (bv. per 1 juli). Die staan niet aan de persoon gekoppeld; FM houdt ze bij
+    // in een dealtabel. We herkennen de records op vorm (zie Fields.DEAL_*) en bewaren per
+    // speler het akkoord met de vroegste ingangsdatum. Een "deal" naar dezelfde club
+    // (contractverlenging, doorschuiven uit de jeugd) telt niet.
+    internal static int DiagDeals, DiagDealsAgreed;
+    private static void ScanAgreedTransfers(MemScan mem, Dictionary<uint, Person> players, Dictionary<ulong, uint> personToUid,
+                                            IEnumerable<ulong> clubAddrs, List<(ulong start, ulong size)> regions, int maxDop)
+    {
+        DiagDeals = 0; DiagDealsAgreed = 0;
+        var teamClub = new Dictionary<ulong, string>();
+        foreach (ulong c in clubAddrs.Distinct())
+        {
+            string n = ClubNameOf(mem, c);
+            if (n == null) continue;
+            ulong tb = mem.Ptr(c + F.CLUB_TEAMS_BEGIN), te = mem.Ptr(c + F.CLUB_TEAMS_END);
+            if (tb == 0 || te <= tb || (te - tb) % 8 != 0 || (te - tb) / 8 > 64) continue;
+            for (ulong i = 0; i < (te - tb) / 8; i++) { ulong t = mem.Ptr(tb + i * 8); if (t != 0) teamClub[t] = n; }
+        }
+        if (teamClub.Count == 0) return;
+
+        int need = (int)F.DEAL_STATUS + 1, dateOff = (int)F.DEAL_DATE;
+        var found = new List<(uint uid, string to, string from, uint date)>[maxDop];
+        var counts = new int[maxDop];
+        var tasks = new System.Threading.Tasks.Task[maxDop];
+        for (int t = 0; t < maxDop; t++)
+        {
+            int worker = t;
+            found[worker] = new();
+            tasks[worker] = System.Threading.Tasks.Task.Run(() =>
+            {
+                var buf = BufPool[worker];
+                var hits = found[worker];
+                int seen = 0;
+                for (int ri = worker; ri < regions.Count; ri += maxDop)
+                {
+                    var (start, size) = regions[ri];
+                    // Overlap van één record tussen blokken, zodat er geen record op een grens wegvalt.
+                    for (ulong o = 0; o < size; o += (ulong)(buf.Length - need))
+                    {
+                        int len = (int)System.Math.Min((ulong)buf.Length, size - o);
+                        if (len < need || !mem.ReadBlock(start + o, buf, len)) continue;
+                        for (int i = 0; i + need <= len; i += 8)
+                        {
+                            // Goedkope vaste velden eerst; dictionary-lookups pas daarna.
+                            if (BitConverter.ToUInt32(buf, i + (int)F.DEAL_SENT2) != 0x076C0001u
+                                || BitConverter.ToUInt32(buf, i + (int)F.DEAL_SENT1) != 0xFFFFFFFFu) continue;
+                            if (!personToUid.TryGetValue(BitConverter.ToUInt64(buf, i), out uint uid)
+                                || !teamClub.TryGetValue(BitConverter.ToUInt64(buf, i + (int)F.DEAL_TO_TEAM), out var to)
+                                || !teamClub.TryGetValue(BitConverter.ToUInt64(buf, i + (int)F.DEAL_FROM_TEAM), out var from)) continue;
+                            seen++;
+                            if (buf[i + (int)F.DEAL_STATUS] != F.DEAL_STATUS_AGREED || to == from) continue;
+                            hits.Add((uid, to, from, BitConverter.ToUInt32(buf, i + dateOff)));
+                        }
+                        if (o + (ulong)len >= size) break;
+                    }
+                }
+                counts[worker] = seen;
+            });
+        }
+        System.Threading.Tasks.Task.WaitAll(tasks);
+        DiagDeals = counts.Sum();
+
+        foreach (var (uid, to, from, date) in found.SelectMany(x => x))
+        {
+            if (!players.TryGetValue(uid, out var p)) continue;
+            // Al uitgevoerd (speler staat bij de koper en is er niet te huur): geen akkoord meer.
+            // Huur met koopverplichting (speelt al bij de koper, eigendom elders) blijft staan.
+            if (p.Club == to && (p.OwnerClub == null || p.OwnerClub == to)) continue;
+            string iso = FmDateIso(date);
+            if (p.TransferTo != null && string.CompareOrdinal(iso ?? "9999", p.TransferDate ?? "9999") >= 0) continue;
+            p.TransferTo = to; p.TransferFrom = from; p.TransferDate = iso;
+        }
+        DiagDealsAgreed = players.Values.Count(p => p.TransferTo != null);
+        Host.Info($"Transferakkoorden: {DiagDealsAgreed:N0} spelers (van {DiagDeals:N0} deal-records).");
+    }
+
     private static (int year, int doy) DecodeFmDate(uint raw)
     {
         int year = (int)(raw >> 16);
@@ -1242,6 +1322,7 @@ internal static class Dumper
             j.Null4("wageDemand");
             j.Prop("listed", p.Listed);
             j.Prop("loanListed", p.LoanListed);
+            if (p.TransferTo != null) { j.Prop("transferTo", p.TransferTo); if (p.TransferDate != null) j.Prop("transferDate", p.TransferDate); }
             j.Prop("notForSale", p.NotForSale);
             j.Prop("setForRelease", p.SetForRelease);
             j.Prop("clubRep", p.ClubRep);
@@ -1359,6 +1440,13 @@ internal static class Dumper
                 w.WriteLine($"  {p.Name} lft={p.Age} club={p.Club}");
             w.WriteLine();
 
+            // Transferakkoorden (status 0x13 in de dealtabel): check een paar namen in FM.
+            w.WriteLine($"=== Transferakkoorden: {DiagDealsAgreed:N0} spelers (van {DiagDeals:N0} deal-records) ===");
+            var agreed = players.Values.Where(p => p.TransferTo != null).ToList();
+            foreach (var p in agreed.Where(p => p.Club == MyClub || p.OwnerClub == MyClub || p.TransferTo == MyClub).Concat(agreed).Distinct().Take(25))
+                w.WriteLine($"  {p.Name,-24} {p.TransferFrom} -> {p.TransferTo} per {p.TransferDate ?? "?"}  (speelt nu: {p.Club})");
+            w.WriteLine();
+
             // Huur-overzicht: moederclub (volledig contract) ≠ huidige squad-club.
             var loans = players.Values.Where(x => x.OwnerClub != null && x.OwnerClub != x.Club).ToList();
             w.WriteLine($"=== Huur-overzicht: {loans.Count:N0} huurrelaties (moederclub ≠ huidige club) ===");
@@ -1412,6 +1500,9 @@ internal sealed class Person
     public string Expires;
     public bool Listed;
     public bool LoanListed;
+    public string TransferTo;     // akkoord met deze club, nog niet uitgevoerd
+    public string TransferFrom;
+    public string TransferDate;   // ingangsdatum (ISO) van dat akkoord
     public byte StatusFlags;
     public bool NotForSale;
     public bool SetForRelease;

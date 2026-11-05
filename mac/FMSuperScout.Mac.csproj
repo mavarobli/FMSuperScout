@@ -15,7 +15,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <AssemblyName>fmss_core</AssemblyName>
     <RootNamespace>FMSuperScout</RootNamespace>
-    <Version>1.7.2</Version>
+    <Version>1.7.3</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

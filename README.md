@@ -83,7 +83,8 @@ Wonderkids get a gold card. Built for showing off that one insane regen.
 - **Role ratings** for 19 FM roles, **comparison** of up to 3 players, **squad analysis** per
   position group, and **development charts** per player.
 - **Your club** by squad: first team, reserves or youth, with loaned-out players under the
-  squad they belong to. **Loans** shown with the parent club; **market value** from memory for most players, an
+  squad they belong to. **Agreed transfers** ("Mallorca → Barcelona") are labelled and
+  left out of the list by default. **Loans** shown with the parent club; **market value** from memory for most players, an
   estimate for the rest; **asking price and transfer interest** estimates.
 - **Shortlist** with CSV export; **network saves**: pick which manager is you.
 - **Settings**: English, Dutch, French, German; GBP/EUR/USD; one toggle hides CA/PA and all
@@ -173,8 +174,9 @@ See [`mac/README.md`](mac/README.md).
 
 **Read straight from memory (reliable):** name, nationality, birth year, height, foot; **CA and
 PA** (the real values); all visible and hidden attributes and positions; wage, contract end,
-transfer status; current club; club and player reputation; **FM's real transfer value** for most
-players; staff CA/PA, attributes, role, **preferred job**, reputation and personality.
+transfer status; agreed transfers (club and date); current club; club and player reputation;
+**FM's real transfer value** for most players; staff CA/PA, attributes, role, **preferred job**,
+reputation and personality.
 
 **Estimates (clearly labelled as such):**
 
