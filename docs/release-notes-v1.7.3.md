@@ -15,3 +15,8 @@ Checked on Windows against a running FM 27.0 save. The Mac version gets the same
 was not re-tested on a Mac for this release.
 
 FMSuperScout only reads; it never changes Football Manager, Steam or your saves.
+
+**SHA-256**
+
+- `FMSuperScout-Setup.exe`: `96ee55a62c05ef7ef4123256a9aaa09410a52bccf979c6c93834fb1ed2738bae`
+- `FMSuperScout-Mac.dmg`: `4d494f6ed1edeca0debc57ed0c5f2a6656b6e19ceb23cde5fe4a88c1cf379b0a`
