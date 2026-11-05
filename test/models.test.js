@@ -182,3 +182,15 @@ test('inMyTeam: verhuurde speler telt bij zijn elftal bij de moederclub', () => 
   assert.ok(M.inMyTeam(outUnknown, 'all', my));
   assert.equal(M.myTeamType(loanIn, my), 0);   // gehuurd: elftal waarin hij bij mij speelt
 });
+
+// ---------- transferakkoorden ----------
+// Spelers met een akkoord gaan standaard uit de lijst, behalve als mijn club erbij betrokken is
+// (eigen speler die vertrekt, speler die naar mij komt, of mijn speler die verhuurd is).
+test('dealInvolvesMe: van, naar of eigendom van mijn club', () => {
+  const my = 'feyenoord';
+  assert.ok(M.dealInvolvesMe({ club: 'Feyenoord', transferTo: 'Parthenope' }, my));
+  assert.ok(M.dealInvolvesMe({ club: 'Mallorca', transferTo: 'Feyenoord' }, my));
+  assert.ok(M.dealInvolvesMe({ club: 'Emmen', ownerClub: 'Feyenoord', transferTo: 'Ajax' }, my));
+  assert.ok(!M.dealInvolvesMe({ club: 'Mallorca', transferTo: 'Barcelona' }, my));
+  assert.ok(!M.dealInvolvesMe({ club: 'Mallorca', transferTo: 'Barcelona' }, ''));
+});

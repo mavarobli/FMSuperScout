@@ -624,6 +624,8 @@ td.exp-year { color: #d8c88a; }
 .tag.rel { background: #143a2a; color: #6fe0a0; }
 .tag.nfs { background: #3a1414; color: #e08080; }
 .tag.free { background: #1f2a5a; color: #7fb0e0; }
+.tag.deal { background: #2e2350; color: #c3b2f0; }
+.deal-txt { color: #c3b2f0; }
 .eu-yes { color: var(--good); font-weight: 700; }
 .int { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 3px; }
 .int-g { background: #16412a; color: #6fe0a0; }

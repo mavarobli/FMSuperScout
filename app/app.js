@@ -41,7 +41,7 @@ try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.r
 // $: xe.com-koers uit diezelfde periode; verifieer tegen FM's eigen USD-weergave.
 const CUR_RATE = { '£': 1, '€': 1.16, '$': 1.35 };
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.7.2';
+const APP_VERSION = '1.7.3';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -130,6 +130,7 @@ const I18N = {
     scanStalled: 'De scan lijkt gestopt (is FM afgesloten of gecrasht?). Herstart FM en probeer opnieuw.',
     serverGone: 'Geen verbinding met de lokale server. Sluit dit venster en start FMSuperScout opnieuw.',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_loan: 'te huur', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
+    dealTip: 'Transferakkoord met {c}, gaat over op {d}', dealLabel: 'Transferakkoord', inclDeals: 'Incl. transferakkoorden', inclDealsHint: 'Spelers die al rond zijn met een andere club (bv. per 1 juli) staan standaard niet in de lijst. Spelers van of naar jouw club blijven altijd zichtbaar.',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     sg_coaching: 'Training', sg_mental: 'Mentaal', sg_knowledge: 'Kennis', sg_medical: 'Medisch & data',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
@@ -270,6 +271,7 @@ const I18N = {
     scanStalled: 'The scan appears to have stopped (was FM closed, or did it crash?). Restart FM and try again.',
     serverGone: 'Lost connection to the local server. Close this window and start FMSuperScout again.',
     tag_free: 'free', tag_listed: 'listed', tag_loan: 'for loan', tag_rel: 'released', tag_nfs: 'not for sale',
+    dealTip: 'Transfer agreed with {c}, moves on {d}', dealLabel: 'Transfer agreed', inclDeals: 'Incl. agreed transfers', inclDealsHint: 'Players who already agreed a move to another club (e.g. on 1 July) are left out by default. Players from or to your club always stay visible.',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     sg_coaching: 'Coaching', sg_mental: 'Mental', sg_knowledge: 'Knowledge', sg_medical: 'Medical & data',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
@@ -410,6 +412,7 @@ const I18N = {
     scanStalled: 'Le scan semble arrêté (FM fermé ou planté ?). Relancez FM et réessayez.',
     serverGone: 'Pas de connexion au serveur local. Fermez cette fenêtre et relancez FMSuperScout.',
     tag_free: 'libre', tag_listed: 'transférable', tag_loan: 'à prêter', tag_rel: 'libéré', tag_nfs: 'pas à vendre',
+    dealTip: 'Transfert conclu avec {c}, effectif le {d}', dealLabel: 'Transfert conclu', inclDeals: 'Incl. transferts conclus', inclDealsHint: 'Les joueurs qui ont déjà conclu un transfert vers un autre club (par ex. au 1er juillet) sont masqués par défaut. Les joueurs de ou vers votre club restent toujours visibles.',
     colHint: 'Glissez pour déplacer · clic droit pour les colonnes', colsTitle: 'Colonnes affichées', colsReset: 'Rétablir par défaut',
     sg_coaching: 'Entraînement', sg_mental: 'Mental', sg_knowledge: 'Connaissances', sg_medical: 'Médical & données',
     g_technical: 'Technique', g_setpieces: 'Coups de pied arrêtés', g_mental: 'Mental', g_physical: 'Physique', g_goalkeeping: 'Gardien',
@@ -550,6 +553,7 @@ const I18N = {
     scanStalled: 'Der Scan scheint gestoppt (FM beendet oder abgestürzt?). Starte FM neu und versuche es erneut.',
     serverGone: 'Keine Verbindung zum lokalen Server. Schließe dieses Fenster und starte FMSuperScout neu.',
     tag_free: 'vereinslos', tag_listed: 'Transferliste', tag_loan: 'zu verleihen', tag_rel: 'freigestellt', tag_nfs: 'unverkäuflich',
+    dealTip: 'Wechsel zu {c} vereinbart, ab {d}', dealLabel: 'Wechsel vereinbart', inclDeals: 'Inkl. vereinbarter Wechsel', inclDealsHint: 'Spieler, deren Wechsel zu einem anderen Verein schon feststeht (z. B. zum 1. Juli), sind standardmäßig ausgeblendet. Spieler von oder zu deinem Verein bleiben immer sichtbar.',
     colHint: 'Ziehen zum Verschieben · Rechtsklick für Spalten', colsTitle: 'Spalten anzeigen', colsReset: 'Standard wiederherstellen',
     sg_coaching: 'Training', sg_mental: 'Mental', sg_knowledge: 'Wissen', sg_medical: 'Medizin & Daten',
     g_technical: 'Technik', g_setpieces: 'Standards', g_mental: 'Mental', g_physical: 'Physis', g_goalkeeping: 'Torwart',
@@ -1043,7 +1047,7 @@ const PLAYER_COLS = [
   { key: 'name', label: 'c_name', get: p => p.name, name: true, w: 180 },
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p), w: 50 },
   { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => posHtml(p), w: 130 },
-  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
+  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p) + dealSuffix(p), w: 175 },
   { key: 'div', label: 'c_div', get: p => p.div || '', render: p => p.div ? escHtml(p.div) : '<span class="dim">–</span>', defHidden: true, w: 170 },
   { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
   { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? `<span class="eu-yes">${icon('check', 12)}</span>` : '<span class="dim">–</span>', w: 42 },
@@ -1073,7 +1077,7 @@ const STAFF_COLS = [
   { key: 'job', label: 'c_role', get: p => staffJobless(p) ? '' : jobLabel(p), render: p => staffJobless(p) ? '<span class="dim">–</span>' : escHtml(jobLabel(p)), w: 150 },
   { key: 'prefJob', label: 'c_prefjob', get: p => prefJobLabel(p), render: p => prefJobLabel(p) ? escHtml(prefJobLabel(p)) : '<span class="dim">–</span>', w: 150 },
   { key: 'fit', label: 'c_fit', num: true, help: 'fitHint', get: p => fitOf(p) ?? -1, render: p => { const v = fitOf(p); return v == null ? '<span class="dim">–</span>' : `<span class="${roleClass(v)}">${v.toFixed(1)}</span>`; }, w: 90 },
-  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p), w: 175 },
+  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p) + dealSuffix(p), w: 175 },
   { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa), w: 56 },
@@ -1099,6 +1103,9 @@ function wSat(w) { return Math.min(w, 7500) + 0.30 * Math.max(0, w - 7500); }   
 const isFree = p => !p.club && !(p.clubRep > 0);
 // Clublabel: naam, of "onbekende club" als de plugin wél een clubreputatie vond maar de naam
 // niet kon uitlezen (bekende beperking), of "clubloos" bij een echte transfervrije speler.
+// Clubkolom: akkoord met een andere club direct achter de huidige club ("Mallorca → Barcelona").
+const dealSuffix = p => p.transferTo && p.transferTo !== p.club
+  ? ` <span class="deal-txt" data-tip="${escHtml(dealTip(p))}">→ ${escHtml(p.transferTo)}</span>` : '';
 function clubLabel(p) {
   if (p.club) return escHtml(p.club);
   if (p.clubRep > 0) return `<span class="dim" data-tip="${escHtml(tf('clubNotRead', { r: p.clubRep }))}">${t('clubUnknown')}</span>`;
@@ -1314,6 +1321,12 @@ function intHtml(p) {
   return `<span class="int ${i.cls}" data-tip="${i.score}/100">${i.label}</span>`;
 }
 
+// Transferakkoord (scanner 1.7.3+): al rond met een andere club, nog niet overgestapt.
+const dealTip = p => tf('dealTip', { c: p.transferTo, d: p.transferDate ? fmtDate(p.transferDate) : '?' });
+// Bij mijn club betrokken (van, naar of eigendom van): altijd tonen, ook met een akkoord.
+function dealInvolvesMe(p, myClub) {
+  return !!myClub && [p.club, p.ownerClub, p.transferTo].some(c => (c || '').toLowerCase() === myClub);
+}
 function statusHtml(p) {
   let h = '';
   if (isFree(p)) h += `<span class="tag free">${t('tag_free')}</span>`;
@@ -1321,6 +1334,7 @@ function statusHtml(p) {
   if (p.loanListed) h += `<span class="tag listed">${t('tag_loan')}</span>`;
   if (p.setForRelease) h += `<span class="tag rel">${t('tag_rel')}</span>`;
   if (p.notForSale) h += `<span class="tag nfs">${t('tag_nfs')}</span>`;
+  if (p.transferTo) h = `<span class="tag deal" data-tip="${escHtml(dealTip(p))}">→ ${escHtml(p.transferTo)}</span>` + h;
   return h || '<span class="dim">–</span>';
 }
 // Natuurlijke posities. posArr bevat sinds scanner 1.6 ook bedreven nevenposities (15+);
@@ -2307,6 +2321,7 @@ function applyFilters() {
   // Wonderkids: staf heeft geen PA-groei, en zonder zichtbare PA is het filter verstopt.
   const onlyWk = state.mode !== 'staff' && !state.hideCapa && $('f-wonderkid').checked;
   const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
+  const hideDeals = state.mode === 'players' && !$('f-deals').checked;
   const minInterest = +$('f-interest').value || 0;
   const tstatus = $('f-tstatus').value, contractF = $('f-contract').value;
   const onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
@@ -2347,6 +2362,7 @@ function applyFilters() {
     if (hMin > 0 || hMax < 999) { const h = p.height || 0; if (h < hMin || h > hMax) return false; }
     if (footF && p.foot !== footF) return false;
     if (onlyEu && !isEu(p)) return false;
+    if (hideDeals && p.transferTo && !dealInvolvesMe(p, myClub)) return false;
     // "Mijn club": toon eigen spelers + verhuurde (moederclub = mijn club, spelen elders)
     // + gehuurde (spelen bij mij, moederclub elders). Zie loanStatus() voor de kleuring.
     if (onlyMyClub) {
@@ -2405,7 +2421,7 @@ function updateSecDots() {
     physical: n(pair('f-height-min', 'f-height-max'), $('f-foot').value),
     financial: n(val('f-price'), val('f-fee'), val('f-wage')),
     origin: n(val('f-nat'), $('f-eu').checked, val('f-div')),
-    availability: n(+$('f-interest').value > 0, $('f-tstatus').value, $('f-contract').value, $('f-myclub').checked, $('f-shortlist').checked),
+    availability: n(+$('f-interest').value > 0, $('f-tstatus').value, $('f-contract').value, $('f-myclub').checked, $('f-shortlist').checked, $('f-deals').checked),
   };
   document.querySelectorAll('.fsection[data-sec]').forEach(sec => {
     const k = sec.dataset.sec, head = sec.querySelector('.fsec-head');
@@ -2493,6 +2509,7 @@ function buildChips() {
       () => { $('f-myclub').checked = false; state.myTeam = 'all'; renderMyTeamChips(); });
   }
   if ($('f-shortlist').checked && state.mode !== 'shortlist') add(t('onlyshortlist'), uncheck('f-shortlist'));
+  if ($('f-deals').checked && state.mode === 'players') add(t('inclDeals'), uncheck('f-deals'));
   return chips;
 }
 function renderChips(chips) {
@@ -2516,7 +2533,7 @@ function renderChips(chips) {
 // Een preset is een momentopname van alle filtervelden (tekst, vinkjes, selects, posities
 // op het veld en de gekozen tactische rol). Bewaard in localStorage; zelfde naam = overschrijven.
 const PRESET_TEXT_IDS = ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-metapa-min', 'f-metapa-max', 'f-growth-min', 'f-growth-max', 'f-height-min', 'f-height-max', 'f-price', 'f-fee', 'f-wage', 'f-nat', 'f-div'];
-const PRESET_CHECK_IDS = ['f-eu', 'f-myclub', 'f-shortlist', 'f-wonderkid', 'f-new'];
+const PRESET_CHECK_IDS = ['f-eu', 'f-myclub', 'f-shortlist', 'f-wonderkid', 'f-new', 'f-deals'];
 // De peilperiode hoort bewust bij de preset: "doorbraken dit seizoen" betekent niets als
 // het venster erbij wegvalt. Zie applyPreset voor het opnieuw ophalen van de groeidata.
 const PRESET_SELECT_IDS = ['f-interest', 'f-staffrole', 'f-role', 'f-contract', 'f-tstatus', 'f-foot', 'f-hist-period', 'f-gender'];
@@ -3125,6 +3142,7 @@ function showDetail(p) {
     ${p.worldRep ? `<div><b>${t('repLabel')}</b> ${p.worldRep}</div>` : ''}
     <div><b>${t('contractLabel')}</b> ${fmtDate(p.expires)}</div>
     ${p.ownerClub && p.ownerClub !== p.club ? `<div><b>${t('ownerLabel')}</b> ${escHtml(p.ownerClub)}</div>` : ''}
+    ${p.transferTo ? `<div><b>${t('dealLabel')}</b> <span class="deal-txt">${escHtml(p.transferTo)}</span>${p.transferDate ? ` <span class="dim">· ${fmtDate(p.transferDate)}</span>` : ''}</div>` : ''}
     ${p.height ? `<div><b>${t('height')}</b> ${p.height} cm</div>` : ''}
     ${isPlayer && !state.hideMeta && metaScore(p) != null ? `<div data-help="metaHint"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
     ${isPlayer && !state.hideMeta && !state.hideCapa && metaPaScore(p) != null ? `<div data-help="metaPaHint"><b>${t('c_metapa')}</b> <span class="${roleClass(metaPaScore(p))}">${metaPaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
@@ -4198,7 +4216,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
 ['f-name', 'f-age-min', 'f-age-max', 'f-ca-min', 'f-ca-max', 'f-pa-min', 'f-pa-max', 'f-meta-min', 'f-meta-max', 'f-metapa-min', 'f-metapa-max', 'f-growth-min', 'f-growth-max', 'f-height-min', 'f-height-max', 'f-price', 'f-fee', 'f-wage', 'f-nat'].forEach(id => {
   let tm; $(id).addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(applyFilters, 150); });
 });
-['f-eu', 'f-myclub', 'f-tstatus', 'f-contract', 'f-shortlist', 'f-wonderkid', 'f-foot', 'f-new'].forEach(id => $(id).addEventListener('change', applyFilters));
+['f-eu', 'f-myclub', 'f-tstatus', 'f-contract', 'f-shortlist', 'f-wonderkid', 'f-foot', 'f-new', 'f-deals'].forEach(id => $(id).addEventListener('change', applyFilters));
 $('f-hist-period').addEventListener('change', async () => {
   await setHistPeriod($('f-hist-period').value);
   renderTable();     // groeikolom leest andere peildata
@@ -4559,6 +4577,7 @@ function setMode(mode) {
   // Staf heeft geen lengte, voet of PA-groei in de dump; die filters horen daar niet.
   $('fg-physical').style.display = mode === 'staff' ? 'none' : '';
   $('f-wonderkid-row').style.display = mode === 'staff' ? 'none' : '';
+  $('f-deals-row').style.display = mode === 'players' ? '' : 'none';   // akkoorden verbergen geldt alleen voor de spelerslijst
   renderDevSection();   // historie wordt alleen voor spelers bijgehouden
   renderIntakeBar();
   // Kolom bestaat niet in deze modus: anders sorteert de tabel stilzwijgend op een
