@@ -130,7 +130,7 @@ const I18N = {
     scanStalled: 'De scan lijkt gestopt (is FM afgesloten of gecrasht?). Herstart FM en probeer opnieuw.',
     serverGone: 'Geen verbinding met de lokale server. Sluit dit venster en start FMSuperScout opnieuw.',
     tag_free: 'clubloos', tag_listed: 'transferlijst', tag_loan: 'te huur', tag_rel: 'vrijgegeven', tag_nfs: 'niet te koop',
-    dealTip: 'Transferakkoord met {c}, gaat over op {d}', dealLabel: 'Transferakkoord', inclDeals: 'Incl. transferakkoorden', inclDealsHint: 'Spelers die al rond zijn met een andere club (bv. per 1 juli) staan standaard niet in de lijst. Spelers van of naar jouw club blijven altijd zichtbaar.',
+    dealTip: 'Transferakkoord met {c}, gaat over op {d}', dealLabel: 'Transferakkoord', hideDeals: 'Zonder transferakkoorden', hideDealsHint: 'Verbergt spelers die al rond zijn met een andere club (bv. per 1 juli). Spelers van of naar jouw club blijven altijd zichtbaar.',
     colHint: 'Sleep om te verplaatsen · rechtsklik voor kolommen', colsTitle: 'Kolommen tonen', colsReset: 'Standaard herstellen',
     sg_coaching: 'Training', sg_mental: 'Mentaal', sg_knowledge: 'Kennis', sg_medical: 'Medisch & data',
     g_technical: 'Technisch', g_setpieces: 'Standaardsituaties', g_mental: 'Mentaal', g_physical: 'Fysiek', g_goalkeeping: 'Keepen',
@@ -271,7 +271,7 @@ const I18N = {
     scanStalled: 'The scan appears to have stopped (was FM closed, or did it crash?). Restart FM and try again.',
     serverGone: 'Lost connection to the local server. Close this window and start FMSuperScout again.',
     tag_free: 'free', tag_listed: 'listed', tag_loan: 'for loan', tag_rel: 'released', tag_nfs: 'not for sale',
-    dealTip: 'Transfer agreed with {c}, moves on {d}', dealLabel: 'Transfer agreed', inclDeals: 'Incl. agreed transfers', inclDealsHint: 'Players who already agreed a move to another club (e.g. on 1 July) are left out by default. Players from or to your club always stay visible.',
+    dealTip: 'Transfer agreed with {c}, moves on {d}', dealLabel: 'Transfer agreed', hideDeals: 'Without agreed transfers', hideDealsHint: 'Hides players who already agreed a move to another club (e.g. on 1 July). Players from or to your club always stay visible.',
     colHint: 'Drag to reorder · right-click for columns', colsTitle: 'Show columns', colsReset: 'Reset to default',
     sg_coaching: 'Coaching', sg_mental: 'Mental', sg_knowledge: 'Knowledge', sg_medical: 'Medical & data',
     g_technical: 'Technical', g_setpieces: 'Set Pieces', g_mental: 'Mental', g_physical: 'Physical', g_goalkeeping: 'Goalkeeping',
@@ -412,7 +412,7 @@ const I18N = {
     scanStalled: 'Le scan semble arrêté (FM fermé ou planté ?). Relancez FM et réessayez.',
     serverGone: 'Pas de connexion au serveur local. Fermez cette fenêtre et relancez FMSuperScout.',
     tag_free: 'libre', tag_listed: 'transférable', tag_loan: 'à prêter', tag_rel: 'libéré', tag_nfs: 'pas à vendre',
-    dealTip: 'Transfert conclu avec {c}, effectif le {d}', dealLabel: 'Transfert conclu', inclDeals: 'Incl. transferts conclus', inclDealsHint: 'Les joueurs qui ont déjà conclu un transfert vers un autre club (par ex. au 1er juillet) sont masqués par défaut. Les joueurs de ou vers votre club restent toujours visibles.',
+    dealTip: 'Transfert conclu avec {c}, effectif le {d}', dealLabel: 'Transfert conclu', hideDeals: 'Sans transferts conclus', hideDealsHint: 'Masque les joueurs qui ont déjà conclu un transfert vers un autre club (par ex. au 1er juillet). Les joueurs de ou vers votre club restent toujours visibles.',
     colHint: 'Glissez pour déplacer · clic droit pour les colonnes', colsTitle: 'Colonnes affichées', colsReset: 'Rétablir par défaut',
     sg_coaching: 'Entraînement', sg_mental: 'Mental', sg_knowledge: 'Connaissances', sg_medical: 'Médical & données',
     g_technical: 'Technique', g_setpieces: 'Coups de pied arrêtés', g_mental: 'Mental', g_physical: 'Physique', g_goalkeeping: 'Gardien',
@@ -553,7 +553,7 @@ const I18N = {
     scanStalled: 'Der Scan scheint gestoppt (FM beendet oder abgestürzt?). Starte FM neu und versuche es erneut.',
     serverGone: 'Keine Verbindung zum lokalen Server. Schließe dieses Fenster und starte FMSuperScout neu.',
     tag_free: 'vereinslos', tag_listed: 'Transferliste', tag_loan: 'zu verleihen', tag_rel: 'freigestellt', tag_nfs: 'unverkäuflich',
-    dealTip: 'Wechsel zu {c} vereinbart, ab {d}', dealLabel: 'Wechsel vereinbart', inclDeals: 'Inkl. vereinbarter Wechsel', inclDealsHint: 'Spieler, deren Wechsel zu einem anderen Verein schon feststeht (z. B. zum 1. Juli), sind standardmäßig ausgeblendet. Spieler von oder zu deinem Verein bleiben immer sichtbar.',
+    dealTip: 'Wechsel zu {c} vereinbart, ab {d}', dealLabel: 'Wechsel vereinbart', hideDeals: 'Ohne vereinbarte Wechsel', hideDealsHint: 'Blendet Spieler aus, deren Wechsel zu einem anderen Verein schon feststeht (z. B. zum 1. Juli). Spieler von oder zu deinem Verein bleiben immer sichtbar.',
     colHint: 'Ziehen zum Verschieben · Rechtsklick für Spalten', colsTitle: 'Spalten anzeigen', colsReset: 'Standard wiederherstellen',
     sg_coaching: 'Training', sg_mental: 'Mental', sg_knowledge: 'Wissen', sg_medical: 'Medizin & Daten',
     g_technical: 'Technik', g_setpieces: 'Standards', g_mental: 'Mental', g_physical: 'Physis', g_goalkeeping: 'Torwart',
@@ -2321,7 +2321,7 @@ function applyFilters() {
   // Wonderkids: staf heeft geen PA-groei, en zonder zichtbare PA is het filter verstopt.
   const onlyWk = state.mode !== 'staff' && !state.hideCapa && $('f-wonderkid').checked;
   const onlyEu = $('f-eu').checked, onlyMyClub = $('f-myclub').checked;
-  const hideDeals = state.mode === 'players' && !$('f-deals').checked;
+  const hideDeals = state.mode === 'players' && $('f-deals').checked;   // standaard uit: akkoorden staan gewoon in de lijst
   const minInterest = +$('f-interest').value || 0;
   const tstatus = $('f-tstatus').value, contractF = $('f-contract').value;
   const onlySl = $('f-shortlist').checked || state.mode === 'shortlist';
@@ -2509,7 +2509,7 @@ function buildChips() {
       () => { $('f-myclub').checked = false; state.myTeam = 'all'; renderMyTeamChips(); });
   }
   if ($('f-shortlist').checked && state.mode !== 'shortlist') add(t('onlyshortlist'), uncheck('f-shortlist'));
-  if ($('f-deals').checked && state.mode === 'players') add(t('inclDeals'), uncheck('f-deals'));
+  if ($('f-deals').checked && state.mode === 'players') add(t('hideDeals'), uncheck('f-deals'));
   return chips;
 }
 function renderChips(chips) {

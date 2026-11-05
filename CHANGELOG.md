@@ -7,8 +7,8 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [1.7.3] - 2026-11-05
 
-Agreed transfers: players who already have a deal with another club are labelled and left out
-of the player list by default.
+Agreed transfers: players who already have a deal with another club are labelled, and you can
+hide them with one tick.
 
 ### Added
 - **Agreed transfers** read from FM's deal table: the club a player has agreed to join and the
@@ -20,9 +20,8 @@ of the player list by default.
   not shown.
 - Shown as "Club → New club" in the club column, a tag in the status column and a line on the
   player card.
-- **Hidden by default** in the player list; the "Incl. agreed transfers" box brings them back.
-  Players from, to or owned by your club always stay visible. Shortlist and staff are not
-  affected.
+- **"Without agreed transfers"** box hides them from the player list (off by default). Players
+  from, to or owned by your club always stay visible. Shortlist and staff are not affected.
 
 ## [1.7.2] - 2026-11-05
 
