@@ -6,7 +6,7 @@
 ; Bouwen: installer\build-exe.ps1 (staged payload in dist\stage).
 
 #define MyAppName "FMSuperScout"
-#define MyAppVersion "1.7.1"
+#define MyAppVersion "1.7.2"
 #define Stage "..\dist\stage"
 
 [Setup]

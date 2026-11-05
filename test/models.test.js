@@ -158,3 +158,27 @@ test('posities: natPos valt terug op posArr (oude dumps) en gebruikt posNat als 
   assert.deepEqual(M.natPos({ posArr: ['DC', 'DM'], posNat: ['DC'] }), ['DC']);
   assert.deepEqual(M.natPos({}), []);
 });
+
+// ---------- teamchips binnen "Mijn club" ----------
+// Verhuurde spelers horen bij het elftal van de moederclub (ownerTeamType), niet bij het
+// elftal van de huurclub (teamType, bijna altijd 0). Praktijkgeval 05-11: Vanhoutte, reserves
+// bij Feyenoord en verhuurd, stond onder "1e elftal".
+test('inMyTeam: verhuurde speler telt bij zijn elftal bij de moederclub', () => {
+  const my = 'feyenoord';
+  const own0 = { club: 'Feyenoord', teamType: 0 };
+  const own11 = { club: 'Feyenoord', teamType: 11 };
+  const outRes = { club: 'Basaksehir', ownerClub: 'Feyenoord', teamType: 0, ownerTeamType: 3 };
+  const outYouth = { club: 'FC Emmen', ownerClub: 'Feyenoord', teamType: 0, ownerTeamType: 11 };
+  const outFirst = { club: 'FC Groningen', ownerClub: 'Feyenoord', teamType: 0, ownerTeamType: 0 };
+  const outUnknown = { club: 'Almere', ownerClub: 'Feyenoord', teamType: 0 };
+  const loanIn = { club: 'Feyenoord', ownerClub: 'Ajax', teamType: 0, ownerTeamType: 3 };
+  const first = [own0, own11, outRes, outYouth, outFirst, outUnknown, loanIn].filter(p => M.inMyTeam(p, 'first', my));
+  assert.deepEqual(first, [own0, outFirst, loanIn]);
+  assert.ok(M.inMyTeam(outRes, 'res', my));
+  assert.ok(M.inMyTeam(outYouth, 'youth', my));
+  assert.ok(!M.inMyTeam(outRes, 'first', my));
+  // Onbekend elftal: alleen onder "Alles", nergens anders.
+  for (const sel of ['first', 'res', 'youth']) assert.ok(!M.inMyTeam(outUnknown, sel, my));
+  assert.ok(M.inMyTeam(outUnknown, 'all', my));
+  assert.equal(M.myTeamType(loanIn, my), 0);   // gehuurd: elftal waarin hij bij mij speelt
+});

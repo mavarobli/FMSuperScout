@@ -916,6 +916,16 @@ internal static class Dumper
                                   Dictionary<uint, Person> players,
                                   uint uid, string cname, int tt, int trep, string div)
     {
+        // Verhuurde spelers staan ook nog in een selectie van de moederclub. Dat elftal
+        // onthouden we apart: TeamType wordt het elftal bij de húúrclub (meestal 0), maar
+        // "Mijn club → 1e elftal" moet juist weten of hij vanuit de A-selectie, de O21 of de
+        // O18 is verhuurd. (Het contract-team helpt niet: dat is vrijwel altijd het
+        // hoofdteam, ook bij jeugdspelers — gemeten 05-11.)
+        players.TryGetValue(uid, out var pe);
+        string parent = pe?.OwnerClub;
+        if (pe != null && parent != null && cname == parent && (pe.OwnerTeamType < 0 || tt < pe.OwnerTeamType))
+            pe.OwnerTeamType = tt;
+
         if (!squad.TryGetValue(uid, out var cur)) { squad[uid] = (cname, tt, trep, div); return; }
 
         bool take;
@@ -925,7 +935,6 @@ internal static class Dumper
         }
         else
         {
-            string parent = players.TryGetValue(uid, out var pe) ? pe.OwnerClub : null;
             bool curIsParent = parent != null && cur.club == parent;
             bool newIsParent = parent != null && cname == parent;
             if (curIsParent == newIsParent) take = tt < cur.tt;   // geen van beide (of allebei) de moederclub
@@ -1202,7 +1211,11 @@ internal static class Dumper
         if (p.NatId != 0) j.Prop("natId", p.NatId);
         j.Prop("club", p.Club);
         // Moederclub alleen emitten als die afwijkt van de huidige club (= huurrelatie); scheelt ruis.
-        if (isPlayer && p.OwnerClub != null && p.OwnerClub != p.Club) j.Prop("ownerClub", p.OwnerClub);
+        if (isPlayer && p.OwnerClub != null && p.OwnerClub != p.Club)
+        {
+            j.Prop("ownerClub", p.OwnerClub);
+            if (p.OwnerTeamType >= 0) j.Prop("ownerTeamType", p.OwnerTeamType);   // elftal bij de moederclub
+        }
         j.Prop("div", p.Div);
         // Gender alleen emitten als vrouw (bij "vrouwenvoetbal meenemen"); mannen blijven veld-loos.
         if (p.Gender == 1) j.Prop("gender", 1);
@@ -1359,7 +1372,7 @@ internal static class Dumper
             }
             w.WriteLine("  Eerste 40:");
             foreach (var p in loans.Take(40))
-                w.WriteLine($"    {p.Name,-24} speelt: {p.Club ?? "-"}  ·  moederclub: {p.OwnerClub}");
+                w.WriteLine($"    {p.Name,-24} speelt: {p.Club ?? "-"} (tt{p.TeamType})  ·  moederclub: {p.OwnerClub} (tt{p.OwnerTeamType})");
             w.WriteLine();
             // Dubbele selectie-hits: hier koos PickSquad de niet-moederclub. Valse positieven
             // zouden hier zichtbaar worden (bv. een B-elftal dat als aparte club telt).
@@ -1385,6 +1398,7 @@ internal sealed class Person
     public string Div;
     public int Gender;          // 0 = man, 1 = vrouw
     public int TeamType = -1;   // 0 = 1e elftal, ~3 = reserves, ≥10 = jeugd; -1 = onbekend
+    public int OwnerTeamType = -1;   // elftal bij de moederclub (squad-walk); alleen relevant bij huur
     public bool IsPlayer;
     public ushort Ca;
     public ushort Pa;
