@@ -82,7 +82,8 @@ Wonderkids get a gold card. Built for showing off that one insane regen.
   **suitability** score per role from the staff attributes.
 - **Role ratings** for 19 FM roles, **comparison** of up to 3 players, **squad analysis** per
   position group, and **development charts** per player.
-- **Loans** shown with the parent club; **market value** from memory for most players, an
+- **Your club** by squad: first team, reserves or youth, with loaned-out players under the
+  squad they belong to. **Loans** shown with the parent club; **market value** from memory for most players, an
   estimate for the rest; **asking price and transfer interest** estimates.
 - **Shortlist** with CSV export; **network saves**: pick which manager is you.
 - **Settings**: English, Dutch, French, German; GBP/EUR/USD; one toggle hides CA/PA and all

@@ -41,7 +41,7 @@ try { ['fmss_donate', 'fmss_donate_at', 'fmss_days'].forEach(k => localStorage.r
 // $: xe.com-koers uit diezelfde periode; verifieer tegen FM's eigen USD-weergave.
 const CUR_RATE = { '£': 1, '€': 1.16, '$': 1.35 };
 // App-versie: bij een release gelijk trekken met MyAppVersion in installer/FMSuperScout.iss.
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.7.2';
 const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 
 // ================= i18n =================
@@ -2354,12 +2354,7 @@ function applyFilters() {
       if (cl !== myClub && ow !== myClub) return false;
     }
     // Teamchips (1e/2e/jeugd) — alleen actief samen met "Mijn club" en teamType-data (plugin v0.1.10+).
-    if (onlyMyClub && state.myTeam !== 'all' && state.mode !== 'staff') {
-      const tt = p.teamType;
-      if (state.myTeam === 'first' && tt !== 0) return false;
-      if (state.myTeam === 'res' && !(tt >= 1 && tt <= 9)) return false;
-      if (state.myTeam === 'youth' && !(tt >= 10)) return false;
-    }
+    if (onlyMyClub && state.myTeam !== 'all' && state.mode !== 'staff' && !inMyTeam(p, state.myTeam, myClub)) return false;
     if (contractF === 'free' && !isFree(p)) return false;
     if (contractF === 'exp6' || contractF === 'exp12') {
       const m = monthsUntil(p.expires);
@@ -2490,7 +2485,13 @@ function buildChips() {
   if ($('f-tstatus').value) add(`${t('tstatus')}: ${$('f-tstatus').selectedOptions[0].textContent}`, () => { $('f-tstatus').value = ''; });
   if ($('f-contract').value) add(`${t('contractF')}: ${$('f-contract').selectedOptions[0].textContent}`, () => { $('f-contract').value = ''; });
   for (const r of activeAdvRules()) add(advChipTxt(r), () => { state.advF = state.advF.filter(x => x !== r); saveAdv(); });
-  if ($('f-myclub').checked) add(t('myclub'), uncheck('f-myclub'));
+  // Met een teamchip actief (bv. standaard "1e elftal" via de clubbadge) hoort dat in het
+  // label: de chips zelf staan in een sectie die meestal ingeklapt is.
+  if ($('f-myclub').checked) {
+    const sub = state.myTeam !== 'all' && state.mode !== 'staff' && hasMyTeamData();
+    add(sub ? `${t('myclub')} · ${t('mt_' + state.myTeam)}` : t('myclub'),
+      () => { $('f-myclub').checked = false; state.myTeam = 'all'; renderMyTeamChips(); });
+  }
   if ($('f-shortlist').checked && state.mode !== 'shortlist') add(t('onlyshortlist'), uncheck('f-shortlist'));
   return chips;
 }
@@ -4369,11 +4370,14 @@ $('mgr-pick').addEventListener('change', () => {
   loadHistDeltas().then(() => applyFilters());
 });
 
-// club-badge klik → filters wissen + mijn club aan
+// club-badge klik → filters wissen + mijn club aan, standaard alleen het eerste elftal
+// (inclusief spelers die vanuit de A-selectie verhuurd zijn). Reserves/jeugd via de chips.
+// Zonder teamtype-data (oude dump) blijft het "Alles": anders zou de lijst leeg zijn.
 $('club-badge').onclick = () => {
   if (!state.meta.myClub) return;
   $('btn-clear').onclick();
   $('f-myclub').checked = true;
+  if (hasMyTeamData()) state.myTeam = 'first';
   renderMyTeamChips();   // programmatisch aanvinken vuurt geen change-event → chips zelf tonen
   applyFilters();
 };
@@ -4589,13 +4593,33 @@ $('tab-analysis').onclick = () => setMode('analysis');
 $('btn-reload').onclick = () => loadDump();
 
 // ---------- teamchips: 1e/2e/jeugd binnen "Mijn club" ----------
+// In welk elftal van mijn club hoort deze speler? Eigen en gehuurde spelers: het elftal
+// waarin ze bij mij spelen (teamType). Verhuurde spelers spelen elders; hun teamType is dat
+// van de huurclub (bijna altijd 0), dus daar telt het elftal bij de moederclub
+// (ownerTeamType, scanner 1.7.2+). Onbekend → valt onder geen enkele chip, alleen "Alles".
+function myTeamType(p, myClub) {
+  const cl = (p.club || '').toLowerCase(), ow = (p.ownerClub || '').toLowerCase();
+  if (ow && ow === myClub && cl !== myClub) return p.ownerTeamType;
+  return p.teamType;
+}
+function inMyTeam(p, sel, myClub) {
+  const tt = myTeamType(p, myClub);
+  if (tt == null) return sel === 'all';
+  if (sel === 'first') return tt === 0;
+  if (sel === 'res') return tt >= 1 && tt <= 9;
+  if (sel === 'youth') return tt >= 10;
+  return true;
+}
+// Heeft deze dump teamtypes voor mijn club? Oudere dumps niet: dan geen chips en geen subfilter.
+function hasMyTeamData() {
+  const myClub = (state.meta.myClub || '').toLowerCase();
+  return !!myClub && state.players.some(p => p.teamType != null && (p.club || '').toLowerCase() === myClub);
+}
 // Zichtbaar zodra het "Mijn club"-vinkje aanstaat én de dump teamType-data heeft
 // (plugin v0.1.10+); oudere dumps → chips blijven verborgen, filter doet niets.
 function renderMyTeamChips() {
   const box = $('myteam-chips');
-  const myClub = (state.meta.myClub || '').toLowerCase();
-  const hasData = myClub && state.players.some(p => p.teamType != null && (p.club || '').toLowerCase() === myClub);
-  const show = hasData && $('f-myclub').checked && state.mode !== 'staff';
+  const show = hasMyTeamData() && $('f-myclub').checked && state.mode !== 'staff';
   box.style.display = show ? '' : 'none';
   if (!show) return;
   const opts = [['all', t('mt_all')], ['first', t('mt_first')], ['res', t('mt_res')], ['youth', t('mt_youth')]];

@@ -5,6 +5,24 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-05
+
+My club: loaned-out players sit under the right squad, and the club button opens the first team.
+
+### Fixed
+- **Loaned-out players under the right squad.** Their team type was the one at the loan club
+  (almost always the first team there), so a reserve or U18 player out on loan showed up under
+  "First team". The scanner now also records the squad at the parent club (`ownerTeamType`,
+  from the parent club's own squad list; the contract's team turned out to be the main team
+  even for youth players). Checked on FM27: 4/4 loans of the test club in the right squad.
+
+### Changed
+- **Club button opens the first team.** Clicking your club at the top now shows only the first
+  team (including players loaned out from it); reserves and youth are one click away. Older
+  dumps without squad data keep showing everything.
+- The active-filter label says which squad is on ("My club · First team"); clearing it also
+  resets the squad.
+
 ## [1.7.1] - 2026-11-04
 
 Staff search fixed: free agents get their preferred job, plus reputation, personality and a
