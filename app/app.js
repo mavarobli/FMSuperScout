@@ -47,7 +47,7 @@ const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 // ================= i18n =================
 const I18N = {
   nl: {
-    players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: 'Zoek naam of club',
+    players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: 'Zoek naam, club of UID',
     settings: 'Instellingen', langLabel: 'Taal', curLabel: 'Valuta',
     showHidden: 'Verborgen stats tonen', showMeta: 'Meta-score tonen',
     profileMode: 'Spelersprofiel', profSide: 'Rechts', profPopup: 'Popup',
@@ -97,7 +97,7 @@ const I18N = {
     results: 'resultaten', c_name: 'Naam', c_age: 'Lft', c_pos: 'Positie', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Waarde', c_fee: 'Vraagprijs', c_wage: 'Salaris', c_expires: 'Contract tot', c_interest: 'Interesse',
     c_status: 'Status', c_role: 'Rol', c_prefjob: 'Voorkeursbaan', c_fit: 'Geschiktheid', foot: 'Voet', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Lengte', repLabel: 'Reputatie',
-    c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.', c_div: 'Divisie',
+    c_clubrep: 'Clubrep.', c_worldrep: 'Wereldrep.', c_div: 'Divisie', c_uid: 'UID',
     estval: 'Gesch. waarde', wageLabel: 'Salaris', contractLabel: 'Contract tot', free_l: 'transfervrij',
     int_big: 'Groot', int_ok: 'Redelijk', int_small: 'Klein', int_no: 'Nee', interestTitle: 'Interesse-inschatting',
     interestHint: 'Wil deze speler naar jouw club? Geschat uit reputatieverschil, salaris, ambitie, loyaliteit, leeftijd en beschikbaarheid. FIFA-artikel 19 telt mee voor niet-EU-spelers onder de 18.\n\nSchatting, geen FM-getal: FM rekent pas tijdens de onderhandeling en weegt dan ook jouw bod. "Klein" kan bij een sterk bod alsnog ja worden.',
@@ -111,7 +111,7 @@ const I18N = {
     loanOut: 'verhuurd aan {c}', loanIn: 'gehuurd van {c}', ownerLabel: 'Moederclub',
     clubless: 'clubloos', clubUnknown: 'onbekende club', copied: 'Gekopieerd',
     copyNameTip: 'Klik = kopieer naam', slEmpty: 'Shortlist leeg',
-    copyBtnTip: 'Kopieer naam', clubNotRead: 'Club niet uitgelezen (rep {r})',
+    copyBtnTip: 'Kopieer naam', copyUidTip: 'Kopieer UID', clubNotRead: 'Club niet uitgelezen (rep {r})',
     reqSent: 'Spelersdata inlezen…',
     dumping: 'Spelersdata inlezen…', dumpReady: 'Nieuwe data klaar, klik om te laden',
     dumpLoaded: 'Nieuwe data geladen',
@@ -188,7 +188,7 @@ const I18N = {
     verWarnOldDump: 'Deze data komt van een oudere FMSuperScout-plugin. Alles werkt, maar haal verse data op (F9 in FM met je save geladen) voor het beste resultaat.',
   },
   en: {
-    players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
+    players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name, club or UID',
     settings: 'Settings', langLabel: 'Language', curLabel: 'Currency',
     showHidden: 'Show hidden stats', showMeta: 'Show meta score',
     profileMode: 'Player profile', profSide: 'Right side', profPopup: 'Popup',
@@ -238,7 +238,7 @@ const I18N = {
     results: 'results', c_name: 'Name', c_age: 'Age', c_pos: 'Position', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Value', c_fee: 'Asking price', c_wage: 'Wage', c_expires: 'Contract until', c_interest: 'Interest',
     c_status: 'Status', c_role: 'Role', c_prefjob: 'Preferred job', c_fit: 'Suitability', foot: 'Foot', footR: 'Right', footL: 'Left', footB: 'Both', height: 'Height', repLabel: 'Reputation',
-    c_clubrep: 'Club rep', c_worldrep: 'World rep', c_div: 'Division',
+    c_clubrep: 'Club rep', c_worldrep: 'World rep', c_div: 'Division', c_uid: 'UID',
     estval: 'Est. value', wageLabel: 'Wage', contractLabel: 'Contract until', free_l: 'free',
     int_big: 'High', int_ok: 'Fair', int_small: 'Low', int_no: 'No', interestTitle: 'Interest estimate',
     interestHint: 'Would this player join your club? Estimated from the reputation gap, wages, ambition, loyalty, age and availability. FIFA article 19 applies to non-EU players under 18.\n\nAn estimate, not an FM number: FM decides during the actual negotiation and weighs your offer. A "Low" can still say yes to a strong bid.',
@@ -252,7 +252,7 @@ const I18N = {
     loanOut: 'on loan at {c}', loanIn: 'on loan from {c}', ownerLabel: 'Parent club',
     clubless: 'free agent', clubUnknown: 'unknown club', copied: 'Copied',
     copyNameTip: 'Click = copy name', slEmpty: 'Shortlist is empty',
-    copyBtnTip: 'Copy name', clubNotRead: 'Club not resolved (rep {r})',
+    copyBtnTip: 'Copy name', copyUidTip: 'Copy UID', clubNotRead: 'Club not resolved (rep {r})',
     reqSent: 'Reading player data…',
     dumping: 'Reading player data…', dumpReady: 'New data ready, click to load',
     dumpLoaded: 'New data loaded',
@@ -329,7 +329,7 @@ const I18N = {
     verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM with your save loaded) for the best results.',
   },
   fr: {
-    players: 'Joueurs', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Nom ou club…',
+    players: 'Joueurs', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Nom, club ou UID…',
     settings: 'Paramètres', langLabel: 'Langue', curLabel: 'Devise',
     showHidden: 'Afficher les stats cachées', showMeta: 'Afficher le score méta',
     profileMode: 'Profil du joueur', profSide: 'À droite', profPopup: 'Popup',
@@ -379,7 +379,7 @@ const I18N = {
     results: 'résultats', c_name: 'Nom', c_age: 'Âge', c_pos: 'Poste', c_club: 'Club', c_nat: 'Nat',
     c_value: 'Valeur', c_fee: 'Prix demandé', c_wage: 'Salaire', c_expires: 'Contrat jusqu\'au', c_interest: 'Intérêt',
     c_status: 'Statut', c_role: 'Rôle', c_prefjob: 'Poste préféré', c_fit: 'Adéquation', foot: 'Pied', footR: 'Droit', footL: 'Gauche', footB: 'Les deux', height: 'Taille', repLabel: 'Réputation',
-    c_clubrep: 'Rép. club', c_worldrep: 'Rép. mondiale', c_div: 'Division',
+    c_clubrep: 'Rép. club', c_worldrep: 'Rép. mondiale', c_div: 'Division', c_uid: 'UID',
     estval: 'Valeur est.', wageLabel: 'Salaire', contractLabel: 'Contrat jusqu\'au', free_l: 'libre',
     int_big: 'Fort', int_ok: 'Correct', int_small: 'Faible', int_no: 'Non', interestTitle: 'Estimation d\'intérêt',
     interestHint: 'Ce joueur rejoindrait-il votre club ? Estimé à partir de l\'écart de réputation, du salaire, de l\'ambition, de la loyauté, de l\'âge et de la disponibilité. L\'article 19 de la FIFA s\'applique aux non-UE de moins de 18 ans.\n\nUne estimation, pas un chiffre FM : FM tranche pendant la négociation et pèse votre offre. Un "Faible" peut dire oui à une belle offre.',
@@ -393,7 +393,7 @@ const I18N = {
     loanOut: 'prêté à {c}', loanIn: 'prêté par {c}', ownerLabel: 'Club propriétaire',
     clubless: 'sans club', clubUnknown: 'club inconnu', copied: 'Copié',
     copyNameTip: 'Clic = copier le nom', slEmpty: 'Shortlist vide',
-    copyBtnTip: 'Copier le nom', clubNotRead: 'Club non résolu (rép {r})',
+    copyBtnTip: 'Copier le nom', copyUidTip: 'Copier l\'UID', clubNotRead: 'Club non résolu (rép {r})',
     reqSent: 'Lecture des données…',
     dumping: 'Lecture des données…', dumpReady: 'Nouvelles données prêtes, cliquez pour charger',
     dumpLoaded: 'Nouvelles données chargées',
@@ -470,7 +470,7 @@ const I18N = {
     verWarnOldDump: 'Ces données viennent d\'un plugin FMSuperScout plus ancien. Tout fonctionne, mais rechargez des données fraîches (F9 dans FM, sauvegarde chargée) pour un meilleur résultat.',
   },
   de: {
-    players: 'Spieler', staff: 'Mitarbeiter', shortlist: 'Shortlist', searchph: 'Name oder Verein…',
+    players: 'Spieler', staff: 'Mitarbeiter', shortlist: 'Shortlist', searchph: 'Name, Verein oder UID…',
     settings: 'Einstellungen', langLabel: 'Sprache', curLabel: 'Währung',
     showHidden: 'Versteckte Werte anzeigen', showMeta: 'Meta-Score anzeigen',
     profileMode: 'Spielerprofil', profSide: 'Rechts', profPopup: 'Popup',
@@ -520,7 +520,7 @@ const I18N = {
     results: 'Treffer', c_name: 'Name', c_age: 'Alter', c_pos: 'Position', c_club: 'Verein', c_nat: 'Nat',
     c_value: 'Wert', c_fee: 'Forderung', c_wage: 'Gehalt', c_expires: 'Vertrag bis', c_interest: 'Interesse',
     c_status: 'Status', c_role: 'Rolle', c_prefjob: 'Bevorzugte Tätigkeit', c_fit: 'Eignung', foot: 'Fuß', footR: 'Rechts', footL: 'Links', footB: 'Beide', height: 'Größe', repLabel: 'Reputation',
-    c_clubrep: 'Vereinsrep.', c_worldrep: 'Weltrep.', c_div: 'Liga',
+    c_clubrep: 'Vereinsrep.', c_worldrep: 'Weltrep.', c_div: 'Liga', c_uid: 'UID',
     estval: 'Gesch. Wert', wageLabel: 'Gehalt', contractLabel: 'Vertrag bis', free_l: 'ablösefrei',
     int_big: 'Hoch', int_ok: 'Ordentlich', int_small: 'Gering', int_no: 'Nein', interestTitle: 'Interesse-Einschätzung',
     interestHint: 'Würde dieser Spieler zu deinem Verein wechseln? Geschätzt aus Reputationsunterschied, Gehalt, Ambition, Loyalität, Alter und Verfügbarkeit. FIFA-Artikel 19 gilt für Nicht-EU-Spieler unter 18.\n\nEine Schätzung, keine FM-Zahl: FM entscheidet erst in der Verhandlung und wägt dein Angebot mit. Ein "Gering" kann bei einem starken Angebot trotzdem Ja sagen.',
@@ -534,7 +534,7 @@ const I18N = {
     loanOut: 'verliehen an {c}', loanIn: 'ausgeliehen von {c}', ownerLabel: 'Stammverein',
     clubless: 'vereinslos', clubUnknown: 'unbekannter Verein', copied: 'Kopiert',
     copyNameTip: 'Klick = Name kopieren', slEmpty: 'Shortlist leer',
-    copyBtnTip: 'Name kopieren', clubNotRead: 'Verein nicht ausgelesen (Rep {r})',
+    copyBtnTip: 'Name kopieren', copyUidTip: 'UID kopieren', clubNotRead: 'Verein nicht ausgelesen (Rep {r})',
     reqSent: 'Spielerdaten werden gelesen…',
     dumping: 'Spielerdaten werden gelesen…', dumpReady: 'Neue Daten bereit, zum Laden klicken',
     dumpLoaded: 'Neue Daten geladen',
@@ -1069,6 +1069,7 @@ const PLAYER_COLS = [
   { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, defHidden: true, w: 85 },
   { key: 'height', label: 'height', num: true, get: p => p.height, fmt: v => v ? v + ' cm' : '–', defHidden: true, w: 70 },
   { key: 'foot', label: 'foot', get: p => footLabel(p), defHidden: true, w: 75 },
+  { key: 'uid', label: 'c_uid', num: true, get: p => p.id, defHidden: true, w: 75 },
 ];
 const STAFF_COLS = [
   { key: 'sl', label: '★', star: true, w: 34 },
@@ -1085,6 +1086,7 @@ const STAFF_COLS = [
   { key: 'expires', label: 'c_expires', get: p => p.expires, fmt: fmtDate, tdCls: p => expiresHtml(p).cls, w: 110 },
   { key: 'clubRep', label: 'c_clubrep', num: true, get: p => p.clubRep || 0, defHidden: true, w: 85 },
   { key: 'worldRep', label: 'c_worldrep', num: true, get: p => p.worldRep || 0, w: 85 },
+  { key: 'uid', label: 'c_uid', num: true, get: p => p.id, defHidden: true, w: 75 },
 ];
 
 // ---------- geschatte marktwaarde (GBP) ----------
@@ -2337,8 +2339,8 @@ function applyFilters() {
       if (onlySl && !state.shortlist.has(p.id)) return false;
     // Zoek-haystack per speler cachen: 2 toLowerCase-allocaties per rij per toetsaanslag
     // wordt één .includes op een vaste string. Een NUL-teken (\u0000) als scheiding kan nooit in de
-    // zoekterm zitten, dus de matchsemantiek (naam óf club bevat de term) is identiek.
-    if (name && !(p._q ??= ((p.name || '') + '\u0000' + (p.club || '')).toLowerCase()).includes(name)) return false;
+    // zoekterm zitten, dus de matchsemantiek (naam, club óf UID bevat de term) is identiek.
+    if (name && !(p._q ??= ((p.name || '') + '\u0000' + (p.club || '') + '\u0000' + (p.id != null ? p.id : '')).toLowerCase()).includes(name)) return false;
     const age = getAge(p);
     if (age < ageMin || age > ageMax) return false;
     if ((p.ca ?? 0) < caMin || (p.ca ?? 0) > caMax) return false;
@@ -2845,7 +2847,7 @@ function renderTable() {
       if (e.target.closest('.col-help')) return;             // ?-icoon is alleen uitleg, niet sorteren
       if (resizing) { resizing = false; return; }            // net een kolom versmald/verbreed: niet sorteren
       if (state.sortKey === k) state.sortDir *= -1;
-      else { state.sortKey = k; state.sortDir = (k === 'pos' || k === 'name' || k === 'nat') ? 1 : -1; }
+      else { state.sortKey = k; state.sortDir = (k === 'pos' || k === 'name' || k === 'nat' || k === 'uid') ? 1 : -1; }
       sortRows(); renderTable();
     };
     if (col?.star) return;
@@ -2981,6 +2983,11 @@ function copyName(name) {
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(name).then(ok, () => fallbackCopy(name, ok));
   else fallbackCopy(name, ok);
 }
+function copyUid(id) {
+  const ok = () => showToast(t('copied') + ': ' + id, 'clipboard');
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(String(id)).then(ok, () => fallbackCopy(String(id), ok));
+  else fallbackCopy(String(id), ok);
+}
 function fallbackCopy(text, ok) {
   try {
     const ta = document.createElement('textarea');
@@ -3003,13 +3010,13 @@ function exportShortlist() {
   const all = [...state.players, ...state.staff].filter(p => ids.has(p.id));
   if (!all.length) { showToast(t('slEmpty')); return; }
   const withCapa = !state.hideCapa;   // vraagprijs valt ook onder de verborgen-stats-toggle
-  const cols = ['Name', 'Position', 'Age', 'Club', 'Nationality',
+  const cols = ['UID', 'Name', 'Position', 'Age', 'Club', 'Nationality',
     ...(withCapa ? ['CA', 'PA'] : []), 'Value(GBP)', ...(withCapa ? ['AskingPrice(GBP)'] : []), 'Wage(GBP)', 'Contract', 'Interest'];
   const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
   const lines = [cols.join(',')];
   for (const p of all) {
     const i = interestEstimate(p);
-    lines.push([p.name, p.pos || jobLabel(p), getAge(p), p.club || '', natsLabel(p),
+    lines.push([p.id ?? '', p.name, p.pos || jobLabel(p), getAge(p), p.club || '', natsLabel(p),
       ...(withCapa ? [p.ca, p.pa] : []), estValue(p).v ?? '', ...(withCapa ? [feeEstimate(p).v ?? ''] : []), p.wage ?? '', p.expires || '', i ? i.label : ''].map(esc).join(','));
   }
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
@@ -3144,6 +3151,7 @@ function showDetail(p) {
     ${p.ownerClub && p.ownerClub !== p.club ? `<div><b>${t('ownerLabel')}</b> ${escHtml(p.ownerClub)}</div>` : ''}
     ${p.transferTo ? `<div><b>${t('dealLabel')}</b> <span class="deal-txt">${escHtml(p.transferTo)}</span>${p.transferDate ? ` <span class="dim">· ${fmtDate(p.transferDate)}</span>` : ''}</div>` : ''}
     ${p.height ? `<div><b>${t('height')}</b> ${p.height} cm</div>` : ''}
+    ${p.id ? `<div><b>${t('c_uid')}</b> <span>${p.id}</span> <button class="copybtn mini copyuidbtn" title="${t('copyUidTip')}">${icon('clipboard', 11)}</button></div>` : ''}
     ${isPlayer && !state.hideMeta && metaScore(p) != null ? `<div data-help="metaHint"><b>${t('metaLabel')}</b> <span class="${roleClass(metaScore(p))}">${metaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
     ${isPlayer && !state.hideMeta && !state.hideCapa && metaPaScore(p) != null ? `<div data-help="metaPaHint"><b>${t('c_metapa')}</b> <span class="${roleClass(metaPaScore(p))}">${metaPaScore(p).toFixed(1)}</span> <span class="col-help">?</span></div>` : ''}
   </div>`;
@@ -3230,6 +3238,8 @@ function showDetail(p) {
   $('detail-body').innerHTML = html;
   document.querySelector('.detail-star').onclick = () => toggleShortlist(p.id);
   document.querySelector('.copybtn').onclick = () => copyName(p.name);
+  const uidBtn = document.querySelector('.copyuidbtn');
+  if (uidBtn) uidBtn.onclick = () => copyUid(p.id);
   const cmp = document.querySelector('.cmpbtn');
   if (cmp) cmp.onclick = () => { toggleCompare(p.id); cmp.classList.toggle('on', state.compare.includes(p.id)); };
   const cb = document.querySelector('.cardbtn');
