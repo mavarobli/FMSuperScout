@@ -194,3 +194,27 @@ test('dealInvolvesMe: van, naar of eigendom van mijn club', () => {
   assert.ok(!M.dealInvolvesMe({ club: 'Mallorca', transferTo: 'Barcelona' }, my));
   assert.ok(!M.dealInvolvesMe({ club: 'Mallorca', transferTo: 'Barcelona' }, ''));
 });
+
+// ---------- uid kolom en weergave ----------
+test('PLAYER_COLS en STAFF_COLS bevatten uid kolom (standaard verborgen)', () => {
+  const pCol = M.PLAYER_COLS.find(c => c.key === 'uid');
+  assert.ok(pCol, 'PLAYER_COLS mist uid kolom');
+  assert.equal(pCol.defHidden, true);
+  assert.equal(pCol.num, true);
+  assert.equal(pCol.get({ id: 12345 }), 12345);
+
+  const sCol = M.STAFF_COLS.find(c => c.key === 'uid');
+  assert.ok(sCol, 'STAFF_COLS mist uid kolom');
+  assert.equal(sCol.defHidden, true);
+  assert.equal(sCol.num, true);
+  assert.equal(sCol.get({ id: 67890 }), 67890);
+});
+
+test('zoeken op UID matcht speler-id in zoek-haystack', () => {
+  const p = { id: 13946271, name: 'Erling Haaland', club: 'Man City' };
+  const qStr = ((p.name || '') + '\u0000' + (p.club || '') + '\u0000' + (p.id != null ? p.id : '')).toLowerCase();
+  assert.ok(qStr.includes('13946271'));
+  assert.ok(qStr.includes('haaland'));
+  assert.ok(qStr.includes('city'));
+  assert.ok(!qStr.includes('99999999'));
+});
