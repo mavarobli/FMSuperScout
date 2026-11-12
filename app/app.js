@@ -51,6 +51,9 @@ const I18N = {
     settings: 'Instellingen', langLabel: 'Taal', curLabel: 'Valuta',
     showHidden: 'Verborgen stats tonen', showMeta: 'Meta-score tonen',
     profileMode: 'Spelersprofiel', profSide: 'Rechts', profPopup: 'Popup',
+    bestxi: 'Beste XI', bxi_auto: 'Beste opstelling zoeken', bxi_formation: 'Formatie',
+    bxi_bench: 'Wisselspelers', bxi_avgMeta: 'Gem. Meta (basis)', bxi_avgPaMeta: 'Gem. PA Meta (basis)',
+    bxi_noPlayer: 'Geen speler', bxi_noFormation: 'Geen formatie gevonden',
     devTitle: 'Ontwikkeling',
     cardBtnTip: 'Spelerskaart opslaan (PNG)', cardSaved: 'Kaart opgeslagen in Downloads',
     donateBtn: 'Steun FMSuperScout',
@@ -192,6 +195,9 @@ const I18N = {
     settings: 'Settings', langLabel: 'Language', curLabel: 'Currency',
     showHidden: 'Show hidden stats', showMeta: 'Show meta score',
     profileMode: 'Player profile', profSide: 'Right side', profPopup: 'Popup',
+    bestxi: 'Best XI', bxi_auto: 'Find best formation', bxi_formation: 'Formation',
+    bxi_bench: 'Bench', bxi_avgMeta: 'Avg. Meta (XI)', bxi_avgPaMeta: 'Avg. PA Meta (XI)',
+    bxi_noPlayer: 'No player', bxi_noFormation: 'No formation found',
     devTitle: 'Development',
     cardBtnTip: 'Save player card (PNG)', cardSaved: 'Card saved to Downloads',
     donateBtn: 'Support FMSuperScout',
@@ -333,6 +339,9 @@ const I18N = {
     settings: 'Paramètres', langLabel: 'Langue', curLabel: 'Devise',
     showHidden: 'Afficher les stats cachées', showMeta: 'Afficher le score méta',
     profileMode: 'Profil du joueur', profSide: 'À droite', profPopup: 'Popup',
+    bestxi: 'Meilleur XI', bxi_auto: 'Trouver la meilleure formation', bxi_formation: 'Formation',
+    bxi_bench: 'Remplaçants', bxi_avgMeta: 'Meta moy. (XI)', bxi_avgPaMeta: 'PA Meta moy. (XI)',
+    bxi_noPlayer: 'Aucun joueur', bxi_noFormation: 'Aucune formation trouvée',
     devTitle: 'Progression',
     cardBtnTip: 'Enregistrer la carte du joueur (PNG)', cardSaved: 'Carte enregistrée dans Téléchargements',
     donateBtn: 'Soutenir FMSuperScout',
@@ -474,6 +483,9 @@ const I18N = {
     settings: 'Einstellungen', langLabel: 'Sprache', curLabel: 'Währung',
     showHidden: 'Versteckte Werte anzeigen', showMeta: 'Meta-Score anzeigen',
     profileMode: 'Spielerprofil', profSide: 'Rechts', profPopup: 'Popup',
+    bestxi: 'Beste Elf', bxi_auto: 'Beste Aufstellung finden', bxi_formation: 'Formation',
+    bxi_bench: 'Ersatzbank', bxi_avgMeta: 'Durchschn. Meta (XI)', bxi_avgPaMeta: 'Durchschn. PA Meta (XI)',
+    bxi_noPlayer: 'Kein Spieler', bxi_noFormation: 'Keine Formation gefunden',
     devTitle: 'Entwicklung',
     cardBtnTip: 'Spielerkarte speichern (PNG)', cardSaved: 'Karte in Downloads gespeichert',
     donateBtn: 'FMSuperScout unterstützen',
@@ -4208,6 +4220,353 @@ function scoutFor(s) {
   applyFilters();
   showToast([...codes].join(', '), 'search');
 }
+
+// ---------- beste xi ----------
+// Optimale basisopstelling en wisselspelers op basis van meta-scores en formatie (gebaseerd op PR #24 door iamPurity).
+const XI_FORMATIONS = {
+  '4-3-3': [
+    { role: 'af', side: 'C', t: 15, l: 50 },
+    { role: 'wing', side: 'L', t: 26, l: 15 },
+    { role: 'wing', side: 'R', t: 26, l: 85 },
+    { role: 'cm', side: 'CL', t: 45, l: 32 },
+    { role: 'cm', side: 'CR', t: 45, l: 68 },
+    { role: 'dm', side: 'C', t: 58, l: 50 },
+    { role: 'fb', side: 'L', t: 76, l: 15 },
+    { role: 'cd', side: 'CL', t: 76, l: 36 },
+    { role: 'cd', side: 'CR', t: 76, l: 64 },
+    { role: 'fb', side: 'R', t: 76, l: 85 },
+    { role: 'gk', side: 'C', t: 90, l: 50 },
+  ],
+  '4-2-3-1': [
+    { role: 'af', side: 'C', t: 15, l: 50 },
+    { role: 'wing', side: 'L', t: 28, l: 15 },
+    { role: 'am', side: 'C', t: 30, l: 50 },
+    { role: 'wing', side: 'R', t: 28, l: 85 },
+    { role: 'dm', side: 'CL', t: 52, l: 36 },
+    { role: 'dm', side: 'CR', t: 52, l: 64 },
+    { role: 'fb', side: 'L', t: 76, l: 15 },
+    { role: 'cd', side: 'CL', t: 76, l: 36 },
+    { role: 'cd', side: 'CR', t: 76, l: 64 },
+    { role: 'fb', side: 'R', t: 76, l: 85 },
+    { role: 'gk', side: 'C', t: 90, l: 50 },
+  ],
+  '4-4-2': [
+    { role: 'af', side: 'CL', t: 16, l: 36 },
+    { role: 'af', side: 'CR', t: 16, l: 64 },
+    { role: 'wing', side: 'L', t: 44, l: 15 },
+    { role: 'cm', side: 'CL', t: 46, l: 36 },
+    { role: 'cm', side: 'CR', t: 46, l: 64 },
+    { role: 'wing', side: 'R', t: 44, l: 85 },
+    { role: 'fb', side: 'L', t: 76, l: 15 },
+    { role: 'cd', side: 'CL', t: 76, l: 36 },
+    { role: 'cd', side: 'CR', t: 76, l: 64 },
+    { role: 'fb', side: 'R', t: 76, l: 85 },
+    { role: 'gk', side: 'C', t: 90, l: 50 },
+  ],
+  '5-3-2': [
+    { role: 'af', side: 'CL', t: 16, l: 36 },
+    { role: 'af', side: 'CR', t: 16, l: 64 },
+    { role: 'cm', side: 'CL', t: 44, l: 32 },
+    { role: 'cm', side: 'C', t: 46, l: 50 },
+    { role: 'cm', side: 'CR', t: 44, l: 68 },
+    { role: 'wb', side: 'L', t: 64, l: 15 },
+    { role: 'cd', side: 'CL', t: 76, l: 33 },
+    { role: 'cd', side: 'C', t: 76, l: 50 },
+    { role: 'cd', side: 'CR', t: 76, l: 67 },
+    { role: 'wb', side: 'R', t: 64, l: 85 },
+    { role: 'gk', side: 'C', t: 90, l: 50 },
+  ],
+  '3-4-3': [
+    { role: 'af', side: 'C', t: 16, l: 50 },
+    { role: 'wing', side: 'L', t: 26, l: 20 },
+    { role: 'wing', side: 'R', t: 26, l: 80 },
+    { role: 'cm', side: 'CL', t: 46, l: 36 },
+    { role: 'cm', side: 'CR', t: 46, l: 64 },
+    { role: 'wb', side: 'L', t: 56, l: 15 },
+    { role: 'wb', side: 'R', t: 56, l: 85 },
+    { role: 'cd', side: 'CL', t: 76, l: 30 },
+    { role: 'cd', side: 'C', t: 76, l: 50 },
+    { role: 'cd', side: 'CR', t: 76, l: 70 },
+    { role: 'gk', side: 'C', t: 90, l: 50 },
+  ],
+  '4-2-4': [
+    { role: 'af', side: 'CL', t: 16, l: 36 },
+    { role: 'af', side: 'CR', t: 16, l: 64 },
+    { role: 'wing', side: 'L', t: 28, l: 15 },
+    { role: 'wing', side: 'R', t: 28, l: 85 },
+    { role: 'cm', side: 'CL', t: 50, l: 36 },
+    { role: 'cm', side: 'CR', t: 50, l: 64 },
+    { role: 'fb', side: 'L', t: 76, l: 15 },
+    { role: 'cd', side: 'CL', t: 76, l: 36 },
+    { role: 'cd', side: 'CR', t: 76, l: 64 },
+    { role: 'fb', side: 'R', t: 76, l: 85 },
+    { role: 'gk', side: 'C', t: 90, l: 50 },
+  ],
+  '5-4-1': [
+    { role: 'af', side: 'C', t: 16, l: 50 },
+    { role: 'wing', side: 'L', t: 42, l: 15 },
+    { role: 'cm', side: 'CL', t: 44, l: 36 },
+    { role: 'cm', side: 'CR', t: 44, l: 64 },
+    { role: 'wing', side: 'R', t: 42, l: 85 },
+    { role: 'wb', side: 'L', t: 64, l: 15 },
+    { role: 'cd', side: 'CL', t: 76, l: 33 },
+    { role: 'cd', side: 'C', t: 76, l: 50 },
+    { role: 'cd', side: 'CR', t: 76, l: 67 },
+    { role: 'wb', side: 'R', t: 64, l: 85 },
+    { role: 'gk', side: 'C', t: 90, l: 50 },
+  ],
+  '4-1-4-1': [
+    { role: 'af', side: 'C', t: 16, l: 50 },
+    { role: 'wing', side: 'L', t: 40, l: 15 },
+    { role: 'cm', side: 'CL', t: 42, l: 36 },
+    { role: 'cm', side: 'CR', t: 42, l: 64 },
+    { role: 'wing', side: 'R', t: 40, l: 85 },
+    { role: 'dm', side: 'C', t: 58, l: 50 },
+    { role: 'fb', side: 'L', t: 76, l: 15 },
+    { role: 'cd', side: 'CL', t: 76, l: 36 },
+    { role: 'cd', side: 'CR', t: 76, l: 64 },
+    { role: 'fb', side: 'R', t: 76, l: 85 },
+    { role: 'gk', side: 'C', t: 90, l: 50 },
+  ],
+};
+
+function canPlaySlot(p, slot) {
+  const pos = p.posArr || natPos(p);
+  if (!pos || !pos.length) return false;
+  const role = slot.role, side = slot.side;
+  if (role === 'gk') return pos.includes('GK');
+  if (role === 'cd' || role === 'bpd') return pos.includes('DC');
+  if (role === 'fb' || role === 'wb') {
+    if (side === 'L' || side === 'CL') return pos.includes('DL') || pos.includes('WBL');
+    if (side === 'R' || side === 'CR') return pos.includes('DR') || pos.includes('WBR');
+    return pos.includes('DL') || pos.includes('DR') || pos.includes('WBL') || pos.includes('WBR');
+  }
+  if (role === 'dm' || role === 'dlp' || role === 'bwm') return pos.includes('DM');
+  if (role === 'cm' || role === 'b2b' || role === 'ap') return pos.includes('MC');
+  if (role === 'wing' || role === 'if') {
+    if (side === 'L' || side === 'CL') return pos.includes('AML') || pos.includes('ML');
+    if (side === 'R' || side === 'CR') return pos.includes('AMR') || pos.includes('MR');
+    return pos.includes('AML') || pos.includes('AMR') || pos.includes('ML') || pos.includes('MR');
+  }
+  if (role === 'am') return pos.includes('AMC');
+  if (role === 'af' || role === 'poacher' || role === 'tm' || role === 'cf') return pos.includes('ST');
+  return false;
+}
+
+function findOptimalLineup(squad, formation) {
+  if (!squad || !squad.length || !formation || !formation.length) return null;
+  const candidatesForSlot = formation.map(f => {
+    const list = [];
+    for (const p of squad) {
+      if (canPlaySlot(p, f)) {
+        const sc = metaScore(p);
+        if (sc != null && sc > 0) list.push({ player: p, score: sc });
+      }
+    }
+    list.sort((a, b) => b.score - a.score);
+    return list.slice(0, 15);
+  });
+
+  const n = formation.length;
+  const maxRem = new Array(n + 1).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    maxRem[i] = maxRem[i + 1] + (candidatesForSlot[i][0] ? candidatesForSlot[i][0].score : 0);
+  }
+
+  let bestSum = -1, bestLineup = null;
+  const assigned = new Set();
+  const current = new Array(n);
+  let iters = 0;
+
+  function dfs(idx, curSum) {
+    if (iters++ > 200000) return;
+    if (curSum + maxRem[idx] <= bestSum) return;
+    if (idx === n) {
+      bestSum = curSum;
+      bestLineup = current.map(c => ({ ...c }));
+      return;
+    }
+    const slot = formation[idx];
+    let matched = false;
+    for (const cand of candidatesForSlot[idx]) {
+      if (!assigned.has(cand.player.id)) {
+        matched = true;
+        assigned.add(cand.player.id);
+        current[idx] = { player: cand.player, score: cand.score, slot };
+        dfs(idx + 1, curSum + cand.score);
+        assigned.delete(cand.player.id);
+      }
+    }
+    if (!matched) {
+      current[idx] = { player: null, score: 0, slot };
+      dfs(idx + 1, curSum);
+    }
+  }
+
+  dfs(0, 0);
+  return bestLineup ? { lineup: bestLineup, score: bestSum } : null;
+}
+
+function autoDetectBestFormation(squad) {
+  if (!squad || !squad.length) return null;
+  let bestKey = null, bestRes = null, maxAvg = -1;
+  for (const k of Object.keys(XI_FORMATIONS)) {
+    const res = findOptimalLineup(squad, XI_FORMATIONS[k]);
+    if (res && res.score > 0) {
+      const avgScore = res.score / XI_FORMATIONS[k].length;
+      if (avgScore > maxAvg) {
+        maxAvg = avgScore;
+        bestKey = k;
+        bestRes = res;
+      }
+    }
+  }
+  return bestKey ? { key: bestKey, result: bestRes } : null;
+}
+
+function renderBestXI() {
+  const box = $('bestxi');
+  if (!box) return;
+  const myClub = (state.meta.myClub || '').toLowerCase();
+  if (!myClub) {
+    box.innerHTML = `<div class="an-empty">${t('anNoClub')}</div>`;
+    return;
+  }
+  const squad = state.players.filter(p => (p.club || '').toLowerCase() === myClub);
+  if (!squad.length) {
+    box.innerHTML = `<div class="an-empty">${t('nodata')}</div>`;
+    return;
+  }
+
+  const fKey = state.bestXiFormation || (state.bestXiFormation = localStorage.getItem('fmss_xi_formation') || '4-3-3');
+  const formation = XI_FORMATIONS[fKey] || XI_FORMATIONS['4-3-3'];
+  const res = findOptimalLineup(squad, formation);
+  if (!res || !res.lineup) {
+    box.innerHTML = `<div class="an-empty">${t('bxi_noFormation')}</div>`;
+    return;
+  }
+
+  const titularIds = new Set(res.lineup.map(s => s.player ? s.player.id : null).filter(Boolean));
+  const benchSquad = squad.filter(p => !titularIds.has(p.id));
+  const benchRes = findOptimalLineup(benchSquad, formation);
+
+  const starters = res.lineup.filter(s => s.player);
+  const avgMeta = starters.length ? res.score / starters.length : 0;
+  const avgPa = starters.length ? starters.reduce((s, x) => s + (metaPaScore(x.player) || x.score), 0) / starters.length : 0;
+
+  const fOptions = Object.keys(XI_FORMATIONS).map(k =>
+    `<option value="${k}" ${k === fKey ? 'selected' : ''}>${k}</option>`).join('');
+
+  const pitchSlots = res.lineup.map(s => {
+    const sc = s.score > 0 ? s.score.toFixed(1) : '-';
+    const cls = s.score > 0 ? roleClass(s.score) : 'empty';
+    const name = s.player ? escHtml(s.player.name) : t('bxi_noPlayer');
+    const rName = escHtml(roleName(s.slot.role));
+    const pId = s.player ? s.player.id : '';
+    return `<div class="bxi-slot" style="top:${s.slot.t}%; left:${s.slot.l}%;" data-id="${pId}">
+      <div class="bxi-node ${cls}">${sc}</div>
+      <div class="bxi-name">${name}</div>
+      <div class="bxi-role">${rName}</div>
+    </div>`;
+  }).join('');
+
+  const benchRows = [];
+  if (benchRes && benchRes.lineup) {
+    const seen = new Set();
+    benchRes.lineup.forEach(s => {
+      if (!s.player || seen.has(s.player.id)) return;
+      seen.add(s.player.id);
+      const sc = s.score > 0 ? s.score.toFixed(1) : '-';
+      const cls = s.score > 0 ? roleClass(s.score) : '';
+      const rName = escHtml(roleName(s.slot.role));
+      benchRows.push(`<div class="bxi-bench-row" data-id="${s.player.id}">
+        <div class="b-info">
+          <span class="b-name">${escHtml(s.player.name)}</span>
+          <span class="b-sub">${rName} · ${getAge(s.player)} j</span>
+        </div>
+        <span class="b-score ${cls}">${sc}</span>
+      </div>`);
+    });
+  }
+
+  const benchHtml = `<div class="bxi-bench">
+    <h3>${t('bxi_bench')}</h3>
+    <div class="bxi-bench-list">
+      ${benchRows.length ? benchRows.join('') : `<div class="dim" style="font-size:12px;">${t('bxi_noPlayer')}</div>`}
+    </div>
+  </div>`;
+
+  box.innerHTML = `<div class="an-head">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+      <h2>${t('bestxi')}</h2>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <label for="xi-formation" style="font-size:12px; color:var(--muted);">${t('bxi_formation')}:</label>
+        <select id="xi-formation" style="background:var(--bg2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:4px 8px; font-size:12px; font-weight:600; cursor:pointer;">
+          ${fOptions}
+        </select>
+        <button id="btn-auto-xi" class="an-scout">${t('bxi_auto')}</button>
+      </div>
+    </div>
+    <div class="an-summary">
+      <div class="an-sum-item">
+        <span class="an-sum-n">${avgMeta.toFixed(1)}</span>
+        <span class="an-sum-l">${t('bxi_avgMeta')}</span>
+      </div>
+      ${state.hideCapa ? '' : `
+      <div class="an-sum-item">
+        <span class="an-sum-n">${avgPa.toFixed(1)}</span>
+        <span class="an-sum-l">${t('bxi_avgPaMeta')}</span>
+      </div>`}
+      <div class="an-sum-item">
+        <span class="an-sum-n">${squad.length}</span>
+        <span class="an-sum-l">${t('anSquadSize')}</span>
+      </div>
+    </div>
+  </div>
+  <div class="bxi-layout">
+    <div class="bxi-pitch-wrap">
+      <div class="bxi-pitch-lines">
+        <div class="p-line p-half"></div>
+        <div class="p-circle"></div>
+        <div class="p-box-top"></div>
+        <div class="p-box-bot"></div>
+        <div class="p-spot" style="top:50%; left:50%;"></div>
+        <div class="p-spot" style="top:11%; left:50%;"></div>
+        <div class="p-spot" style="top:89%; left:50%;"></div>
+      </div>
+      ${pitchSlots}
+    </div>
+    ${benchHtml}
+  </div>`;
+
+  box.querySelector('#xi-formation').onchange = e => {
+    state.bestXiFormation = e.target.value;
+    localStorage.setItem('fmss_xi_formation', state.bestXiFormation);
+    renderBestXI();
+  };
+
+  box.querySelector('#btn-auto-xi').onclick = () => {
+    const auto = autoDetectBestFormation(squad);
+    if (auto && auto.key) {
+      state.bestXiFormation = auto.key;
+      localStorage.setItem('fmss_xi_formation', auto.key);
+      renderBestXI();
+      showToast(auto.key + ' (' + (auto.result.score / 11).toFixed(1) + ')', 'check');
+    } else {
+      showToast(t('bxi_noFormation'), '!');
+    }
+  };
+
+  box.querySelectorAll('[data-id]').forEach(el => {
+    const id = Number(el.dataset.id);
+    if (id) {
+      el.onclick = () => {
+        const p = state.players.find(x => x.id === id);
+        if (p) showDetail(p);
+      };
+    }
+  });
+}
 $('detail-close').onclick = closeDetail;
 $('detail-backdrop').onclick = closeDetail;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
@@ -4442,7 +4801,7 @@ function applyHideCapa() {
   if (hiddenStatCol(state.sortKey)) { state.sortKey = state.mode === 'staff' ? 'wage' : 'value'; state.sortDir = -1; }
   updateAdvBtn();   // regels op verborgen data tellen niet mee zolang de toggle uit staat
   renderDevSection(); renderIntakeBar();
-  if (state.mode === 'analysis') renderAnalysis(); else { renderTable(); applyFilters(); }
+  if (state.mode === 'analysis') renderAnalysis(); else if (state.mode === 'bestxi') renderBestXI(); else { renderTable(); applyFilters(); }
   if (state.selected) showDetail(state.selected);
 }
 $('set-profile').value = profMode();
@@ -4564,14 +4923,18 @@ function setMode(mode) {
     updateAdvBtn();
   }
   const isAn = mode === 'analysis';
+  const isXi = mode === 'bestxi';
+  const isCustomView = isAn || isXi;
   $('tab-players').classList.toggle('active', mode === 'players');
   $('tab-staff').classList.toggle('active', mode === 'staff');
   $('tab-shortlist').classList.toggle('active', mode === 'shortlist');
   $('tab-analysis').classList.toggle('active', isAn);
-  $('fg-pitch').style.display = mode === 'staff' || isAn ? 'none' : '';
+  const tabXi = $('tab-bestxi');
+  if (tabXi) tabXi.classList.toggle('active', isXi);
+  $('fg-pitch').style.display = mode === 'staff' || isCustomView ? 'none' : '';
   $('fg-staffrole').style.display = mode === 'staff' ? '' : 'none';
   buildGenderFilter();   // spelers- en staflijst kunnen apart gemengd zijn
-  $('fg-role').style.display = mode === 'staff' || isAn ? 'none' : '';
+  $('fg-role').style.display = mode === 'staff' || isCustomView ? 'none' : '';
   $('f-meta-row').style.display = mode === 'staff' ? 'none' : '';   // meta-score bestaat niet voor staf
   $('f-metapa-row').style.display = mode === 'staff' ? 'none' : '';
   // Staf heeft geen lengte, voet of PA-groei in de dump; die filters horen daar niet.
@@ -4585,15 +4948,25 @@ function setMode(mode) {
   if (hiddenStatCol(state.sortKey)) { state.sortKey = mode === 'staff' ? 'wage' : 'ca'; state.sortDir = -1; }
   $('sl-bar').classList.toggle('hidden', mode !== 'shortlist');
   renderMyTeamChips();
-  document.body.classList.toggle('mode-analysis', isAn);
+  document.body.classList.toggle('mode-analysis', isCustomView);
   state.selected = null;
   $('detail').classList.add('hidden');
+  const xiBox = $('bestxi');
+  if (xiBox) xiBox.classList.toggle('hidden', !isXi);
   if (isAn) {
     $('chipbar').innerHTML = '';
     $('table-wrap').style.display = 'none';
     $('empty-state').classList.add('hidden');
     $('analysis').classList.remove('hidden');
     renderAnalysis();
+    return;
+  }
+  if (isXi) {
+    $('chipbar').innerHTML = '';
+    $('table-wrap').style.display = 'none';
+    $('empty-state').classList.add('hidden');
+    $('analysis').classList.add('hidden');
+    renderBestXI();
     return;
   }
   $('table-wrap').style.display = '';
@@ -4606,6 +4979,8 @@ $('tab-players').onclick = () => setMode('players');
 $('tab-staff').onclick = () => setMode('staff');
 $('tab-shortlist').onclick = () => setMode('shortlist');
 $('tab-analysis').onclick = () => setMode('analysis');
+const bxiTab = $('tab-bestxi');
+if (bxiTab) bxiTab.onclick = () => setMode('bestxi');
 // Niet direct koppelen: dan wordt het MouseEvent als force=true doorgegeven en
 // omzeilt elke klik de OOM-crashdetectie die loadDump(true) juist als bewuste
 // escape-hatch heeft.

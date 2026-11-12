@@ -194,3 +194,75 @@ test('dealInvolvesMe: van, naar of eigendom van mijn club', () => {
   assert.ok(!M.dealInvolvesMe({ club: 'Mallorca', transferTo: 'Barcelona' }, my));
   assert.ok(!M.dealInvolvesMe({ club: 'Mallorca', transferTo: 'Barcelona' }, ''));
 });
+
+// ---------- beste xi en formatieoptimalisatie ----------
+test('canPlaySlot: controleert of een speler op een veldpositie kan spelen', () => {
+  const gk = { posArr: ['GK'] };
+  const cb = { posArr: ['DC'] };
+  const lb = { posArr: ['DL'] };
+  const winger = { posArr: ['AML', 'AMR'] };
+  const striker = { posArr: ['ST'] };
+
+  assert.ok(M.canPlaySlot(gk, { role: 'gk' }));
+  assert.ok(!M.canPlaySlot(gk, { role: 'af' }));
+
+  assert.ok(M.canPlaySlot(cb, { role: 'cd' }));
+  assert.ok(!M.canPlaySlot(cb, { role: 'gk' }));
+
+  assert.ok(M.canPlaySlot(lb, { role: 'fb', side: 'L' }));
+  assert.ok(!M.canPlaySlot(lb, { role: 'fb', side: 'R' }));
+
+  assert.ok(M.canPlaySlot(winger, { role: 'wing', side: 'L' }));
+  assert.ok(M.canPlaySlot(winger, { role: 'wing', side: 'R' }));
+
+  assert.ok(M.canPlaySlot(striker, { role: 'af' }));
+  assert.ok(!M.canPlaySlot(striker, { role: 'gk' }));
+});
+
+test('findOptimalLineup: stelt het beste elftal samen zonder dubbele spelers', () => {
+  const formation = M.XI_FORMATIONS['4-3-3'];
+  assert.ok(formation);
+  assert.equal(formation.length, 11);
+
+  // Lege selectie geeft null
+  assert.equal(M.findOptimalLineup([], formation), null);
+
+  // Selectie met een doelman en een spits
+  const squad = [
+    { id: 1, name: 'Keeper A', posArr: ['GK'], _meta: 14.0 },
+    { id: 2, name: 'Spits B', posArr: ['ST'], _meta: 15.2 },
+  ];
+  const res = M.findOptimalLineup(squad, formation);
+  assert.ok(res);
+  assert.equal(res.lineup.length, 11);
+  const gkSlot = res.lineup.find(s => s.slot.role === 'gk');
+  assert.ok(gkSlot && gkSlot.player && gkSlot.player.id === 1);
+  const afSlot = res.lineup.find(s => s.slot.role === 'af');
+  assert.ok(afSlot && afSlot.player && afSlot.player.id === 2);
+  assert.ok(res.score > 0);
+});
+
+test('autoDetectBestFormation: selecteert formatie met hoogste totale score', () => {
+  assert.equal(M.autoDetectBestFormation([]), null);
+
+  const squad = [
+    { id: 1, name: 'GK', posArr: ['GK'], _meta: 13.5 },
+    { id: 2, name: 'LB', posArr: ['DL'], _meta: 13.0 },
+    { id: 3, name: 'CB1', posArr: ['DC'], _meta: 13.8 },
+    { id: 4, name: 'CB2', posArr: ['DC'], _meta: 13.7 },
+    { id: 5, name: 'RB', posArr: ['DR'], _meta: 13.2 },
+    { id: 6, name: 'DM', posArr: ['DM'], _meta: 13.6 },
+    { id: 7, name: 'CM1', posArr: ['MC'], _meta: 14.1 },
+    { id: 8, name: 'CM2', posArr: ['MC'], _meta: 14.0 },
+    { id: 9, name: 'LW', posArr: ['AML'], _meta: 14.5 },
+    { id: 10, name: 'RW', posArr: ['AMR'], _meta: 14.3 },
+    { id: 11, name: 'ST', posArr: ['ST'], _meta: 15.0 },
+  ];
+  const auto = M.autoDetectBestFormation(squad);
+  assert.ok(auto);
+  assert.ok(auto.key);
+  assert.ok(auto.result);
+  assert.equal(auto.result.lineup.length, 11);
+  assert.ok(auto.result.score > 0);
+});
+
