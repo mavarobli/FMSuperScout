@@ -56,6 +56,7 @@ function loadApp() {
     'I18N', 'ATTR_LABEL', 'ROLE_LABEL', 'CARDL', 'metaScore', 'metaPaScore',
     'NATIONS', 'JOB_LABEL', 'natsLabel', 'jobLabel', 'fmtWage', 'wageFactor',
     'histKey', 'STAFF_ATTR_LABEL', 'STAFF_ATTR_GROUPS', 'natPos', 'myTeamType', 'inMyTeam', 'dealInvolvesMe',
+    'XI_FORMATIONS', 'canPlaySlot', 'findOptimalLineup', 'autoDetectBestFormation',
   ];
   const body = src + '\n;return {' + exposed.map(n => `${n}: typeof ${n} !== 'undefined' ? ${n} : undefined`).join(',') + '};';
   const factory = new Function(
