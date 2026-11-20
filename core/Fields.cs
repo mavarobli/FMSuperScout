@@ -12,13 +12,16 @@ namespace FMSuperScout;
 /// </summary>
 internal sealed class Fields
 {
-    // Game waarvoor deze layout geldt, en de game_plugin.dll-versie (major.minor) waarop de
-    // offsets gepind zijn. Wijkt de minor af, dan waarschuwt de web-app dat de data mogelijk
+    // Game waarvoor deze layout geldt, en de game_plugin.dll-versies (major.minor) waarop de
+    // offsets geverifieerd zijn. Een patch die de layout niet raakt (FM 27.1) komt er alleen
+    // bij in VerifiedMinors. Onbekende minor: de web-app waarschuwt dat de data mogelijk
     // onbetrouwbaar is tot de offsets opnieuw geverifieerd zijn.
     public string Game { get; private set; } = "FM26";
     public int SupportedMajor { get; private set; } = 26;
-    public int SupportedMinor { get; private set; } = 3;
+    public int[] VerifiedMinors { get; private set; } = { 3 };
+    public int SupportedMinor => VerifiedMinors[VerifiedMinors.Length - 1];   // oplopend: nieuwste laatst
     public string SupportedVersion => $"{SupportedMajor}.{SupportedMinor}";
+    public bool IsVerified(int minor) => Array.IndexOf(VerifiedMinors, minor) >= 0;
 
     // --- Object-header (elk DB-object) ---
     public uint OBJ_DUNI { get; private set; } = 0x0C;         // uint32 Unique ID (UID)
@@ -135,12 +138,13 @@ internal sealed class Fields
     public static readonly Fields FM26 = new();
 
     /// <summary>
-    /// FM27 (Unity 6000.3, game_plugin.dll 27.0). De database-layout is vrijwel ongewijzigd
-    /// t.o.v. FM26; geverifieerd 02-11-2026 tegen een draaiende FM 27.0-save.
+    /// FM27 (Unity 6000.3, game_plugin.dll 27.x). De database-layout is vrijwel ongewijzigd
+    /// t.o.v. FM26; geverifieerd 02-11-2026 tegen een draaiende FM 27.0-save en 20-11-2026
+    /// tegen FM 27.1 (zelfde class-pieken, alle veld-offsets ongewijzigd).
     /// </summary>
     public static readonly Fields FM27 = FM26.With(f =>
     {
-        f.Game = "FM27"; f.SupportedMajor = 27; f.SupportedMinor = 0;
+        f.Game = "FM27"; f.SupportedMajor = 27; f.VerifiedMinors = new[] { 0, 1 };
         f.HUMAN_MANAGER_OFFSET = 0x440;   // FM26: 0x450 (piekpaar 0x440/0x468 in het histogram)
     });
 

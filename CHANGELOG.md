@@ -5,6 +5,23 @@ new release is built, so the Unreleased section below is what the next release s
 
 ## [Unreleased]
 
+## [1.7.4] - 2026-11-20
+
+FM 27.1 support and a fix for "Access to the path is denied" scans.
+
+### Changed
+- **FM 27.1 supported.** The memory layout did not change in the 27.1 patch: same class
+  offsets, and names, ages, CA/PA, attributes per position, contracts, values, loans and
+  agreed transfers all check out against a running 27.1 save. The amber "calibrated for
+  27.0.x" warning is gone on 27.1; 27.0 stays supported too. A layout can now list several
+  verified patch versions.
+
+### Fixed
+- **"Scan failed: Access to the path is denied"** (#38). Windows refuses to replace
+  `dump.json` while another program has it open: the app still sending the previous dump to
+  the browser, or an antivirus scan of the fresh file. The scanner now retries for about 15
+  seconds, and if the file stays locked it says which file and what to do.
+
 ## [1.7.3] - 2026-11-05
 
 Agreed transfers: players who already have a deal with another club are labelled, and you can

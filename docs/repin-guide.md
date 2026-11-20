@@ -23,12 +23,13 @@ Een nieuwe editie krijgt een eigen layout met alleen de afwijkende velden, plus 
 ```csharp
 public static readonly Fields FM27 = FM26.With(f =>
 {
-    f.Game = "FM27"; f.SupportedMajor = 27; f.SupportedMinor = 0;
+    f.Game = "FM27"; f.SupportedMajor = 27; f.VerifiedMinors = new[] { 0 };
     f.HUMAN_MANAGER_OFFSET = 0x440;
 });
 ```
 
-Een patch binnen dezelfde editie: pas de waarden van die layout aan.
+Een patch binnen dezelfde editie: pas de waarden van die layout aan. Blijft de layout gelijk
+(zoals 27.0 → 27.1), dan alleen de minor toevoegen aan `VerifiedMinors`.
 
 Lees het histogram "Class-offsets (meta+4) met plausibele UID". De patronen die op
 26.3 golden en vrijwel zeker terugkomen:
@@ -64,7 +65,7 @@ sample-spelers in diagnostics: kloppen namen, leeftijden, CA/PA, clubs?
 
 ## Stap 4: sluitstuk
 
-1. `SupportedMajor`/`SupportedMinor` van de layout in core/Fields.cs bijwerken.
+1. `SupportedMajor`/`VerifiedMinors` van de layout in core/Fields.cs bijwerken.
 2. Volledige scan + steekproef in de app (bekende spelers, clubs, waardes, huurspelers).
    Leg een selectiescherm uit FM naast de app: leeftijd, contract, nationaliteit en salaris
    (FM toont euro's; de dump is GBP, factor ≈1,16) moeten exact kloppen. Vergelijk ook de
