@@ -23,8 +23,8 @@ the old, longer backlog is in the git history.
 
 ## After FM patches
 
-- **FM27 launch, 10 November 2026**: check the layout against the day-one patch on Windows
-  (`docs/repin-guide.md`) and the Mac ("= gemeten ✓" in diagnostics, `docs/macos.md`).
+- **FM 27.1** (20 November 2026): layout unchanged, checked on Windows. Still to check on the
+  Mac ("= gemeten ✓" in diagnostics, `docs/macos.md`).
 
 ## Known limitations
 

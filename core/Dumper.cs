@@ -1161,7 +1161,7 @@ internal static class Dumper
             if (string.IsNullOrEmpty(GameVersion)) return;   // geen versie-info: geen oordeel
             var layout = Fields.ForVersion(major);
             F = layout ?? fallback;
-            VersionOk = layout != null && minor == F.SupportedMinor;
+            VersionOk = layout != null && F.IsVerified(minor);
             Host.Info($"game_plugin.dll versie {GameVersion} → layout {F.Game} (gepind op {F.SupportedVersion}.x → {(VersionOk ? "ok" : "AFWIJKEND")})");
         }
         catch (Exception e) { Host.Warn("Versiedetectie mislukt: " + e.Message); }
@@ -1269,7 +1269,34 @@ internal static class Dumper
         j.EndArr();
         j.EndObj();
         j.Close();
-        File.Move(tmp, path, true);
+        ReplaceWithRetry(tmp, path);
+    }
+
+    // File.Move over een bestaand dump.json faalt op Windows met "Access to the path is
+    // denied." zolang een ander proces het doelbestand open heeft: de app die de vorige dump
+    // (100+ MB) nog naar de browser streamt, of een virusscanner die het verse tmp-bestand
+    // controleert (issue #38). Beide zijn tijdelijk: ca. 15 s opnieuw proberen met oplopende
+    // pauzes. Daarna een melding die zegt wat er aan de hand is in plaats van alleen de
+    // Windows-tekst.
+    private static void ReplaceWithRetry(string src, string dst)
+    {
+        const int attempts = 12;
+        for (int i = 1; ; i++)
+        {
+            try { File.Move(src, dst, true); return; }
+            catch (Exception e) when ((e is UnauthorizedAccessException || e is IOException) && i < attempts)
+            {
+                if (i == 1) Host.Warn($"{Path.GetFileName(dst)} is in gebruik ({e.Message}); opnieuw proberen…");
+                Thread.Sleep(Math.Min(250 * i, 2000));
+            }
+            catch (Exception e) when (e is UnauthorizedAccessException || e is IOException)
+            {
+                throw new IOException(
+                    $"Could not replace {Path.GetFileName(dst)} in {Path.GetDirectoryName(dst)}: {e.Message} " +
+                    "Another program keeps the file open (antivirus, a backup/sync tool, or a second FMSuperScout window). " +
+                    "Close it or add an exception for this folder, then try again.", e);
+            }
+        }
     }
 
     // Met de echte aantallen: de eerdere 0,0 liet de tellers in status.json terugflappen
@@ -1395,7 +1422,7 @@ internal static class Dumper
                 w.WriteLine("Kandidaten nu (grootste class-pieken hieronder). Vuistregels: elke class toont");
                 w.WriteLine("als twee pieken 0x28 uit elkaar (neem de laagste van het paar); de staf-piek is");
                 w.WriteLine("groter dan de spelerpiek; manager is een mini-piek (~2). Volledige werkwijze:");
-                w.WriteLine("docs/repin-guide.md in de repo. Na het pinnen: SUPPORTED_* in Fields.cs bijwerken.");
+                w.WriteLine("docs/repin-guide.md in de repo. Na het pinnen: VerifiedMinors in Fields.cs bijwerken.");
                 w.WriteLine();
             }
             // Health-check: de grote pieken horen speler=0x288 en staf=0x100 te zijn. Wijkt dit

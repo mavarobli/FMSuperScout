@@ -50,7 +50,7 @@ free memory at each scan (`Geheugen: ... MB fysiek vrij`), which tells you how t
 
 ## 6. Game version
 
-FMSuperScout knows the memory layout of **FM27 (27.0)** and **FM26 (26.3)**. The app shows
+FMSuperScout knows the memory layout of **FM27 (27.0 and 27.1)** and **FM26 (26.3)**. The app shows
 an amber warning when your game version differs; after a big FM patch the tool may read
 garbage or nothing until it is updated. Check for a newer FMSuperScout release.
 
