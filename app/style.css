@@ -518,6 +518,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #grid td.pname.loan-out { color: #e08080; }
 #grid td.pname.loan-in { color: #5a9fe8; }
 .copybtn { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; color: var(--text); padding: 3px 7px; margin-left: 4px; vertical-align: middle; }
+.copybtn.mini { padding: 1px 5px; font-size: 11px; }
 .copybtn:hover { border-color: var(--accent2); }
 .copybtn svg, .cmpbtn svg { display: block; }
 /* profielknoppen (kopieer / vergelijk) */
