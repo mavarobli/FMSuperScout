@@ -88,7 +88,7 @@ Wonderkids get a gold card. Built for showing off that one insane regen.
   **market value** from memory for most players, an
   estimate for the rest; **asking price and transfer interest** estimates.
 - **Shortlist** with CSV export; **network saves**: pick which manager is you.
-- **Settings**: English, Dutch, French, German; GBP/EUR/USD; one toggle hides CA/PA and all
+- **Settings**: English, Dutch, French, German, Simplified Chinese; GBP/EUR/USD; one toggle hides CA/PA and all
   hidden stats if you consider them cheating.
 - **Updates**: a daily check with a dismissible notice. On Windows one click downloads the
   installer, checks its SHA-256 and starts it.
@@ -153,6 +153,7 @@ Or double-click `Start FMSuperScout.cmd`. The scanner is C# (.NET 8) and shares 
 
 ```bash
 dotnet build scanner -c Release        # dev build, picked up by app/server.js automatically
+dotnet run --project test/scanner -c Release  # Windows name-reader regression tests
 dotnet publish scanner -c Release      # self-contained single exe -> scanner/dist/
 scanner/dist/FMSuperScout.Scanner.exe scan   # one dump of the running fm.exe
 ```

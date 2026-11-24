@@ -19,8 +19,7 @@ namespace FMSuperScout;
 /// </summary>
 internal static class Program
 {
-    private static readonly string DataDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FMSuperScout");
+    private static readonly string DataDir = Host.DataDirectory;
     private static readonly string LogFile = Path.Combine(DataDir, "scanner.log");
     private static readonly string RequestFile = Path.Combine(DataDir, "request.flag");
     private static readonly object LogLock = new();

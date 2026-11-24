@@ -17,9 +17,9 @@ const APP_DIR = __dirname;
 // verschillende mappen ("F9 werkt, app blijft leeg").
 // Op de Mac: ~/Library/Application Support (daar schrijft de module in FM, = .NET's LocalApplicationData).
 const IS_MAC = process.platform === 'darwin';
-const DATA_DIR = IS_MAC
+const DATA_DIR = process.env.FMSS_DATA_DIR || (IS_MAC
   ? path.join(os.homedir(), 'Library', 'Application Support', 'FMSuperScout')
-  : path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'FMSuperScout');
+  : path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'FMSuperScout'));
 
 // App-modus (standalone venster): server sluit zichzelf af zodra het venster dicht is.
 // Het sluiten van het venster wordt betrouwbaar gemeld via /api/bye (pagehide-beacon).

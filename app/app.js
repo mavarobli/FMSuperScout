@@ -2,6 +2,18 @@
 'use strict';
 const $ = id => document.getElementById(id);
 
+// Locale voor getallen en datums per app-taal.
+const LOCALES = { nl: 'nl-NL', en: 'en-GB', fr: 'fr-FR', de: 'de-DE', 'zh-CN': 'zh-CN' };
+
+function initialLang() {
+  const saved = localStorage.getItem('fmss_lang');
+  if (Object.hasOwn(LOCALES, saved)) return saved;
+  const platform = navigator.userAgentData?.platform || navigator.platform || '';
+  const language = navigator.language || '';
+  const simplified = /^zh(?:-Hans(?:-|$)|-(?:CN|SG)(?:-|$)|$)/i.test(language);
+  return /^Win/i.test(platform) && simplified ? 'zh-CN' : 'nl';
+}
+
 const state = {
   mode: 'players',
   players: [], staff: [], meta: {},
@@ -10,7 +22,7 @@ const state = {
   selected: null,
   cur: localStorage.getItem('fmss_cur') || '£',
   wagePer: localStorage.getItem('fmss_wageper') || 'w',   // salarisweergave: w(eek)/m(aand)/j(aar)
-  lang: ['nl', 'en'].includes(localStorage.getItem('fmss_lang')) ? localStorage.getItem('fmss_lang') : 'nl',
+  lang: initialLang(),
   showPot: false,
   myTeam: 'all',   // teamchip bij "Mijn club": all | first | res | youth
   hideCapa: localStorage.getItem('fmss_hidecapa') === '1',
@@ -47,6 +59,7 @@ const REPO_URL = 'https://github.com/mavarobli/FMSuperScout';
 // ================= i18n =================
 const I18N = {
   nl: {
+    reload: 'Laatste gegevens herladen', natSearch: 'Typ een land…',
     players: 'Spelers', staff: 'Staf', shortlist: 'Shortlist', searchph: 'Zoek naam of club',
     settings: 'Instellingen', langLabel: 'Taal', curLabel: 'Valuta',
     showHidden: 'Verborgen stats tonen', showMeta: 'Meta-score tonen',
@@ -188,6 +201,7 @@ const I18N = {
     verWarnOldDump: 'Deze data komt van een oudere FMSuperScout-plugin. Alles werkt, maar haal verse data op (F9 in FM met je save geladen) voor het beste resultaat.',
   },
   en: {
+    reload: 'Reload the latest data', natSearch: 'Type a country…',
     players: 'Players', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Search name or club',
     settings: 'Settings', langLabel: 'Language', curLabel: 'Currency',
     showHidden: 'Show hidden stats', showMeta: 'Show meta score',
@@ -329,6 +343,7 @@ const I18N = {
     verWarnOldDump: 'This data was made by an older FMSuperScout plugin. Everything works, but fetch fresh data (F9 in FM with your save loaded) for the best results.',
   },
   fr: {
+    reload: 'Recharger les dernières données', natSearch: 'Saisir un pays…',
     players: 'Joueurs', staff: 'Staff', shortlist: 'Shortlist', searchph: 'Nom ou club…',
     settings: 'Paramètres', langLabel: 'Langue', curLabel: 'Devise',
     showHidden: 'Afficher les stats cachées', showMeta: 'Afficher le score méta',
@@ -470,6 +485,7 @@ const I18N = {
     verWarnOldDump: 'Ces données viennent d\'un plugin FMSuperScout plus ancien. Tout fonctionne, mais rechargez des données fraîches (F9 dans FM, sauvegarde chargée) pour un meilleur résultat.',
   },
   de: {
+    reload: 'Letzte Daten neu laden', natSearch: 'Land eingeben…',
     players: 'Spieler', staff: 'Mitarbeiter', shortlist: 'Shortlist', searchph: 'Name oder Verein…',
     settings: 'Einstellungen', langLabel: 'Sprache', curLabel: 'Währung',
     showHidden: 'Versteckte Werte anzeigen', showMeta: 'Meta-Score anzeigen',
@@ -610,12 +626,152 @@ const I18N = {
     verWarn: 'FM-Version {v} erkannt; das Auslesen ist auf {s}.x geeicht. Daten bis zu einem FMSuperScout-Update möglicherweise unzuverlässig.',
     verWarnOldDump: 'Diese Daten stammen von einem älteren FMSuperScout-Plugin. Alles funktioniert, aber hole frische Daten (F9 in FM mit geladenem Spielstand) für das beste Ergebnis.',
   },
+  'zh-CN': {
+    reload: '重新加载最近一次读取的数据', natSearch: '输入国家或地区…',
+    players: '球员', staff: '职员', shortlist: '候选名单', searchph: '搜索姓名或俱乐部',
+    settings: '设置', langLabel: '语言', curLabel: '货币',
+    showHidden: '显示隐藏属性', showMeta: '显示实战评分',
+    profileMode: '球员档案', profSide: '右侧面板', profPopup: '弹出窗口',
+    devTitle: '成长',
+    cardBtnTip: '保存球员卡（PNG）', cardSaved: '球员卡已保存到下载文件夹',
+    donateBtn: '支持 FMSuperScout',
+    seasonTitle: '{s} 赛季回顾',
+    seasonStatProfiles: '查看了 {n} 份档案', seasonStatLoads: '加载了 {n} 次数据库',
+    seasonStatCards: '分享了 {n} 张球员卡', seasonStatShort: '将 {n} 人加入候选名单',
+    seasonAsk: 'FMSuperScout 免费陪伴了你整个赛季。请作者喝杯咖啡，就当是这一年的工资。',
+    alreadyDonated: '已经支持过了？', neverAsk: '不再提示',
+    supporterThanks: '感谢支持！此提示将不再出现。',
+    donateCta: '☕ 请我喝杯咖啡', donateLater: '以后再说',
+    spTitle: '支持 FMSuperScout', spIntro: 'FMSuperScout 免费、开源且无广告。如果这个工具帮到了你，可以通过以下方式支持我们：', spKofi: '请我喝杯咖啡', spKofiSub: '通过 Ko-fi 支持，金额不限', spStar: '在 GitHub 上加星', spStarSub: '免费，让更多人发现这个工具', spShare: '分享给朋友', spShareSub: '复制下载链接', spCopied: '下载链接已复制', spThanks: '感谢你的支持！',
+    position: '位置', clear: '清除', staffrole: '职员职责', quality: '能力与年龄',
+    age: '年龄', financial: '财务', maxvalue: '最高身价', maxfee: '最高要价', maxwage: '最高工资',
+    esSetupTitle: '请先启动一次《足球经理》',
+    esSetupBody: '安装后首次启动需要额外等待 1 至 3 分钟，并会出现黑色命令行窗口。这是模组初始化所需的时间。即使游戏看起来没有响应，也请保持窗口开启。',
+    esSetupHint: '初始化完成后，加载存档并按 F9。此后游戏将以正常速度启动。',
+    devDeltaHint: '所选时段内最近一次与最早一次读取结果的差值。绿色表示提升，红色表示下降。',
+    c_growth: '成长', grNew: '新增', development: '成长', histPeriod: '时段',
+    hp_last: '自上次读取以来', hp_m6: '过去 6 个月', hp_y1: '过去一年',
+    hp_season: '本赛季', hp_all: '自开始追踪以来', growthRange: '能力变化', onlyNew: '仅显示新增球员',
+    fitHint: '此人与职责的适配程度（1–20）。按相关职员属性加权计算，例如体能教练的体能训练和运动科学。使用筛选中的职责，或采用当前职责或偏好职责。这是工具的估算值。',
+    growthHint: '根据你的存档数据计算自所选基准日期以来的当前能力变化。绿色表示提升，红色表示下降，“新增”表示此前的数据中没有该球员。\n\n每按一次 F9 就会新增一个数据点。积累的数据越多，可回顾的时间越长。',
+    onlyNewHint: '筛选基准日期尚未出现在数据中的球员。通常是新一批青训球员，也可能是来自此前未加载联赛的球员。',
+    intakeTitle: '青训入队：全球新增 {n} 名球员', intakeBest: '最佳新秀：{p}',
+    intakeShow: '查看新一批青训球员',
+    physical: '身体', heightCm: '身高（厘米）', wonderkidOnly: '仅显示妖人',
+    wonderkidHint: '年龄不超过 21 岁，潜在能力达到 150，且潜在能力比当前能力至少高 25 点。球员卡的金边采用同一标准。',
+    origin: '来源', originComp: '国籍与赛事', nat: '国籍', euonly: '仅限欧盟／欧洲经济区', availability: '转会条件',
+    interestmin: '加盟意愿 ≥', all: '全部', attainable: '可签约', listed: '已挂牌',
+    tstatus: '转会状态', tsSale: '出售', tsLoan: '出租', tsAny: '出售或出租',
+    attainHint: '符合以下任一条件：已挂牌、被推荐出售、是自由球员，或合同将在 12 个月内到期。“非卖品”除外。是否愿意加盟你的俱乐部请看加盟意愿。',
+    exp6: '不足 6 个月', exp12: '不足一年', free: '自由球员', myclub: '我的俱乐部', contractF: '合同',
+    advBtn: '属性筛选', advTitle: '按属性筛选', advSearch: '选择或输入属性…',
+    advAdd: '+ 属性', advClear: '清除', advDone: '完成', advMin: '最低', advMax: '最高', advColAttr: '属性',
+    reportBug: '报告问题…', esReportHint: '按 F9 后没有数据？', updateAvail: '有可用更新 {v}',
+    updDl: '正在下载更新… {pct}%', updVerify: '正在验证下载…',
+    updLaunch: '安装程序已启动。请按提示操作，完成后应用将重启。',
+    updErr: '更新失败，请打开下载页面',
+    updCheckBtn: '检查更新', updChecking: '正在检查…',
+    updNone: '已是最新版本（v{v}）', updFound: '有可用更新 {v}，请查看顶部提示',
+    updCheckErr: '检查更新失败，请确认网络连接。',
+    onlyshortlist: '仅显示候选名单', clearfilters: '清除筛选', fetch: '读取新数据',
+    nodata: '尚未加载数据', exportcsv: '导出候选名单（CSV）',
+    results: '条结果', c_name: '姓名', c_age: '年龄', c_pos: '位置', c_club: '俱乐部', c_nat: '国家或地区',
+    c_value: '转会身价', c_fee: '要价', c_wage: '工资', c_expires: '到期', c_interest: '加盟意愿',
+    c_status: '状态', c_role: '职责', c_prefjob: '偏好职位', c_fit: '适配度', foot: '惯用脚', footR: '右脚', footL: '左脚', footB: '双脚', height: '身高', repLabel: '声望',
+    c_clubrep: '俱乐部声望', c_worldrep: '世界声望', c_div: '联赛',
+    estval: '估计身价', wageLabel: '工资', contractLabel: '合同到期', free_l: '免费',
+    int_big: '高', int_ok: '中等', int_small: '低', int_no: '无', interestTitle: '加盟意愿估算',
+    interestHint: '根据声望差距、工资、野心、忠诚度、年龄及转会条件估算球员是否愿意加盟你的俱乐部。对来自欧盟以外、未满 18 岁的球员，适用国际足联第 19 条规定。\n\n实际意愿由游戏在谈判时根据你的报价决定。即使意愿较低，球员也可能接受优厚报价。',
+    minorNote: '年龄太小，暂不能转会。', minorIntlNote: '欧盟以外的未成年球员需年满 18 岁才能进行国际转会（国际足联规定）。',
+    ambition: '野心', loyalty: '忠诚度', professionalism: '职业素养', adaptability: '适应性',
+    pressure: '抗压能力', sportsmanship: '体育精神', temperament: '气质', controversy: '争议性', determination: '意志力',
+    personaTitle: '性格',
+    hiddenTitle: '隐藏属性', a_Consistency: '稳定性', a_ImportantMatches: '大赛发挥',
+    a_InjuryProneness: '受伤倾向', a_Versatility: '多面性', a_Dirtiness: '肮脏程度',
+    showPot: '显示潜力预测', potNote: '达到潜在能力（PA）时的预测属性',
+    loanOut: '租借至 {c}', loanIn: '从 {c} 租借', ownerLabel: '所属俱乐部',
+    clubless: '自由球员', clubUnknown: '俱乐部未知', copied: '已复制',
+    copyNameTip: '点击复制姓名', slEmpty: '候选名单为空',
+    copyBtnTip: '复制姓名', clubNotRead: '未能读取俱乐部（声望 {r}）',
+    reqSent: '正在读取球员数据…',
+    dumping: '正在读取球员数据…', dumpReady: '新数据已就绪，点击加载',
+    dumpLoaded: '新数据已加载',
+    dumpError: '读取失败', fmNotRunning: '请先启动《足球经理》并加载存档。',
+    fmNoModule: '游戏未通过 FMSuperScout 启动。请保存存档、退出《足球经理》，再点击此按钮重新启动。',
+    macStartHint: '请通过 FMSuperScout 启动《足球经理》，以便读取新数据。',
+    startFm: '启动《足球经理》', fmStarting: '正在启动《足球经理》。如果 Steam 未运行，将先启动 Steam…',
+    fmStarted: '《足球经理》正在启动。请加载存档，然后读取新数据。',
+    fmNotFoundMac: '未找到《足球经理 27》。macOS 上的 FMSuperScout 目前仅支持 Steam 版本。',
+    fmStartFail: '无法启动《足球经理》（{e}）。',
+    fmSteamLogin: '请登录 Steam 后重试。', fmNoSteam: 'Steam 未能启动。请手动打开 Steam 并登录，再重试。',
+    fmExited: '《足球经理》启动后立即退出。请确认 Steam 已打开且已登录，然后重试。',
+    dumpIncomplete: '数据不完整，游戏可能仍在写入数据。请稍后重试。',
+    reqNoPickup: '游戏尚未响应读取请求。请确认已加载存档，在游戏中按 F9 或重启 FMSuperScout。',
+    reqNoPickupMore: '问题反复出现？查看解决方法',
+    scanStalled: '读取已停止，游戏可能已经关闭或崩溃。请重启游戏后重试。',
+    serverGone: '与本地服务器的连接已断开。请关闭此窗口并重新打开 FMSuperScout。',
+    tag_free: '自由球员', tag_listed: '已挂牌', tag_loan: '可出租', tag_rel: '将解约', tag_nfs: '非卖品',
+    dealTip: '已与 {c} 达成转会协议，将于 {d} 加盟', dealLabel: '已达成转会协议', hideDeals: '隐藏已达成转会协议的球员', hideDealsHint: '隐藏已同意在未来日期（如 7 月 1 日）转会到其他俱乐部的球员。转出或转入你的俱乐部的球员始终显示。',
+    colHint: '拖动调整顺序 · 右键选择列', colsTitle: '显示列', colsReset: '恢复默认',
+    sg_coaching: '训练', sg_mental: '精神', sg_knowledge: '知识', sg_medical: '医疗与数据',
+    g_technical: '技术', g_setpieces: '定位球', g_mental: '精神', g_physical: '身体', g_goalkeeping: '守门',
+    staffAttrs: '职员属性',
+    posAccomplished: '熟练（非天然位置）',
+    quickFilters: '快速筛选', qfWonderkid: '妖人', qfExpiring: '合同即将到期', qfSale: '出售', activeCount: '已启用 · {n}', noActiveFilters: '尚未设置筛选。可选择快速筛选、点击球场上的位置，或展开筛选组。', resultsOf: '/ {total} 名{what}', railOpen: '显示筛选',
+    clearAll: '全部清除', chipSearch: '搜索',
+    loading: '正在加载数据…',
+    parsing: '正在处理数据…',
+    esErrTitle: '无法加载数据',
+    esErrBig: '磁盘中已有数据，但应用无法读取。加载了大量联赛的存档容易出现此问题。可点击下方按钮报告问题。',
+    esErrSize: '磁盘上的数据大小：{mb} MB',
+    esErrReload: '重试',
+    esErrCrash: '上次加载时发生崩溃，可能是因为可用内存不足。数据已保存到磁盘，可以先关闭游戏，再点击“重试”。',
+    step1: '启动 <b>FM</b> 并加载存档',
+    step2: '在游戏中按 <kbd>F9</kbd>，或点击此处的<b>读取新数据</b>',
+    step3: '读取完成后，数据会自动加载',
+    playersWord: '球员', staffWord: '职员', clickClubFilter: '点击筛选你的俱乐部', mgrPick: '在线存档：请选择你控制的主教练', repWord: '声望',
+    roleFit: '战术角色', roleColHdr: '角色', roleAny: '未选择角色', bestRoles: '最佳角色',
+    compare: '比较', comparing: '比较中', addCompare: '加入比较', compareFull: '最多比较 3 名球员',
+    cmpTitle: '球员比较', cmpValue: '转会身价', cmpTopRole: '最佳角色',
+    cmpWinsBadge: '{n} 项属性领先', avgLabel: '平均',
+    mt_all: '全部', mt_first: '一线队', mt_res: '预备队', mt_youth: '青年队',
+    cmpDeltaHint: '差值为球员 1 的属性减去球员 2 的属性。绿色表示球员 1 领先。',
+    analysis: '分析', anTitle: '阵容需求分析', anNoClub: '数据中未找到你执教的俱乐部。',
+    anPlayers: '名球员', anAvgAge: '平均年龄', anAvgCa: '平均 CA', anTopCa: '最高 CA',
+    anOk: '人员充足', anThin: '替补不足', anShort: '人员短缺', anAging: '年龄偏大', anNoSucc: '缺少接班人',
+    anScout: '考察球员', anYoungTalent: '最年轻的新秀', anNone: '无',
+    anBiggestNeed: '最需补强的位置', anSquadSize: '阵容',
+    anRecAging: '球员年龄偏大。寻找未满 {age} 岁且潜在能力超过 {pa} 的接班人。',
+    anRecShort: '人员不足。至少再签下 {n} 名潜在能力达到 {pa} 的球员。',
+    anRecThin: '替补偏少。可引进潜在能力达到 {pa} 的球员，增加阵容深度。',
+    anRecSucc: '缺少达到所需水平的新秀。寻找未满 {age} 岁且潜在能力超过 {pa} 的球员。',
+    anRecAgingNp: '球员年龄偏大。寻找更年轻的接班人。',
+    anRecShortNp: '人员不足。再签下 {n} 名球员。',
+    anRecThinNp: '替补偏少。可引援增加阵容深度。',
+    anRecSuccNp: '缺少达到所需水平的新秀。寻找未满 {age} 岁的优秀新秀。',
+    competition: '赛事', divLabel: '联赛', divSearch: '输入赛事名称…',
+    gameDateMemory: '游戏日期（从内存读取）', gameDateDerived: '估计游戏日期（年份已确认，日期为估计值）',
+    presetsTitle: '已保存的筛选条件', presetSave: '保存当前筛选条件', presetNamePrompt: '输入筛选名称',
+    presetSaved: '已保存筛选条件', presetNone: '尚无已保存的筛选条件。', presetPick: '选择已保存的筛选条件…',
+    presetDelConfirm: '确定删除“{name}”？',
+    presetEmptyFilters: '没有可保存的筛选条件',
+    presetSaveTitle: '保存筛选条件', presetDelTitle: '删除筛选条件',
+    saveBtn: '保存', deleteBtn: '删除', cancelBtn: '取消',
+    scanDb: '数据库', dbMen: '男子', dbWomen: '女子', dbBoth: '全部',
+    genderLabel: '性别', womenNote: '下次读取（F9）时生效',
+    scanDbHint: '选择下次读取（F9）时加载男子、女子或全部数据。加载全部数据时，侧栏会显示性别筛选。',
+    wagePer: '工资周期', perWeek: '每周', perMonth: '每月', perYear: '每年',
+    perWeekSuf: '/周', perMonthSuf: '/月', perYearSuf: '/年', jobStaff: '职员',
+    c_meta: '实战', metaLabel: '实战评分', c_metapa: '潜在实战',
+    metaHint: '根据 FM-Arena 比赛引擎测试，对影响比赛表现的属性进行加权平均（1–20 分）。速度与爆发力权重最高。门将使用门将测试的权重，重点看反应和灵活。\n\n15 分以上为顶级，13–15 分为优秀，11–13 分为良好。当前能力相同的球员中，实战评分较高的球员通常表现更好。',
+    metaPaHint: '用相同的实战权重计算球员达到潜在能力时的预测评分。属性预测采用对应位置的成长规律，身体属性在 23 岁后不再预测增长。\n\n球员充分成长后，这一评分与当前实战评分相同。可按此列排序，寻找有潜力的球员。',
+    verWarn: '检测到 FM {v}，当前内存读取适用于 {s}.x 版本。在 FMSuperScout 更新前，数据可能存在偏差。',
+    verWarnOldDump: '这些数据由旧版 FMSuperScout 生成。建议在 FM 中加载存档并按 F9，以读取最新数据。',
+  },
 };
 // Onbekende taalcode (oude versie in localStorage, gesynct profiel) mag de app niet
 // slopen vóór er ook maar iets gerenderd is → altijd via een geldige tabel.
 const t = k => ((I18N[state.lang] || I18N.en)[k] ?? I18N.en[k] ?? I18N.nl[k] ?? k);
-// Locale voor getallen/datums per app-taal (toLocaleString/-DateString).
-const LOCALES = { nl: 'nl-NL', en: 'en-GB', fr: 'fr-FR', de: 'de-DE' };
 const uiLocale = () => LOCALES[state.lang] || 'en-GB';
 
 // ================= SVG-iconen =================
@@ -695,6 +851,12 @@ const ATTR_LABEL = {
     Acceleration: 'Antritt', Agility: 'Beweglichkeit', Balance: 'Balance', JumpingReach: 'Sprungkraft', NaturalFitness: 'Natürliche Fitness', Pace: 'Schnelligkeit', Stamina: 'Ausdauer', Strength: 'Kraft',
     AerialReach: 'Luftbeherrschung', CommandOfArea: 'Strafraumbeherrschung', Communication: 'Kommunikation', Eccentricity: 'Exzentrik', Handling: 'Fangsicherheit', Kicking: 'Abschlag', OneOnOnes: 'Eins gegen eins', Punching: 'Fausten', Reflexes: 'Reflexe', RushingOut: 'Herauslaufen', Throwing: 'Abwurf',
   },
+  'zh-CN': {
+    Corners: '角球', Crossing: '传中', Dribbling: '盘带', Finishing: '射门', FirstTouch: '停球', FreeKicks: '任意球', Heading: '头球', LongShots: '远射', LongThrows: '界外球', Marking: '盯人', Passing: '传球', PenaltyTaking: '罚点球', Tackling: '抢断', Technique: '技术',
+    Aggression: '侵略性', Anticipation: '预判', Bravery: '勇敢', Composure: '镇定', Concentration: '集中', Decisions: '决断', Determination: '意志力', Flair: '才华', Leadership: '领导力', OffTheBall: '无球跑动', Positioning: '防守站位', Teamwork: '团队合作', Vision: '视野', WorkRate: '工作投入',
+    Acceleration: '爆发力', Agility: '灵活', Balance: '平衡', JumpingReach: '弹跳', NaturalFitness: '体质', Pace: '速度', Stamina: '耐力', Strength: '强壮',
+    AerialReach: '制空范围', CommandOfArea: '拦截传中', Communication: '指挥防守', Eccentricity: '意外性', Handling: '手控球', Kicking: '大脚开球', OneOnOnes: '一对一', Punching: '拳击球(倾向)', Reflexes: '反应', RushingOut: '出击(倾向)', Throwing: '手抛球',
+  },
 };
 const attrName = k => ((ATTR_LABEL[state.lang] || ATTR_LABEL.en)[k] ?? k);
 // FM sorteert attributen binnen een groep alfabetisch in de taal van de game; wij dus ook,
@@ -753,7 +915,13 @@ const EU_NATIONS = new Set([
   'Letonya', 'Litvanya', 'Kıbrıs', 'Norveç', 'İzlanda', 'Lihtenştayn', 'İsviçre',
 ].map(s => s.toLowerCase()));
 // EU/EER-check: via het nation-ID als dat er is (taalonafhankelijk), anders de naamlijst.
-const isEu = p => { const r = natRec(p); return r ? r[4] === 1 : (p.nat || []).some(n => EU_NATIONS.has((n || '').toLowerCase())); };
+const isEu = p => {
+  const r = natRec(p);
+  return r ? r[4] === 1 : (p.nat || []).some(n => {
+    const key = normSearch(n);
+    return NAT_BY_NAME.get(key)?.[4] === 1 || EU_NATIONS.has(key);
+  });
+};
 
 // Voet: de plugin schrijft NL ('Rechts'/'Links'/'Beide') in de dump → vertalen bij tonen.
 // ---------- ontwikkeling: groei t.o.v. een peildatum ----------
@@ -968,12 +1136,27 @@ const NATION_EN = {
 };
 // Landnamen: bij voorkeur via het taalonafhankelijke nation-ID uit de dump (natId,
 // plugin 0.1.44+) en de NATIONS-tabel uit nations.js: dan klopt de weergave in elke
-// game- én app-taal (issue #15). Oude dumps zonder natId vallen terug op de naamstring,
-// met de NL→EN-tabel voor niet-NL app-talen.
-const NAT_LANG_IDX = { nl: 0, en: 1, fr: 2, de: 3 };
+// game- én app-taal (issue #15). Bewaar de volgorde van meerdere nationaliteiten.
+const NAT_LANG_IDX = { nl: 0, en: 1, fr: 2, de: 3, 'zh-CN': 5 };
+const NAT_BY_NAME = new Map();
+function normSearch(s) { return (s || '').normalize('NFKC').toLowerCase(); }
+if (typeof NATIONS !== 'undefined') {
+  for (const r of Object.values(NATIONS)) {
+    for (const idx of Object.values(NAT_LANG_IDX)) NAT_BY_NAME.set(normSearch(r[idx]), r);
+  }
+}
 const natRec = p => (typeof NATIONS !== 'undefined' && p && p.natId && NATIONS[p.natId]) || null;
-const natLabel = n => state.lang !== 'nl' ? (NATION_EN[n] || n) : n;
-const natsLabel = p => { const r = natRec(p); return r ? r[NAT_LANG_IDX[state.lang] ?? 1] : (p.nat || []).map(natLabel).join(', '); };
+const natLabel = n => NAT_BY_NAME.get(normSearch(n))?.[NAT_LANG_IDX[state.lang] ?? 1] ?? (state.lang !== 'nl' ? (NATION_EN[n] || n) : n);
+function natsLabel(p) {
+  const r = natRec(p);
+  const raw = p.nat || [];
+  const sourceLang = state.meta.dataLanguage;
+  const sameChinese = state.lang === 'zh-CN' && (sourceLang
+    ? /^zh(?:-CN|-Hans)?$/i.test(sourceLang)
+    : /\p{Script=Han}/u.test(raw[0] || ''));
+  const first = sameChinese && raw[0] ? raw[0] : r?.[NAT_LANG_IDX[state.lang] ?? 1] ?? (raw[0] ? natLabel(raw[0]) : '');
+  return [first, ...raw.slice(1).map(n => sameChinese ? n : natLabel(n))].filter(Boolean).join(state.lang === 'zh-CN' ? '、' : ', ');
+}
 
 // Kolommen die onder de "verborgen stats"-toggle vallen: CA/PA zelf, plus meta-score en
 // vraagprijs (beide afgeleid van/verweven met verborgen data, Marks keuze).
@@ -1005,6 +1188,10 @@ function fmtMoney(v) {
 // (sorteert/parset beter in spreadsheets).
 const fmtDate = v => {
   const s = v ? String(v) : '';
+  if (state.lang === 'zh-CN' && /^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const date = new Date(s.slice(0, 10) + 'T00:00:00');
+    if (!Number.isNaN(+date)) return date.toLocaleDateString(uiLocale(), { dateStyle: 'medium' });
+  }
   return s.length >= 10 ? `${s.slice(8, 10)}-${s.slice(5, 7)}-${s.slice(0, 4)}` : (s || '–');
 };
 
@@ -1047,8 +1234,8 @@ const PLAYER_COLS = [
   { key: 'name', label: 'c_name', get: p => p.name, name: true, w: 180 },
   { key: 'age', label: 'c_age', num: true, get: p => getAge(p), w: 50 },
   { key: 'pos', label: 'c_pos', get: p => posRank(p), render: p => posHtml(p), w: 130 },
-  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p) + dealSuffix(p), w: 175 },
-  { key: 'div', label: 'c_div', get: p => p.div || '', render: p => p.div ? escHtml(p.div) : '<span class="dim">–</span>', defHidden: true, w: 170 },
+  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p, true) + dealSuffix(p), w: 175 },
+  { key: 'div', label: 'c_div', get: p => p.div || '', render: p => p.div ? shortLabel(p.div, p.divisionShort) : '<span class="dim">–</span>', defHidden: true, w: 170 },
   { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
   { key: 'eu', label: 'EU', get: p => isEu(p) ? 1 : 0, render: p => isEu(p) ? `<span class="eu-yes">${icon('check', 12)}</span>` : '<span class="dim">–</span>', w: 42 },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
@@ -1077,7 +1264,7 @@ const STAFF_COLS = [
   { key: 'job', label: 'c_role', get: p => staffJobless(p) ? '' : jobLabel(p), render: p => staffJobless(p) ? '<span class="dim">–</span>' : escHtml(jobLabel(p)), w: 150 },
   { key: 'prefJob', label: 'c_prefjob', get: p => prefJobLabel(p), render: p => prefJobLabel(p) ? escHtml(prefJobLabel(p)) : '<span class="dim">–</span>', w: 150 },
   { key: 'fit', label: 'c_fit', num: true, help: 'fitHint', get: p => fitOf(p) ?? -1, render: p => { const v = fitOf(p); return v == null ? '<span class="dim">–</span>' : `<span class="${roleClass(v)}">${v.toFixed(1)}</span>`; }, w: 90 },
-  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p) + dealSuffix(p), w: 175 },
+  { key: 'club', label: 'c_club', get: p => p.club || '', render: p => clubLabel(p, true) + dealSuffix(p), w: 175 },
   { key: 'nat', label: 'c_nat', get: p => natsLabel(p), w: 115 },
   { key: 'ca', label: 'CA', num: true, get: p => p.ca, render: p => qHtml(p.ca), w: 56 },
   { key: 'pa', label: 'PA', num: true, get: p => p.pa, render: p => qHtml(p.pa), w: 56 },
@@ -1098,19 +1285,20 @@ const STAFF_COLS = [
 // de rest. Zie docs/value-model.md.
 const VAL_B = { c0: 10.96, wRep: 0.997, age: -0.069, yhead: -0.041, lnC: 0.507 };
 function wSat(w) { return Math.min(w, 7500) + 0.30 * Math.max(0, w - 7500); }   // faam vlakt af aan de top
-// Écht clubloos = geen club én geen clubreputatie. (Club met wél rep maar zonder naam is een
-// niet-opgeloste clubverwijzing, geen transfervrije speler — zie clubLabel.)
-const isFree = p => !p.club && !(p.clubRep > 0);
-// Clublabel: naam, of "onbekende club" als de plugin wél een clubreputatie vond maar de naam
-// niet kon uitlezen (bekende beperking), of "clubloos" bij een echte transfervrije speler.
+// Alleen de scanner kan bevestigen dat er geen huidige club is.
+const isFree = p => p.clubStatus === 'free' && !p.club && !p.ownerClub;
+const clubText = p => p.club || t(isFree(p) ? 'clubless' : 'clubUnknown');
 // Clubkolom: akkoord met een andere club direct achter de huidige club ("Mallorca → Barcelona").
 const dealSuffix = p => p.transferTo && p.transferTo !== p.club
   ? ` <span class="deal-txt" data-tip="${escHtml(dealTip(p))}">→ ${escHtml(p.transferTo)}</span>` : '';
-function clubLabel(p) {
-  if (p.club) return escHtml(p.club);
-  if (p.clubRep > 0) return `<span class="dim" data-tip="${escHtml(tf('clubNotRead', { r: p.clubRep }))}">${t('clubUnknown')}</span>`;
-  // Transfervrij: streepje met tooltip (de status-pill "clubloos" vertelt het al).
-  return `<span class="dim" data-help="clubless">–</span>`;
+function shortLabel(full, short) {
+  return short && short !== full ? `<span data-tip="${escHtml(full)}">${escHtml(short)}</span>` : escHtml(full);
+}
+function clubLabel(p, short = false) {
+  if (p.club) return shortLabel(p.club, short && p.clubShort);
+  if (isFree(p)) return '<span class="dim" data-help="clubless">–</span>';
+  if (p.clubRep > 0) return `<span class="dim" data-tip="${escHtml(tf('clubNotRead', { r: p.clubRep }))}">${clubText(p)}</span>`;
+  return `<span class="dim">${clubText(p)}</span>`;
 }
 // Gememoiseerd per speler (_ev); zie metaScore. Consumers lezen het object alleen.
 function estValue(p) {
@@ -1340,12 +1528,40 @@ function statusHtml(p) {
 // Natuurlijke posities. posArr bevat sinds scanner 1.6 ook bedreven nevenposities (15+);
 // posNat staat alleen in de dump als dat verschil er is. Oude dumps: posArr wás al natuurlijk.
 const natPos = p => p.posNat || p.posArr || [];
+const POSITION_ZH = {
+  GK: ['门将', '门将'],
+  DL: ['左后', '左后卫'], DC: ['中卫', '中后卫'], DR: ['右后', '右后卫'],
+  WBL: ['左翼', '左边翼卫'], WBR: ['右翼', '右边翼卫'],
+  DM: ['后腰', '后腰'],
+  ML: ['左中', '左中场'], MC: ['中场', '中场（中）'], MR: ['右中', '右中场'],
+  AML: ['左前', '左前腰'], AMC: ['前腰', '前腰（中）'], AMR: ['右前', '右前腰'],
+  ST: ['前锋', '前锋'],
+};
+const positionLabel = (code, compact = false) => state.lang === 'zh-CN'
+  ? POSITION_ZH[code]?.[compact ? 0 : 1] ?? code : code;
+function positionText(p) {
+  if (state.lang !== 'zh-CN') return p.pos || '';
+  const codes = p.posArr?.length ? p.posArr : (p.pos || '').split(',').map(s => s.trim()).filter(Boolean);
+  return codes.map(code => positionLabel(code)).join('、');
+}
+
 // Positiekolom: natuurlijke posities gewoon, bedreven nevenposities gedimd erachter.
-function posHtml(p) {
+function posHtml(p, compact = true) {
   const all = p.posArr || [];
-  if (!all.length) return p.pos ? escHtml(p.pos) : '<span class="dim">–</span>';
+  if (!all.length) {
+    const text = positionText(p);
+    return text ? escHtml(text) : '<span class="dim">–</span>';
+  }
+  const chinese = state.lang === 'zh-CN';
   const nat = new Set(natPos(p));
-  return all.map(x => nat.has(x) ? escHtml(x) : `<span class="pos-acc" title="${escHtml(t('posAccomplished'))}">${escHtml(x)}</span>`).join(', ');
+  const html = all.map(code => {
+    const name = positionLabel(code, compact);
+    const natural = nat.has(code);
+    const classes = [chinese && !compact && 'pos-term', !natural && 'pos-acc'].filter(Boolean).join(' ');
+    const tip = !natural && (!chinese || !compact) ? ` title="${escHtml(t('posAccomplished'))}"` : '';
+    return classes ? `<span class="${classes}"${tip}>${escHtml(name)}</span>` : escHtml(name);
+  }).join(chinese ? '、' : ', ');
+  return chinese && compact ? `<span data-tip="${escHtml(positionText(p))}">${html}</span>` : html;
 }
 // Positievolgorde zoals in FM: van doel naar aanval (GK ... ST), niet alfabetisch.
 const POS_ORDER = ['GK', 'DL', 'DC', 'DR', 'WBL', 'WBR', 'DM', 'ML', 'MC', 'MR', 'AML', 'AMC', 'AMR', 'ST'];
@@ -1380,6 +1596,7 @@ const STAFF_ATTR_LABEL = {
   en: { Aanvallen: 'Attacking', Verdedigen: 'Defending', Fitheid: 'Fitness', Balbezit: 'Possession', Technisch: 'Technical', Tactisch: 'Tactical', Standaardsituaties: 'Set Pieces', KV_reflexen: 'Goalkeeping', Jeugd: 'Working with Youngsters', Aanpassingsvermogen: 'Adaptability', KV_distributie: 'Authority', Motiveren: 'Motivating', 'Man-management': 'Man Management', Vastberadenheid: 'Determination', Oordeel_staf: 'Judging Staff Ability', Onderhandelen: 'Negotiating', Oordeel_vermogen: 'Judging Player Ability', Oordeel_potentie: 'Judging Player Potential', Tactische_kennis: 'Tactical Knowledge', Fysiotherapie: 'Physiotherapy', Sportwetenschap: 'Sports Science', Data_analyse: 'Analysing Data' },
   fr: { Aanvallen: 'Attaque', Verdedigen: 'Défense', Fitheid: 'Condition physique', Balbezit: 'Possession', Technisch: 'Technique', Tactisch: 'Tactique', Standaardsituaties: 'Coups de pied arrêtés', KV_reflexen: 'Gardiens', Jeugd: 'Travail avec les jeunes', Aanpassingsvermogen: 'Adaptabilité', KV_distributie: 'Autorité', Motiveren: 'Motivation', 'Man-management': 'Gestion humaine', Vastberadenheid: 'Détermination', Oordeel_staf: 'Évaluer le staff', Onderhandelen: 'Négociation', Oordeel_vermogen: 'Évaluer les capacités', Oordeel_potentie: 'Évaluer le potentiel', Tactische_kennis: 'Connaissances tactiques', Fysiotherapie: 'Kinésithérapie', Sportwetenschap: 'Sciences du sport', Data_analyse: 'Analyse de données' },
   de: { Aanvallen: 'Angriff', Verdedigen: 'Abwehr', Fitheid: 'Fitness', Balbezit: 'Ballbesitz', Technisch: 'Technik', Tactisch: 'Taktik', Standaardsituaties: 'Standards', KV_reflexen: 'Torwarttraining', Jeugd: 'Arbeit mit Jugendlichen', Aanpassingsvermogen: 'Anpassungsfähigkeit', KV_distributie: 'Autorität', Motiveren: 'Motivieren', 'Man-management': 'Menschenführung', Vastberadenheid: 'Entschlossenheit', Oordeel_staf: 'Mitarbeiter beurteilen', Onderhandelen: 'Verhandeln', Oordeel_vermogen: 'Spielerstärke beurteilen', Oordeel_potentie: 'Spielerpotenzial beurteilen', Tactische_kennis: 'Taktikwissen', Fysiotherapie: 'Physiotherapie', Sportwetenschap: 'Sportwissenschaft', Data_analyse: 'Datenanalyse' },
+  'zh-CN': { Aanvallen: '进攻', Verdedigen: '防守', Fitheid: '体能', Balbezit: '控球', Technisch: '技术', Tactisch: '战术', Standaardsituaties: '定位球', KV_reflexen: '门将训练', Jeugd: '与年轻球员共事', Aanpassingsvermogen: '适应性', KV_distributie: '管理纪律', Motiveren: '激励', 'Man-management': '人员管理', Vastberadenheid: '意志力', Oordeel_staf: '评估职员能力', Onderhandelen: '谈判', Oordeel_vermogen: '评估球员能力', Oordeel_potentie: '评估球员潜力', Tactische_kennis: '战术知识', Fysiotherapie: '理疗', Sportwetenschap: '运动科学', Data_analyse: '数据分析' },
 };
 const isStaffAttr = k => k in STAFF_ATTR_LABEL.en;
 // Dumps van vóór de scanner (plugin ≤ 0.1.46, geen meta.host) bewaarden "Jeugd" onterecht
@@ -1561,6 +1778,7 @@ const ROLE_LABEL = {
   en: { gk: 'Goalkeeper', sk: 'Sweeper Keeper', cd: 'Central Defender', bpd: 'Ball Playing Defender', fb: 'Full Back', wb: 'Wing Back', dm: 'Defensive Midfielder', dlp: 'Deep Lying Playmaker', bwm: 'Ball Winning Midfielder', cm: 'Central Midfielder', b2b: 'Box to Box Midfielder', ap: 'Advanced Playmaker', wing: 'Winger', if: 'Inside Forward', am: 'Attacking Midfielder', af: 'Advanced Forward', poacher: 'Poacher', tm: 'Target Man', cf: 'Complete Forward' },
   fr: { gk: 'Gardien', sk: 'Gardien libéro', cd: 'Défenseur central', bpd: 'Défenseur relanceur', fb: 'Arrière latéral', wb: 'Piston', dm: 'Milieu défensif', dlp: 'Meneur reculé', bwm: 'Récupérateur', cm: 'Milieu central', b2b: 'Milieu box-to-box', ap: 'Meneur avancé', wing: 'Ailier', if: 'Attaquant intérieur', am: 'Milieu offensif', af: 'Attaquant avancé', poacher: 'Renard des surfaces', tm: 'Pivot', cf: 'Attaquant complet' },
   de: { gk: 'Torwart', sk: 'Mitspielender Torwart', cd: 'Innenverteidiger', bpd: 'Ballspielender Innenverteidiger', fb: 'Außenverteidiger', wb: 'Flügelverteidiger', dm: 'Defensiver Mittelfeldspieler', dlp: 'Tiefer Spielmacher', bwm: 'Balleroberer', cm: 'Zentraler Mittelfeldspieler', b2b: 'Box-to-Box-Spieler', ap: 'Offensiver Spielmacher', wing: 'Flügelspieler', if: 'Inverser Flügelstürmer', am: 'Offensiver Mittelfeldspieler', af: 'Vorgezogene Spitze', poacher: 'Knipser', tm: 'Zielspieler', cf: 'Komplette Spitze' },
+  'zh-CN': { gk: '门将', sk: '出球门将', cd: '中后卫', bpd: '出球后卫', fb: '边后卫', wb: '边翼卫', dm: '防守型中场', dlp: '拖后组织核心', bwm: '抢球机器', cm: '中场', b2b: '全能中场', ap: '前场组织核心', wing: '边锋', if: '内锋', am: '进攻型中场', af: '突前前锋', poacher: '抢点型前锋', tm: '站桩式中锋', cf: '全能前锋' },
 };
 const roleName = id => (ROLE_LABEL[state.lang]?.[id] ?? ROLE_LABEL.en[id] ?? id);
 
@@ -1572,6 +1790,7 @@ const JOB_LABEL = {
   en: { 1: 'Player', 2: 'Coach', 3: 'Player/Coach', 4: 'Chairman', 6: 'Director', 8: 'Managing director', 10: 'Director of football', 12: 'Physio', 14: 'Scout', 16: 'Manager', 17: 'Player/Manager', 20: 'Assistant manager', 21: 'Player/Assistant manager', 22: 'Media analyst', 24: 'General manager', 26: 'Fitness coach', 27: 'Player/Fitness coach', 34: 'Goalkeeping coach', 35: 'Player/GK coach', 36: 'Head of data analysis', 38: 'Club doctor', 40: 'Head of sports science', 42: 'Data analyst', 44: 'Chief scout', 45: 'Player/Chief scout', 46: 'Doctor', 48: 'Sports scientist', 49: 'Player/Youth coach', 50: 'Head physio', 52: 'U19 manager', 54: 'First-team coach', 64: 'Head of youth development', 65: 'Player/Head of youth', 66: 'Owner', 70: 'President', 86: 'Loan manager', 88: 'Technical director', 58: 'Recruitment analyst', 60: 'Performance analyst', 62: 'Head of performance analysis', 144: 'Caretaker manager' },
   fr: { 1: 'Joueur', 2: 'Entraîneur', 3: 'Joueur/Entraîneur', 4: 'Président du conseil', 6: 'Directeur', 8: 'Directeur général', 10: 'Directeur sportif', 12: 'Kinésithérapeute', 14: 'Recruteur', 16: 'Manager', 17: 'Joueur/Manager', 20: 'Adjoint', 21: 'Joueur/Adjoint', 22: 'Analyste média', 24: 'Manager général', 26: 'Préparateur physique', 27: 'Joueur/Préparateur physique', 34: 'Entraîneur des gardiens', 35: 'Joueur/Entraîneur des gardiens', 36: 'Resp. analyse de données', 38: 'Médecin du club', 40: 'Resp. sciences du sport', 42: 'Analyste de données', 44: 'Recruteur en chef', 45: 'Joueur/Recruteur en chef', 46: 'Médecin', 48: 'Scientifique du sport', 49: 'Joueur/Entraîneur de jeunes', 50: 'Kiné en chef', 52: 'Manager U19', 54: 'Entraîneur équipe première', 64: 'Resp. formation', 65: 'Joueur/Resp. formation', 66: 'Propriétaire', 70: 'Président', 86: 'Resp. des prêts', 88: 'Directeur technique', 58: 'Analyste recrutement', 60: 'Analyste de performance', 62: 'Resp. analyse de la performance', 144: 'Entraîneur intérimaire' },
   de: { 1: 'Spieler', 2: 'Trainer', 3: 'Spielertrainer', 4: 'Vorsitzender', 6: 'Direktor', 8: 'Geschäftsführer', 10: 'Sportdirektor', 12: 'Physiotherapeut', 14: 'Scout', 16: 'Manager', 17: 'Spielermanager', 20: 'Co-Trainer', 21: 'Spieler/Co-Trainer', 22: 'Medienanalyst', 24: 'General Manager', 26: 'Fitnesstrainer', 27: 'Spieler/Fitnesstrainer', 34: 'Torwarttrainer', 35: 'Spieler/Torwarttrainer', 36: 'Leiter Datenanalyse', 38: 'Vereinsarzt', 40: 'Leiter Sportwissenschaft', 42: 'Datenanalyst', 44: 'Chefscout', 45: 'Spieler/Chefscout', 46: 'Arzt', 48: 'Sportwissenschaftler', 49: 'Spieler/Jugendtrainer', 50: 'Leitender Physiotherapeut', 52: 'U19-Trainer', 54: 'Trainer 1. Mannschaft', 64: 'Leiter Nachwuchs', 65: 'Spieler/Nachwuchsleiter', 66: 'Eigentümer', 70: 'Präsident', 86: 'Leihspielermanager', 88: 'Technischer Direktor', 58: 'Rekrutierungsanalyst', 60: 'Leistungsanalyst', 62: 'Leiter Leistungsanalyse', 144: 'Interimstrainer' },
+  'zh-CN': { 1: '球员', 2: '教练', 3: '球员兼教练', 4: '主席', 6: '董事', 8: '执行董事', 10: '足球总监', 12: '理疗师', 14: '球探', 16: '主教练', 17: '球员兼主教练', 20: '助理教练', 21: '球员兼助理教练', 22: '媒体分析师', 24: '总经理', 26: '体能教练', 27: '球员兼体能教练', 34: '门将教练', 35: '球员兼门将教练', 36: '数据分析主管', 38: '俱乐部医生', 40: '运动科学主管', 42: '数据分析师', 44: '首席球探', 45: '球员兼首席球探', 46: '医生', 48: '运动科学家', 49: '球员兼青年队教练', 50: '首席理疗师', 52: 'U19 主教练', 54: '一线队教练', 64: '青训主管', 65: '球员兼青训主管', 66: '所有者', 70: '总裁', 86: '租借经理', 88: '技术总监', 58: '引援分析师', 60: '表现分析师', 62: '表现分析主管', 144: '临时主教练' },
 };
 const jobLabel = p => {
   const L = JOB_LABEL[state.lang] || JOB_LABEL.en;
@@ -1586,6 +1805,7 @@ const PREF_JOB = [16, 20, 2, 12, 14, 34, 26, 22, null, 10, 64, 86, null, 48, 88]
 const PREF_GROUP_LABEL = {
   nl: { 8: 'Bestuur', 12: 'Analist' }, en: { 8: 'Board', 12: 'Analyst' },
   fr: { 8: 'Direction', 12: 'Analyste' }, de: { 8: 'Vorstand', 12: 'Analyst' },
+  'zh-CN': { 8: '董事会', 12: '分析师' },
 };
 // Functie-id → voorkeursgroep, voor de rolfilter (transfervrije staf matcht op voorkeur).
 const JOB_PREF_GROUP = { 16: 0, 52: 0, 144: 0, 20: 1, 2: 2, 54: 2, 12: 3, 50: 3, 14: 4, 44: 4, 34: 5, 26: 6, 22: 7,
@@ -1597,7 +1817,7 @@ const prefGroupLabel = g => {
 };
 const prefJobLabel = p => (p && p.prefJob && p.prefJob.length) ? p.prefJob.map(prefGroupLabel).filter(Boolean).join(' / ') : '';
 // Geen baan bij een club: transfervrij, of een functie-byte die we niet kennen zonder club.
-const staffJobless = p => !p.club && (!p.jobId || p.job === 'Staflid');
+const staffJobless = p => isFree(p) && (!p.jobId || p.job === 'Staflid');
 // Rolfilter: naast de huidige functie telt ook de voorkeur. jobPrefs = FM's 15 voorkeurs-
 // scores (1-20); 15+ is een serieuze voorkeur, ook als het niet de hoogste is (een trainer
 // met conditietrainer 15/20 komt dus mee bij "Conditietrainer"). Oudere dumps hebben alleen
@@ -1747,8 +1967,9 @@ const PITCH = [
 const activePos = new Set();
 function buildPitch() {
   const nodes = PITCH.map(([pos, x, y]) =>
-    `<g class="pos-node" data-pos="${pos}" transform="translate(${x},${y})">
-       <circle r="7.5"></circle><text>${pos}</text></g>`).join('');
+    `<g class="pos-node${activePos.has(pos) ? ' on' : ''}" data-pos="${pos}" transform="translate(${x},${y})">
+       ${state.lang === 'zh-CN' ? `<title>${escHtml(positionLabel(pos))}</title>` : ''}
+       <circle r="7.5"></circle><text>${escHtml(positionLabel(pos, true))}</text></g>`).join('');
   $('pitch-wrap').innerHTML =
     `<svg viewBox="0 0 100 104" xmlns="http://www.w3.org/2000/svg">
        <rect x="1" y="1" width="98" height="102" rx="3" fill="#12301c" stroke="#2a2f62"/>
@@ -1777,7 +1998,7 @@ function buildPitch() {
 // als de inhoud identiek is. Club-, divisie- en datumwaarden komen in een grote dump
 // honderdduizenden keren voor; één canonieke instantie per waarde scheelt honderden MB
 // piekgeheugen bij mega-dumps (600k+ personen).
-const INTERN_KEYS = ['club', 'ownerClub', 'div', 'pos', 'foot', 'expires', 'dob', 'job'];
+const INTERN_KEYS = ['club', 'clubShort', 'ownerClub', 'div', 'divisionShort', 'pos', 'foot', 'expires', 'dob', 'job'];
 function internStrings(obj, pool) {
   for (const k of INTERN_KEYS) {
     const v = obj[k];
@@ -1968,7 +2189,7 @@ async function loadDump(force = false) {
   } catch (e) {
     console.error(e);
     localStorage.removeItem('fmss_loadmark');   // nette fout, geen crash: marker weg
-    $('dump-info').textContent = 'fout';
+    $('dump-info').textContent = t('dumpError');
     // Er ligt (waarschijnlijk) wél een dump, maar het inlezen faalde. Maak dat zichtbaar
     // op het lege scherm i.p.v. het stil weg te slikken; anders blijft de gebruiker met
     // een leeg scherm en de misleidende "druk op F9"-stappen achter.
@@ -2057,9 +2278,10 @@ function renderDumpInfo() {
   const gd = $('game-date');
   if (!state.dumpStamp) { $('dump-info').textContent = ''; if (gd) gd.textContent = ''; return; }
   const when = new Date(state.dumpStamp);
-  const n = state.players.length.toLocaleString();
+  const loc = uiLocale();
+  const n = state.players.length.toLocaleString(loc);
   $('dump-info').textContent = n;
-  $('dump-info').title = `${state.players.length.toLocaleString()} ${t('playersWord')} · ${state.staff.length.toLocaleString()} ${t('staffWord')}\n${when.toLocaleString()}`;
+  $('dump-info').title = `${n} ${t('playersWord')} · ${state.staff.length.toLocaleString(loc)} ${t('staffWord')}\n${when.toLocaleString(loc)}`;
   // In-game datum naast het spelersaantal. "memory" = exact uit het geheugen; "derived" =
   // afgeleid (jaar zeker, dag benaderd) → tilde + tooltip zodat het verschil duidelijk is.
   if (gd) {
@@ -2069,7 +2291,7 @@ function renderDumpInfo() {
       const derived = state.meta.gameDateSource !== 'memory';
       const d = new Date(ds);
       const txt = isNaN(d) ? ds : d.toLocaleDateString(uiLocale(),
-        { day: 'numeric', month: 'short', year: 'numeric' });
+        { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
       gd.innerHTML = icon('calendar', 12) + ' ' + escHtml((derived ? '~ ' : '') + txt);
       gd.title = derived ? t('gameDateDerived') : t('gameDateMemory');
     }
@@ -2163,11 +2385,14 @@ function buildFootOptions() {
 // mediane clubreputatie van de spelers erin benadert het niveau goed → sterkere competities
 // bovenaan in de suggesties. Ook een genormaliseerde naam (diacrieten/leestekens weg) voor
 // typo-tolerant zoeken.
+const divisionNames = p => [p.div, p.divisionShort, ...(p.divisionAliases || [])].filter(Boolean);
 function buildDivisions() {
   const byDiv = new Map();
   for (const p of state.players) {
     if (!p.div) continue;
-    (byDiv.get(p.div) || byDiv.set(p.div, []).get(p.div)).push(p.clubRep || 0);
+    const entry = byDiv.get(p.div) || byDiv.set(p.div, { reps: [], aliases: new Set() }).get(p.div);
+    entry.reps.push(p.clubRep || 0);
+    for (const name of divisionNames(p)) entry.aliases.add(name);
   }
   // Sterkte-proxy = het 80e-percentiel van de clubreputaties (de top-clubs bepalen het
   // aanzien van een competitie beter dan de mediaan, die kleine landen met een paar sterke
@@ -2177,15 +2402,17 @@ function buildDivisions() {
   const myClub = (state.meta.myClub || '').toLowerCase();
   state.myDivs = new Set(state.players.filter(p => (p.club || '').toLowerCase() === myClub && p.div).map(p => p.div));
   state.divIndex = [...byDiv.entries()]
-    .map(([name, reps]) => ({ name, norm: normStr(name), strength: p80(reps), count: reps.length, mine: state.myDivs.has(name) }))
+    .map(([name, { reps, aliases }]) => ({
+      name, terms: [...aliases].map(normStr), strength: p80(reps), count: reps.length, mine: state.myDivs.has(name),
+    }))
     .sort((a, b) => b.strength - a.strength || b.count - a.count);
   const wrap = $('fg-div');
   wrap.style.display = state.divIndex.length ? '' : 'none';
 }
 // Normaliseer voor zoeken: kleine letters, diacrieten weg, alleen letters/cijfers/spaties.
 function normStr(s) {
-  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return normSearch(s).normalize('NFD').replace(/\p{Mark}/gu, '')
+    .replace(/[^\p{Letter}\p{Number}]+/gu, ' ').trim();
 }
 // Levenshtein (met vroege afkap) voor typo-tolerantie op woordniveau.
 function editDist(a, b, max) {
@@ -2205,13 +2432,12 @@ function editDist(a, b, max) {
 }
 // Score een divisie tegen de (genormaliseerde) query. Hoger = betere match; -1 = geen match.
 // Combineert matchkwaliteit met competitiesterkte (tiebreak), en tolereert typo's per woord.
-function scoreDiv(entry, q) {
+function scoreDiv(name, q, str) {
   // Sterkte weegt fors bínnen een matchklasse (300 punten = het hele bereik), maar overbrugt
   // nooit een klasse: zo staat de sterke "…Eredivisie" boven een zwakke "Eredivisie Guinea"
   // terwijl een echte substring-match altijd boven een losse typo-match blijft.
   // Eigen competitie krijgt een vaste bonus bovenop de sterkte, zodat "mijn" Eredivisie
   // altijd boven gelijknamige buitenlandse competities staat en nooit uit de top-N valt.
-  const name = entry.norm, str = Math.min(300, entry.strength / 40) + (entry.mine ? 400 : 0);
   if (!q) return str;                                     // lege query: puur op sterkte
   // klasse 1: hele query komt aaneengesloten voor. Positie weegt fors mee (een prefix-match
   // als "Premier League" verslaat een diepe match als "…Reservecompetitie Premier Divisie",
@@ -2235,7 +2461,10 @@ function renderDivSuggest() {
   const box = $('div-suggest');
   const q = normStr($('f-div').value);
   const idx = state.divIndex || [];
-  const ranked = idx.map(e => ({ e, s: scoreDiv(e, q) })).filter(x => x.s >= 0)
+  const ranked = idx.map(e => {
+    const str = Math.min(300, e.strength / 40) + (e.mine ? 400 : 0);
+    return { e, s: Math.max(...e.terms.map(term => scoreDiv(term, q, str))) };
+  }).filter(x => x.s >= 0)
     .sort((a, b) => b.s - a.s).slice(0, 8);
   if (!ranked.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
   divSuggestSel = -1;
@@ -2260,6 +2489,7 @@ function buildRoleSelect() {
     en: { GK: 'Goalkeeper', DEF: 'Defence', MID: 'Midfield', AANV: 'Attack' },
     fr: { GK: 'Gardien', DEF: 'Défense', MID: 'Milieu', AANV: 'Attaque' },
     de: { GK: 'Torwart', DEF: 'Abwehr', MID: 'Mittelfeld', AANV: 'Angriff' },
+    'zh-CN': { GK: '门将', DEF: '后卫', MID: '中场', AANV: '前锋' },
   };
   const H = headsBy[state.lang] || headsBy.en;
   let html = `<option value="">${t('roleAny')}</option>`;
@@ -2295,7 +2525,7 @@ function monthsUntil(expires) {
 
 function applyFilters() {
   let rows = state.mode === 'staff' ? state.staff : state.players;
-  const name = $('f-name').value.trim().toLowerCase();
+  const name = normSearch($('f-name').value).trim();
   const ageMin = +$('f-age-min').value || 0, ageMax = +$('f-age-max').value || 99;
   const caMin = +$('f-ca-min').value || 0, caMax = +$('f-ca-max').value || 999;
   const paMin = +$('f-pa-min').value || 0, paMax = +$('f-pa-max').value || 999;
@@ -2309,7 +2539,7 @@ function applyFilters() {
   // Max. loon-invoer volgt de gekozen weergaveperiode; intern vergelijken we per week.
   const wageIn = parseMoney($('f-wage').value);
   const wage = wageIn == null ? null : wageIn / wageFactor();
-  const nat = $('f-nat').value.trim().toLowerCase();
+  const nat = normSearch($('f-nat').value).trim();
   // Ontwikkeling: alleen actief met historie én zichtbare CA (groei is CA-afgeleid).
   const devOn = histReady() && !state.hideCapa && state.mode !== 'staff';
   const gMinRaw = $('f-growth-min').value, gMaxRaw = $('f-growth-max').value;
@@ -2328,17 +2558,15 @@ function applyFilters() {
   const advRules = activeAdvRules();   // spelers: veld-/verborgen attributen; staf: stafattributen
   const staffRole = $('f-staffrole').value;
   const gsel = $('f-gender').value;   // '' = beide, 'm' = mannen, 'v' = vrouwen
-  const divVal = $('f-div').value.trim().toLowerCase();   // zoekbalk: substring, hoofdletterongevoelig
+  const divVal = normSearch($('f-div').value).trim();
   const myClub = (state.meta.myClub || '').toLowerCase();
   if (state.mode === 'shortlist') rows = [...state.players, ...state.staff];
 
   state.filtered = rows.filter(p => {
     if (!p.name || !p.name.trim() || p.name.trim() === '?') return false;   // naamloze stubs verbergen
-      if (onlySl && !state.shortlist.has(p.id)) return false;
-    // Zoek-haystack per speler cachen: 2 toLowerCase-allocaties per rij per toetsaanslag
-    // wordt één .includes op een vaste string. Een NUL-teken (\u0000) als scheiding kan nooit in de
-    // zoekterm zitten, dus de matchsemantiek (naam óf club bevat de term) is identiek.
-    if (name && !(p._q ??= ((p.name || '') + '\u0000' + (p.club || '')).toLowerCase()).includes(name)) return false;
+    if (onlySl && !state.shortlist.has(p.id)) return false;
+    // Cache once per dump. NUL keeps distinct spellings from forming false matches at their boundaries.
+    if (name && !(p._q ??= normSearch([p.name, p.club, p.clubShort, ...(p.nameAliases || []), ...(p.clubAliases || [])].join('\u0000'))).includes(name)) return false;
     const age = getAge(p);
     if (age < ageMin || age > ageMax) return false;
     if ((p.ca ?? 0) < caMin || (p.ca ?? 0) > caMax) return false;
@@ -2348,8 +2576,9 @@ function applyFilters() {
     if (price != null && (estValue(p).v ?? Infinity) > price) return false;
     if (fee != null && (feeEstimate(p).v ?? Infinity) > fee) return false;
     if (wage != null && (p.wage ?? Infinity) > wage) return false;
-    if (nat && !((p.nat || []).some(n => n.toLowerCase().includes(nat) || natLabel(n).toLowerCase().includes(nat))
-      || natsLabel(p).toLowerCase().includes(nat))) return false;
+    if (nat && !(p._natQ ??= normSearch([
+      ...(p.nat || []), ...(natRec(p) || []), ...(p.nat || []).flatMap(n => NAT_BY_NAME.get(normSearch(n)) || [NATION_EN[n]]),
+    ].filter(v => typeof v === 'string').join('\u0000'))).includes(nat)) return false;
     if (onlyWk && !isWonderkid(p)) return false;
     if (onlyNew && !isNewSince(p)) return false;
     // Onbekende groei (nieuw, of te dunne basislijn) valt buiten een ingestelde grens,
@@ -2371,7 +2600,7 @@ function applyFilters() {
     }
     // Teamchips (1e/2e/jeugd) — alleen actief samen met "Mijn club" en teamType-data (plugin v0.1.10+).
     if (onlyMyClub && state.myTeam !== 'all' && state.mode !== 'staff' && !inMyTeam(p, state.myTeam, myClub)) return false;
-    if (contractF === 'free' && !isFree(p)) return false;
+    if (contractF === 'free' && (!isFree(p) || p.transferTo)) return false;
     if (contractF === 'exp6' || contractF === 'exp12') {
       const m = monthsUntil(p.expires);
       if (m == null || m > (contractF === 'exp6' ? 6 : 12)) return false;
@@ -2391,7 +2620,7 @@ function applyFilters() {
     if (state.mode === 'staff' && staffRole && p.job !== staffRole && !staffPrefMatch(p, staffRole)) return false;
     if (gsel === 'm' && p.gender === 1) return false;
     if (gsel === 'v' && p.gender !== 1) return false;
-    if (divVal && !(p.div || '').toLowerCase().includes(divVal)) return false;
+    if (divVal && !(p._divQ ??= normSearch(divisionNames(p).join('\u0000'))).includes(divVal)) return false;
     return true;
   });
   sortRows();
@@ -2475,7 +2704,7 @@ function buildChips() {
   const v = id => $(id).value.trim();
 
   if (v('f-name')) add(`${t('chipSearch')}: "${v('f-name')}"`, clearInput('f-name'));
-  if (activePos.size) add(`${t('position')}: ${[...activePos].join(', ')}`,
+  if (activePos.size) add(`${t('position')}: ${[...activePos].map(code => positionLabel(code)).join(state.lang === 'zh-CN' ? '、' : ', ')}`,
     () => { activePos.clear(); document.querySelectorAll('.pos-node').forEach(n => n.classList.remove('on')); });
   if (state.mode === 'staff' && $('f-staffrole').value) add($('f-staffrole').value, () => { $('f-staffrole').value = ''; });
   if ($('f-gender').value) add(t($('f-gender').value === 'm' ? 'dbMen' : 'dbWomen'), () => { $('f-gender').value = ''; });
@@ -2998,21 +3227,26 @@ function toggleShortlist(id) {
   const el = document.querySelector('.detail-star');
   if (el && state.selected) el.classList.toggle('on', state.shortlist.has(state.selected.id));
 }
-function exportShortlist() {
-  const ids = state.shortlist;
-  const all = [...state.players, ...state.staff].filter(p => ids.has(p.id));
-  if (!all.length) { showToast(t('slEmpty')); return; }
+function buildShortlistCsv(all) {
   const withCapa = !state.hideCapa;   // vraagprijs valt ook onder de verborgen-stats-toggle
-  const cols = ['Name', 'Position', 'Age', 'Club', 'Nationality',
-    ...(withCapa ? ['CA', 'PA'] : []), 'Value(GBP)', ...(withCapa ? ['AskingPrice(GBP)'] : []), 'Wage(GBP)', 'Contract', 'Interest'];
+  const cols = state.lang === 'zh-CN'
+    ? ['姓名', '位置', '年龄', '俱乐部', '国籍', ...(withCapa ? ['CA', 'PA'] : []),
+       '转会身价（英镑）', ...(withCapa ? ['要价（英镑）'] : []), '工资（英镑）', '到期', '加盟意愿']
+    : ['Name', 'Position', 'Age', 'Club', 'Nationality', ...(withCapa ? ['CA', 'PA'] : []),
+       'Value(GBP)', ...(withCapa ? ['AskingPrice(GBP)'] : []), 'Wage(GBP)', 'Contract', 'Interest'];
   const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
   const lines = [cols.join(',')];
   for (const p of all) {
     const i = interestEstimate(p);
-    lines.push([p.name, p.pos || jobLabel(p), getAge(p), p.club || '', natsLabel(p),
+    lines.push([p.name, positionText(p) || jobLabel(p), getAge(p), clubText(p), natsLabel(p),
       ...(withCapa ? [p.ca, p.pa] : []), estValue(p).v ?? '', ...(withCapa ? [feeEstimate(p).v ?? ''] : []), p.wage ?? '', p.expires || '', i ? i.label : ''].map(esc).join(','));
   }
-  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  return '\uFEFF' + lines.join('\r\n');
+}
+function exportShortlist() {
+  const all = [...state.players, ...state.staff].filter(p => state.shortlist.has(p.id));
+  if (!all.length) { showToast(t('slEmpty')); return; }
+  const blob = new Blob([buildShortlistCsv(all)], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   // revoke pas ná de download (Firefox breekt hem anders af) — zelfde patroon als downloadPlayerCard
@@ -3132,10 +3366,10 @@ function showDetail(p) {
   let html = `<h2>${escHtml(p.name)} <span class="detail-star ${on ? 'on' : ''}" data-star="${p.id}">${starSvg(18)}</span>
     <button class="copybtn" title="${t('copyBtnTip')}">${icon('clipboard', 13)}</button>
     <button class="cmpbtn ${inCmp ? 'on' : ''}" title="${t('addCompare')}">${icon('compare', 13)}</button>${isPlayer && p.attrs ? `<button class="cardbtn" title="${t('cardBtnTip')}">${icon('card', 13)}</button>` : ''}</h2>
-  <div class="sub">${getAge(p)} · ${escHtml(natsLabel(p))}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p)}${p.div ? ` · <span class="dim">${escHtml(p.div)}</span>` : ''}</div>
+  <div class="sub">${getAge(p)} · ${escHtml(natsLabel(p))}${isEu(p) ? ' · <span class="eu-yes">EU</span>' : ''} · ${clubLabel(p, true)}${p.div ? ` · <span class="dim">${shortLabel(p.div, p.divisionShort)}</span>` : ''}</div>
   ${gauge}
   <div class="kv">
-    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${posHtml(p)}</div><div><b>${t('foot')}</b> ${escHtml(footLabel(p))}</div>` : `<div><b>${t('c_role')}</b> ${staffJobless(p) ? '–' : escHtml(jobLabel(p))}</div>${prefJobLabel(p) ? `<div><b>${t('c_prefjob')}</b> ${escHtml(prefJobLabel(p))}</div>` : ''}${fitOf(p) != null ? `<div data-help="fitHint"><b>${t('c_fit')}</b> <span class="${roleClass(fitOf(p))}">${fitOf(p).toFixed(1)}</span> <span class="dim">(${escHtml(prefGroupLabel(fitGroup(p)))})</span> <span class="col-help">?</span></div>` : ''}`}
+    ${isPlayer ? `<div><b>${t('c_pos')}</b> ${posHtml(p, false)}</div><div><b>${t('foot')}</b> ${escHtml(footLabel(p))}</div>` : `<div><b>${t('c_role')}</b> ${staffJobless(p) ? '–' : escHtml(jobLabel(p))}</div>${prefJobLabel(p) ? `<div><b>${t('c_prefjob')}</b> ${escHtml(prefJobLabel(p))}</div>` : ''}${fitOf(p) != null ? `<div data-help="fitHint"><b>${t('c_fit')}</b> <span class="${roleClass(fitOf(p))}">${fitOf(p).toFixed(1)}</span> <span class="dim">(${escHtml(prefGroupLabel(fitGroup(p)))})</span> <span class="col-help">?</span></div>` : ''}`}
     ${isPlayer ? `<div><b>${t('estval')}</b> ${valTxt}</div>` : ''}
     ${isPlayer && !state.hideCapa && feeEstimate(p).v > 0 ? `<div><b>${t('c_fee')}</b> ${fmtMoney(feeEstimate(p).v * 0.85)} – ${fmtMoney(feeEstimate(p).v * 1.15)}</div>` : ''}
     <div><b>${t('wageLabel')}</b> ${fmtWage(p.wage)}${p.wage > 0 ? ` <span class="dim">${wageSuf()}</span>` : ''}</div>
@@ -3381,6 +3615,11 @@ const CARDL = {
     wk: '★ WONDERKID', repW: 'Weltweit', repC: 'Kontinental', repN: 'National', repL: 'Lokal',
     injL: 'Gering', injM: 'Mittel', injH: 'Hoch',
     sListed: 'AUF TRANSFERLISTE', sLoan: 'ZU VERLEIHEN', sRel: 'FREIGESTELLT', sNfs: 'UNVERKÄUFLICH', sFree: 'VEREINSLOS' },
+  'zh-CN': { meta: '实战', cur: '能力', pot: '潜力', roles: '最佳角色', value: '转会身价',
+    ask: '要价', wage: '工资', contract: '到期', rep: '声望', inj: '受伤倾向',
+    wk: '★ 妖人', repW: '世界级', repC: '洲际', repN: '全国', repL: '本地',
+    injL: '低', injM: '中', injH: '高',
+    sListed: '已挂牌', sLoan: '可出租', sRel: '将解约', sNfs: '非卖品', sFree: '自由球员' },
 };
 // Kaartkolommen zoals FM ze zelf indeelt: standaardsituaties horen bij Technisch (de app
 // splitst ze in het profiel, de kaart voegt ze weer samen → 14 rijen, net als Mentaal).
@@ -3428,9 +3667,9 @@ function buildCardModel(p) {
   const snapDate = state.meta.gameDate ? fmtDate(state.meta.gameDate) : '';
 
   return {
-    L, tier, wk, gk: isGk, name: (p.name || '?').toUpperCase(),
-    club: p.club || L.sFree, division: p.div || '', nation: natsLabel(p) || '',
-    positions: natPos(p).slice(0, 3).join(' · ') || '–',
+    L, tier, wk, gk: isGk, name: p.name || '?',
+    club: p.club || (isFree(p) ? L.sFree : t('clubUnknown')), division: p.div || '', nation: natsLabel(p) || '',
+    positions: natPos(p).slice(0, 3).map(code => positionLabel(code, true)).join(' · ') || '–',
     age: getAge(p), foot: footLabel(p), height: p.height ? p.height + ' cm' : '–',
     ca, pa, hideNum, hexNum: state.hideMeta ? null : meta != null ? meta.toFixed(1) : '–',
     groups: cardGroups(p, isGk), roles,
@@ -3453,7 +3692,7 @@ function drawPlayerCard(p) {
   const P = { bg2: '#1f2352', bd: '#2a2f62', tx: '#e9ebfa', mu: '#959ac8', gr: '#3fc56f', am: '#e8a13c', gd: '#f5c518' };
   const T = CARD_TIER[d.tier], wk = d.wk;
   const A = cardAlpha, fmc = cardFmc;
-  const F = (w, s) => `${w} ${s}px "Segoe UI", system-ui, sans-serif`;
+  const F = (w, s) => `${w} ${s}px "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif`;
   const ls = v => { try { x.letterSpacing = v; } catch (e) { } };
   const rr = (a, b, w, h, r) => { x.beginPath(); x.roundRect(a, b, w, h, r); };
   const hexPath = (cx, cy, r) => { x.beginPath(); for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + i * Math.PI / 3, px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r; i ? x.lineTo(px, py) : x.moveTo(px, py); } x.closePath(); };
@@ -3588,7 +3827,8 @@ function downloadPlayerCard(p) {
     drawPlayerCard(p).toBlob(b => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(b);
-      a.download = `fmss-${(p.name || 'speler').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '')}.png`;
+      const name = normSearch(p.name).replace(/[^\p{Letter}\p{Mark}\p{Number}]+/gu, '-').replace(/^-+|-+$/g, '');
+      a.download = `fmss-${name || 'player'}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     }, 'image/png');
@@ -3982,7 +4222,7 @@ function openCompare() {
       const bits = [val, p.wage > 0 ? fmtWage(p.wage) + ' ' + wageSuf() : null,
         p.expires ? String(p.expires).slice(0, 4) : null].filter(Boolean).join(' · ');
       return `<div class="cmp-cell"><div class="cmp-name">${escHtml(p.name)}</div>` +
-        `<div class="cmp-meta">${getAge(p)} · ${escHtml(p.pos || jobLabel(p))} · ${p.club ? escHtml(p.club) : '–'}` +
+        `<div class="cmp-meta">${getAge(p)} · ${escHtml(positionText(p) || jobLabel(p))} · ${escHtml(clubText(p))}` +
         `${bits ? `<br>${bits}` : ''}` +
         `${p.attrs ? `<br><span class="cmp-winsb">${tf('cmpWinsBadge', { n: wins[i] })}</span>` : ''}</div></div>`;
     }).join('') +
@@ -4095,14 +4335,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('compar
 // ---------- squad-behoefteanalyse ----------
 // Positiegroepen met een streefaantal (basis + degelijke cover) en de bijhorende pitch-codes.
 const SQUAD_GROUPS = [
-  { id: 'gk', label: { nl: 'Keeper', en: 'Goalkeeper', fr: 'Gardien', de: 'Torwart' }, pos: ['GK'], target: 2 },
-  { id: 'cb', label: { nl: 'Centrale verdediger', en: 'Central defender', fr: 'Défenseur central', de: 'Innenverteidiger' }, pos: ['DC'], target: 4 },
-  { id: 'fb', label: { nl: 'Vleugelverdediger', en: 'Full back', fr: 'Arrière latéral', de: 'Außenverteidiger' }, pos: ['DL', 'DR', 'WBL', 'WBR'], target: 4 },
-  { id: 'dm', label: { nl: 'Verdedigende mid', en: 'Defensive mid', fr: 'Milieu défensif', de: 'Defensives MF' }, pos: ['DM'], target: 2 },
-  { id: 'cm', label: { nl: 'Centrale middenvelder', en: 'Central midfielder', fr: 'Milieu central', de: 'Zentrales MF' }, pos: ['MC'], target: 3 },
-  { id: 'wing', label: { nl: 'Buitenspeler', en: 'Winger', fr: 'Ailier', de: 'Flügelspieler' }, pos: ['ML', 'MR', 'AML', 'AMR'], target: 4 },
-  { id: 'am', label: { nl: 'Aanvallende mid', en: 'Attacking mid', fr: 'Milieu offensif', de: 'Offensives MF' }, pos: ['AMC'], target: 2 },
-  { id: 'st', label: { nl: 'Spits', en: 'Striker', fr: 'Attaquant', de: 'Stürmer' }, pos: ['ST'], target: 3 },
+  { id: 'gk', label: { nl: 'Keeper', en: 'Goalkeeper', fr: 'Gardien', de: 'Torwart', 'zh-CN': '门将' }, pos: ['GK'], target: 2 },
+  { id: 'cb', label: { nl: 'Centrale verdediger', en: 'Central defender', fr: 'Défenseur central', de: 'Innenverteidiger', 'zh-CN': '中后卫' }, pos: ['DC'], target: 4 },
+  { id: 'fb', label: { nl: 'Vleugelverdediger', en: 'Full back', fr: 'Arrière latéral', de: 'Außenverteidiger', 'zh-CN': '边后卫' }, pos: ['DL', 'DR', 'WBL', 'WBR'], target: 4 },
+  { id: 'dm', label: { nl: 'Verdedigende mid', en: 'Defensive mid', fr: 'Milieu défensif', de: 'Defensives MF', 'zh-CN': '后腰' }, pos: ['DM'], target: 2 },
+  { id: 'cm', label: { nl: 'Centrale middenvelder', en: 'Central midfielder', fr: 'Milieu central', de: 'Zentrales MF', 'zh-CN': '中场' }, pos: ['MC'], target: 3 },
+  { id: 'wing', label: { nl: 'Buitenspeler', en: 'Winger', fr: 'Ailier', de: 'Flügelspieler', 'zh-CN': '边锋' }, pos: ['ML', 'MR', 'AML', 'AMR'], target: 4 },
+  { id: 'am', label: { nl: 'Aanvallende mid', en: 'Attacking mid', fr: 'Milieu offensif', de: 'Offensives MF', 'zh-CN': '前腰' }, pos: ['AMC'], target: 2 },
+  { id: 'st', label: { nl: 'Spits', en: 'Striker', fr: 'Attaquant', de: 'Stürmer', 'zh-CN': '前锋' }, pos: ['ST'], target: 3 },
 ];
 const avg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
 function analyseSquad() {
@@ -4527,6 +4767,7 @@ function applyLang() {
   document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
   document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
   document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
+  document.querySelectorAll('[data-i18n-title]').forEach(el => el.title = t(el.dataset.i18nTitle));
   document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); el.title = t(el.dataset.i18nAria); });
   // ?-helpteksten tonen via de eigen app-tooltip (zie initHelpTip), niet meer via title.
   $('f-name').placeholder = t('searchph');
@@ -4545,12 +4786,16 @@ function applyLang() {
   buildGenderFilter();
   buildFootOptions();
   buildRoleSelect();
+  buildPitch();
   buildDivisions();
   renderDevSection();
   renderIntakeBar();
   renderPresets();
-  renderTable();   // kolomkoppen zijn vertaald → header opnieuw opbouwen
-  applyFilters();
+  if (state.mode === 'analysis') renderAnalysis();
+  else {
+    renderTable();   // kolomkoppen zijn vertaald → header opnieuw opbouwen
+    applyFilters();
+  }
   if (state.selected) showDetail(state.selected);
 }
 
@@ -4698,7 +4943,7 @@ async function poll() {
         loadDump().then(ok => {
           if (!ok) return;   // laadfout: loadDump toont zelf het foutscherm en de foutbanner
           b.className = 'done';
-          b.innerHTML = bannerMsg('check', `${t('dumpLoaded')} (${(pl.players ?? 0).toLocaleString()} · ${(pl.staff ?? 0).toLocaleString()})`);
+          b.innerHTML = bannerMsg('check', `${t('dumpLoaded')} (${(pl.players ?? 0).toLocaleString(uiLocale())} · ${(pl.staff ?? 0).toLocaleString(uiLocale())})`);
           b.onclick = () => { b.className = 'hidden'; };
           setTimeout(() => { if (b.className === 'done') b.className = 'hidden'; }, 6000);
         });
@@ -4782,7 +5027,6 @@ async function initMac() {
 }
 initMac();
 
-buildPitch();
 applyLang();
 document.body.classList.toggle('hide-capa', state.hideCapa);
 document.body.classList.toggle('hide-meta', state.hideMeta);
