@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 namespace FMSuperScout;
 
@@ -6,7 +7,7 @@ internal static class Dumper
 {
 
     private static readonly string OutDir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FMSuperScout");
+        Host.DataDirectory;
 
     // Diagnose-data (histogram van alle voorkomende class-offsets, gezet tijdens de scan).
     internal static Dictionary<int, long> AllOffHist = new();
@@ -24,6 +25,12 @@ internal static class Dumper
     internal static bool VersionOk = true; // major.minor == gepinde offsets-versie
     // Geheugenindeling van de geladen game (FM26/FM27…), gekozen op de game_plugin.dll-versie.
     private static Fields F = Fields.FM26;
+#if WINDOWS
+    private static FmClubResources LanguageResources;
+    private static FmPersonNames PersonNames;
+    private static FmPersonNames BasePersonNames;
+    private static string DataLanguage;
+#endif
     // Team-object van de human-manager, waaruit de in-game datum wordt gelezen (team-schema).
     internal static ulong DiagMyTeam;
     // Datum-stemmen van alle teams ([team+0xA0]+0x94), als kruischeck op de team-schema-lezing.
@@ -254,6 +261,9 @@ internal static class Dumper
             WriteError("Football Manager is still starting up (game database not loaded yet). Load your save, then try again.");
             return DumpResult.Done;
         }
+#if WINDOWS
+        LoadLanguageResources(game);
+#endif
 
         var players = new Dictionary<uint, Person>();
         var staff = new Dictionary<uint, Person>();
@@ -471,13 +481,14 @@ internal static class Dumper
         // Ook: welke club heeft de human-manager als teammanager → jouw club.
         var mgrAddrs = new HashSet<ulong>();
         foreach (var mg in managers) { mgrAddrs.Add(mg.obj); mgrAddrs.Add(mg.person); }
-        var squadClub = new Dictionary<uint, (string club, int tt, int rep, string div)>();
+        var squadClub = new Dictionary<uint, (EntityName club, int tt, int rep, EntityName division)>();
         MultiClub = new HashSet<uint>();
         MultiClubSample = new List<string>();
         DiagMyTeam = 0;
         foreach (ulong club in clubObjs)
         {
-            string cname = ClubNameOf(mem, club);
+            var clubNames = ClubNamesOf(mem, club);
+            string cname = clubNames.Full;
             if (cname == null) continue;
             ulong tb = mem.Ptr(club + F.CLUB_TEAMS_BEGIN), te = mem.Ptr(club + F.CLUB_TEAMS_END);
             if (tb == 0 || te <= tb) continue;
@@ -503,7 +514,7 @@ internal static class Dumper
                 {
                     ulong pp = mem.Ptr(pb + pi * 8);
                     if (pp == 0 || !personToUid.TryGetValue(pp, out uint puid)) continue;
-                    PickSquad(squadClub, players, puid, cname, tt, trep, CompNameOf(mem, team));
+                    PickSquad(squadClub, players, puid, clubNames, tt, trep, CompetitionNamesOf(mem, team));
                 }
             }
         }
@@ -528,7 +539,8 @@ internal static class Dumper
         DateVotes = new Dictionary<uint, int>();
         foreach (ulong club in clubAddrs)
         {
-            string cname = ClubNameOf(mem, club);
+            var clubNames = ClubNamesOf(mem, club);
+            string cname = clubNames.Full;
             if (cname == null) continue;
             ulong tb2 = mem.Ptr(club + F.CLUB_TEAMS_BEGIN), te2 = mem.Ptr(club + F.CLUB_TEAMS_END);
             if (tb2 == 0 || te2 <= tb2 || (te2 - tb2) % 8 != 0) continue;
@@ -554,7 +566,7 @@ internal static class Dumper
                         DateVotes[norm] = DateVotes.GetValueOrDefault(norm) + 1;
                     }
                 }
-                string tdiv = CompNameOf(mem, team);
+                var tdiv = CompetitionNamesOf(mem, team);
                 ulong pb2 = mem.Ptr(team + F.TEAM_PLAYERS_BEGIN), pe2 = mem.Ptr(team + F.TEAM_PLAYERS_END);
                 if (pb2 == 0 || pe2 <= pb2 || (pe2 - pb2) % 8 != 0) continue;
                 long pcnt2 = (long)((pe2 - pb2) / 8);
@@ -573,7 +585,7 @@ internal static class Dumper
                             if (q != 0 && personToUid.TryGetValue(q, out puid)) { hitOff = off; break; }
                         }
                     if (hitOff == -1) continue;
-                    PickSquad(squadClub, players, puid, cname, tt, trep, tdiv);
+                    PickSquad(squadClub, players, puid, clubNames, tt, trep, tdiv);
                 }
             }
         }
@@ -583,7 +595,20 @@ internal static class Dumper
         // Koppel clubs aan spelers (squad wint; anders blijft contract-keten-fallback staan).
         foreach (var p in players.Values)
             if (squadClub.TryGetValue(p.Uid, out var sc))
-            { p.Club = sc.club; if (sc.rep > 0) p.ClubRep = sc.rep; if (sc.div != null) p.Div = sc.div; p.TeamType = sc.tt; }
+            {
+                p.Club = sc.club.Full;
+                p.ClubShort = sc.club.Short;
+                p.ClubAliases = sc.club.Aliases;
+                p.ClubStatus = "known";
+                if (sc.rep > 0) p.ClubRep = sc.rep;
+                if (sc.division.Full != null)
+                {
+                    p.Div = sc.division.Full;
+                    p.DivisionShort = sc.division.Short;
+                    p.DivisionAliases = sc.division.Aliases;
+                }
+                p.TeamType = sc.tt;
+            }
 
         Dumper.LinkedViaSquad = squadClub.Count;
 
@@ -656,6 +681,12 @@ internal static class Dumper
         DiagStaffAlsoPlayer = staffAlsoPlayer.Count;
         foreach (var uid in staffAlsoPlayer) staff.Remove(uid);
         Host.Info($"Speler/staf-ontdubbeling: staf ruw {DiagStaffRaw}, ook speler {DiagStaffAlsoPlayer}, netto staf {staff.Count}.");
+#if WINDOWS
+        var people = players.Values.Concat(staff.Values);
+        ApplyDisplayLanguage(people);
+        if (VersionOk && GameVersion != null && me.person != 0 && HumanManagers.Count <= 1)
+            ApplyNicknames(mem, people, mem.U32(me.person + 0x08));
+#endif
 
         Host.Info($"Gevonden: {players.Count} spelers, {staff.Count} staf " +
                            $"({candidates:N0} kandidaten, {sw.ElapsedMilliseconds} ms). JSON schrijven…");
@@ -706,7 +737,7 @@ internal static class Dumper
     private static Person ReadPlayer(MemScan m, ulong person, ulong pl, ulong db, uint uid, ushort ca, ushort pa)
     {
         var e = new Person { Uid = uid, Ca = ca, Pa = pa, IsPlayer = true };
-        e.Name = ReadName(m, person);
+        SetPersonName(m, e, person);
         (e.BirthYear, e.BirthDoy) = DecodeFmDate(m.U32(person + F.PERO_DOB));
         e.Age = AgeFrom(e.BirthYear, e.BirthDoy);
         e.Nat = ReadNation(m, person);
@@ -746,7 +777,7 @@ internal static class Dumper
         // tegen in-game bedragen); 0x238 is de vraagprijs (meestal niet ingesteld).
         e.Value = MoneyVal(m.U32(pl + F.PLAO_GUIDE_VALUE));   // 0x234
         e.GuideValue = Money(m.U32(pl + F.PLAO_TRANSFER_VALUE)); // 0x238 (vraagprijs)
-        ulong con = m.Ptr(person + F.PERO_FULL_CONTRACT);
+        bool contractRead = m.TryPtr(person + F.PERO_FULL_CONTRACT, out ulong con);
         if (con != 0)
         {
             e.Wage = Money(m.U32(con + F.CON_WEEKLY_WAGE));
@@ -774,13 +805,12 @@ internal static class Dumper
         e.PersonAddr = person;
         e.PlAddr = pl;
         e.Gender = (m.U8(db + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
-        var (cname, crep, cdiv) = ResolveClub(m, person);
-        e.Club = cname; e.ClubRep = crep; e.Div = cdiv;
+        SetAffiliation(m, e, con, contractRead);
         // Moederclub = club uit het volledige contract (person+0xA8→team→club). Voor verhuurde
         // spelers wijkt dit af van de squad-club (waar ze nú spelen); daarmee detecteert de app
         // huur: eigenaar==mijn club & speelt elders = verhuurd; speelt bij mij & eigenaar elders
         // = gehuurd. squad-walk overschrijft e.Club straks met de huidige club.
-        e.OwnerClub = cname;
+        e.OwnerClub = e.Club;
         return e;
     }
 
@@ -788,7 +818,7 @@ internal static class Dumper
     private static Person ReadStaff(MemScan m, ulong person, ulong st, ulong db, uint uid, ushort ca, ushort pa)
     {
         var e = new Person { Uid = uid, Ca = ca, Pa = pa, IsPlayer = false };
-        e.Name = ReadName(m, person);
+        SetPersonName(m, e, person);
         (e.BirthYear, e.BirthDoy) = DecodeFmDate(m.U32(person + F.PERO_DOB));
         e.Age = AgeFrom(e.BirthYear, e.BirthDoy);
         e.Nat = ReadNation(m, person);
@@ -803,7 +833,7 @@ internal static class Dumper
         int adapt = ClampAttr(m.U8(person + F.PERO_ADAPTABILITY));
         if (adapt > 0) e.StaffAttrs["Aanpassingsvermogen"] = adapt;
 
-        ulong con = m.Ptr(person + F.PERO_FULL_CONTRACT);
+        bool contractRead = m.TryPtr(person + F.PERO_FULL_CONTRACT, out ulong con);
         if (con != 0)
         {
             e.Wage = Money(m.U32(con + F.CON_WEEKLY_WAGE));
@@ -813,10 +843,10 @@ internal static class Dumper
         }
         if (string.IsNullOrEmpty(e.Job)) e.Job = "Staflid";
         e.Gender = (m.U8(db + (ulong)F.PERO_GENDER) & F.GENDER_FEMALE_BIT) != 0 ? 1 : 0;
-        var (sclub, srep, sdiv) = ResolveClub(m, person);
-        e.Club = sclub; e.Div = sdiv; e.ClubRep = srep;
+        SetAffiliation(m, e, con, contractRead);
         e.CurRep = Rep(m.U16(st + F.NPLO_CUR_REP));
         e.WorldRep = Rep(m.U16(st + F.NPLO_WORLD_REP));
+        e.PersonAddr = person;
         (e.PrefJobs, e.JobPrefs) = ReadJobPrefs(m, person);
         // Persoonlijkheid (pero, ruw 1-20) staat bij staf op dezelfde plek als bij spelers.
         e.Ambition = ClampAttr(m.U8(person + F.PERO_AMBITION));
@@ -872,9 +902,120 @@ internal static class Dumper
         if (!string.IsNullOrEmpty(common)) return common;
         string first = m.NestedString(person + F.PERO_FIRST_NAME);
         string second = m.NestedString(person + F.PERO_SECOND_NAME);
-        string name = string.Join(" ", new[] { first, second }.Where(s => !string.IsNullOrEmpty(s)));
-        return string.IsNullOrEmpty(name) ? null : name;
+        return JoinName(first, second);
     }
+
+    private static string JoinName(string first, string second) =>
+        first == null ? second : second == null ? first : $"{first} {second}";
+
+    private static void SetPersonName(MemScan mem, Person entry, ulong person)
+    {
+#if WINDOWS
+        if (PersonNames != null)
+        {
+            string first = mem.NestedString(person + F.PERO_FIRST_NAME);
+            string last = mem.NestedString(person + F.PERO_SECOND_NAME);
+            string common = mem.NestedString(person + F.PERO_COMMON_NAME);
+            entry.Name = common ?? JoinName(first, last);
+            if (entry.Name == null) return;
+            ulong nation = mem.Ptr(person + F.PERO_NATION);
+            // A compact nation index is distinct from the object's database UID.
+            ushort index = nation == 0 ? ushort.MaxValue : mem.U16(nation + 0x08);
+            ushort firstNation = NameNation(mem, person + F.PERO_FIRST_NAME);
+            ushort lastNation = NameNation(mem, person + F.PERO_SECOND_NAME);
+            string chinese = PersonNames.Resolve(entry.Uid, index, first, last, common, firstNation, lastNation);
+            if (BasePersonNames != null && chinese != BasePersonNames.Resolve(
+                    entry.Uid, index, first, last, common, firstNation, lastNation))
+                chinese = null;
+            if (chinese != entry.Name) entry.NameAlias = chinese;
+            return;
+        }
+#endif
+        entry.Name = ReadName(mem, person);
+    }
+
+#if WINDOWS
+    private static ushort NameNation(MemScan mem, ulong field)
+    {
+        ulong name = mem.Ptr(field);
+        return name == 0 ? ushort.MaxValue : mem.U16(name + 0x0C);
+    }
+
+    private static void LoadLanguageResources(GameProcess game)
+    {
+        LanguageResources = null;
+        PersonNames = null;
+        BasePersonNames = null;
+        DataLanguage = null;
+        if (!VersionOk || GameVersion == null) return;
+        int major = F.SupportedMajor;
+        DataLanguage = FmDataLanguage.Read(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), major);
+        try
+        {
+            string gameDir = Path.GetDirectoryName(game.Process.MainModule?.FileName);
+            if (gameDir == null) return;
+            LanguageResources = FmClubResources.Load(gameDir, major);
+            byte[] data = LanguageResources?.ReadPersonNames();
+            if (data != null) PersonNames = FmPersonNames.Parse(data);
+            // The latest installed update and the database used by a save can differ.
+            // Where both FM26 database versions are installed, require them to agree.
+            byte[] baseData = LanguageResources?.ReadBasePersonNames();
+            if (baseData != null) BasePersonNames = FmPersonNames.Parse(baseData);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException
+            or ZstdSharp.ZstdException or DecoderFallbackException or System.ComponentModel.Win32Exception)
+        {
+            Host.Warn($"Could not read FM's name resources: {e.Message}");
+            PersonNames = null;
+            BasePersonNames = null;
+        }
+    }
+
+    private static void ApplyDisplayLanguage(IEnumerable<Person> people)
+    {
+        if (LanguageResources == null || PersonNames == null) return;
+
+        // A preference on disk can be newer than the loaded game's data. Use names read
+        // from the running game as evidence before replacing any person's display name.
+        int chinese = 0, other = 0;
+        var seen = new HashSet<uint>();
+        foreach (var person in people)
+        {
+            if (person.Nat.Count == 0 || !seen.Add(person.NatId)) continue;
+            string live = person.Nat[0];
+            string localized = LanguageResources.Nation(person.NatId, live);
+            string english = LanguageResources.NationEnglish(person.NatId, live);
+            if (localized == null || english == null || localized == english) continue;
+            if (localized == live) chinese++;
+            else other++;
+            if (chinese + other >= 12) break;
+        }
+
+        if (chinese < 2 || other != 0)
+        {
+            if (DataLanguage == "chinese") DataLanguage = null;
+            return;
+        }
+
+        DataLanguage = "chinese";
+        foreach (var person in people)
+            if (person.NameAlias != null)
+                (person.Name, person.NameAlias) = (person.NameAlias, person.Name);
+    }
+
+    private static void ApplyNicknames(MemScan mem, IEnumerable<Person> people, uint managerIndex)
+    {
+        if (managerIndex == 0 || managerIndex == uint.MaxValue) return;
+        foreach (var person in people)
+        {
+            if (person.PersonAddr == 0) continue;
+            string nickname = FmNicknames.Read(mem, person.PersonAddr, managerIndex);
+            if (nickname == null || nickname == person.Name) continue;
+            person.NameBeforeNickname = person.Name;
+            person.Name = nickname;
+        }
+    }
+#endif
 
     private static List<string> ReadNation(MemScan m, ulong person)
     {
@@ -915,10 +1056,11 @@ internal static class Dumper
     // koos bij een verhuurde eerste-elftalspeler willekeurig de moederclub, waarna club en
     // moederclub gelijk werden en de huur onzichtbaar was (26-07: 167 huren op 51.753 spelers,
     // allemaal teamtype 0 — jeugd- en reserveverhuur werd structureel gemist).
-    private static void PickSquad(Dictionary<uint, (string club, int tt, int rep, string div)> squad,
+    private static void PickSquad(Dictionary<uint, (EntityName club, int tt, int rep, EntityName division)> squad,
                                   Dictionary<uint, Person> players,
-                                  uint uid, string cname, int tt, int trep, string div)
+                                  uint uid, EntityName club, int tt, int trep, EntityName division)
     {
+        string cname = club.Full;
         // Verhuurde spelers staan ook nog in een selectie van de moederclub. Dat elftal
         // onthouden we apart: TeamType wordt het elftal bij de húúrclub (meestal 0), maar
         // "Mijn club → 1e elftal" moet juist weten of hij vanuit de A-selectie, de O21 of de
@@ -929,16 +1071,16 @@ internal static class Dumper
         if (pe != null && parent != null && cname == parent && (pe.OwnerTeamType < 0 || tt < pe.OwnerTeamType))
             pe.OwnerTeamType = tt;
 
-        if (!squad.TryGetValue(uid, out var cur)) { squad[uid] = (cname, tt, trep, div); return; }
+        if (!squad.TryGetValue(uid, out var cur)) { squad[uid] = (club, tt, trep, division); return; }
 
         bool take;
-        if (cur.club == cname)
+        if (cur.club.Full == cname)
         {
             take = tt < cur.tt;
         }
         else
         {
-            bool curIsParent = parent != null && cur.club == parent;
+            bool curIsParent = parent != null && cur.club.Full == parent;
             bool newIsParent = parent != null && cname == parent;
             if (curIsParent == newIsParent) take = tt < cur.tt;   // geen van beide (of allebei) de moederclub
             else take = curIsParent;                              // de niet-moederclub is waar hij speelt
@@ -946,40 +1088,66 @@ internal static class Dumper
             if (MultiClub.Add(uid) && MultiClubSample.Count < 25)
             {
                 string name = pe?.Name ?? "?";
-                string won = take ? cname : cur.club, lost = take ? cur.club : cname;
+                string won = take ? cname : cur.club.Full, lost = take ? cur.club.Full : cname;
                 MultiClubSample.Add($"{name,-24} speelt: {won}  ·  ook in selectie: {lost}  ·  moederclub: {parent ?? "-"}");
             }
         }
-        if (take) squad[uid] = (cname, tt, trep, div);
+        if (take) squad[uid] = (club, tt, trep, division);
     }
 
-    private static (string name, int rep, string div) ResolveClub(MemScan m, ulong person)
+    private static void SetAffiliation(MemScan m, Person entry, ulong contract, bool contractRead)
     {
-        ulong con = m.Ptr(person + (ulong)F.PERO_FULL_CONTRACT);
-        if (con == 0) return (null, 0, null);
-        ulong team = m.Ptr(con + F.CON_TEAM);
-        if (team == 0) return (null, 0, null);
+        entry.ClubStatus = contractRead && contract == 0 && VersionOk && GameVersion != null ? "free" : "unknown";
+        if (contract == 0) return;
+        ulong team = m.Ptr(contract + F.CON_TEAM);
+        if (team == 0) return;
         int rep = m.U16(team + F.TEAM_REP);
-        if (rep is < 0 or > 12000) rep = 0;
+        entry.ClubRep = rep <= 12000 ? rep : 0;
         ulong club = m.Ptr(team + F.TEAM_CLUB);
-        return (club == 0 ? null : ClubNameOf(m, club), rep, CompNameOf(m, team));
+        if (club != 0)
+        {
+            var names = ClubNamesOf(m, club);
+            entry.Club = names.Full;
+            entry.ClubShort = names.Short;
+            entry.ClubAliases = names.Aliases;
+            if (entry.Club != null) entry.ClubStatus = "known";
+        }
+        var division = CompetitionNamesOf(m, team);
+        entry.Div = division.Full;
+        entry.DivisionShort = division.Short;
+        entry.DivisionAliases = division.Aliases;
+    }
+
+    private static (string club, int rep, string div) ResolveClub(MemScan m, ulong person)
+    {
+        var entry = new Person();
+        bool read = m.TryPtr(person + F.PERO_FULL_CONTRACT, out ulong contract);
+        SetAffiliation(m, entry, contract, read);
+        return (entry.Club, entry.ClubRep, entry.Div);
     }
 
     // Competitienaam van een team: [team+0x50/0x60] → VOLLEDIGE naam op comp+0x40, anders
     // de korte op comp+0x48. Volgorde bewust: de korte naam mist bij niet-gelicentieerde
     // competities de landkwalificatie (heel Spanje werd "Eerste Divisie"); de volledige
     // naam heeft die wel ("Oostenrijkse Eredivisie" — geverifieerd 15-07 via de comp-kaart).
-    private static string CompNameOf(MemScan m, ulong team)
+    private static EntityName CompetitionNamesOf(MemScan m, ulong team)
     {
         foreach (uint toff in new[] { F.TEAM_COMP, F.TEAM_COMP_ALT })
         {
             ulong comp = m.Ptr(team + toff);
             if (comp == 0) continue;
-            string s = m.IndirectString(comp + F.COMP_NAME);
-            if (!PlausibleClub(s)) s = m.IndirectString(comp + F.COMP_SHORT_NAME);
-            if (PlausibleClub(s)) return s;
+            var names = ReadEntityName(m, comp, F.COMP_NAME, F.COMP_SHORT_NAME);
+            if (names.Full == null) continue;
+#if WINDOWS
+            if (LanguageResources != null)
+            {
+                uint id = m.U32(comp + F.OBJ_DUNI);
+                names = names with { Aliases = LanguageResources.CompetitionAliases(id, names.Full) };
+            }
+#endif
+            return names;
         }
-        return null;
+        return default;
     }
 
     // Clubobject: een teamvector [club+0x18, club+0x20) met 1..64 teams en een leesbare naam.
@@ -990,26 +1158,56 @@ internal static class Dumper
             && ClubNameOf(m, p) != null;
     }
 
-    private static string ClubNameOf(MemScan m, ulong club)
+    private readonly record struct EntityName(string Full, string Short, string[] Aliases = null);
+
+    private static string ClubNameOf(MemScan m, ulong club) =>
+        ReadEntityName(m, club, F.CLUB_NAME, F.CLUB_SHORT_NAME).Full;
+
+    private static EntityName ClubNamesOf(MemScan m, ulong club)
     {
-        string name = m.IndirectString(club + F.CLUB_NAME) ?? m.IndirectString(club + F.CLUB_SHORT_NAME);
-        return PlausibleClub(name) ? name : null;
+        var names = ReadEntityName(m, club, F.CLUB_NAME, F.CLUB_SHORT_NAME);
+#if WINDOWS
+        if (names.Full != null && LanguageResources != null)
+        {
+            uint id = m.U32(club + F.OBJ_DUNI);
+            names = names with { Aliases = LanguageResources.ClubAliases(id, names.Full) };
+        }
+#endif
+        return names;
     }
 
-    // Alleen echte namen: overwegend Latijnse letters, geen Cyrillische/rare bytes.
-    // Accepteert het hele Latijnse Unicode-blok (t/m Latin Extended-A/B + Additional),
-    // anders vallen bv. Poolse (Lech Poznań, ł/ń/ś) en Turkse (ğ/ş/ı) clubnamen weg
-    // en toont de app "onbekende club" terwijl de reputatie wél gelezen is.
+    private static EntityName ReadEntityName(MemScan m, ulong address, uint fullOffset, uint shortOffset)
+    {
+        string full = m.IndirectString(address + fullOffset, 256);
+        string shortName = m.IndirectString(address + shortOffset, 256);
+        if (!PlausibleClub(shortName)) shortName = null;
+        if (!PlausibleClub(full)) full = shortName;
+        return new(full, shortName == full ? null : shortName);
+    }
+
+    // De naam helpt bij het herkennen van clubobjecten. Accepteer Latijnse en Chinese
+    // namen, inclusief gangbare leestekens, en wijs beschadigde strings af.
     private static bool PlausibleClub(string s)
     {
-        if (string.IsNullOrEmpty(s) || s.Length is < 2 or > 48) return false;
-        int latin = 0, weird = 0;
-        foreach (char c in s)
+        if (string.IsNullOrEmpty(s) || s.Length is < 2 or > 96) return false;
+        int letters = 0;
+        foreach (var c in s.EnumerateRunes())
         {
-            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) latin++;
-            else if (c > 0x7F && !(char.IsLetter(c) && (c <= 0x24F || (c >= 0x1E00 && c <= 0x1EFF)))) weird++;
+            int v = c.Value;
+            if (Rune.IsLetter(c) && (v <= 0x024F || v is >= 0x1E00 and <= 0x1EFF
+                or >= 0x3400 and <= 0x4DBF or >= 0x4E00 and <= 0x9FFF
+                or >= 0xF900 and <= 0xFAFF or >= 0x20000 and <= 0x323AF))
+            {
+                letters++;
+            }
+            else if (v == 0xFFFD || Rune.IsControl(c) || (v > 0x7E && !Rune.IsDigit(c)
+                && !Rune.IsWhiteSpace(c) && !Rune.IsPunctuation(c)
+                && Rune.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark))
+            {
+                return false;
+            }
         }
-        return latin >= 2 && weird == 0;
+        return letters >= 2;
     }
 
     // Echte functie uit personJobTypes-enum (byte op contract+0x26).
@@ -1239,6 +1437,9 @@ internal static class Dumper
         j.Prop("gameVersion", GameVersion);
         j.Prop("supportedVersion", F.SupportedVersion);
         j.Prop("versionOk", VersionOk);
+#if WINDOWS
+        if (DataLanguage != null) j.Prop("dataLanguage", DataLanguage == "chinese" ? "zh-CN" : DataLanguage);
+#endif
         j.Prop("manager", ManagerName);
         j.Prop("myClub", MyClub);
         j.Prop("myClubRep", MyClubRep);
@@ -1312,11 +1513,25 @@ internal static class Dumper
         j.BeginObj();
         j.Prop("id", p.Uid);
         j.Prop("name", p.Name ?? "?");
+        if (p.NameAlias != null || p.NameBeforeNickname != null)
+        {
+            j.Key("nameAliases"); j.BeginArr();
+            if (p.NameAlias != null && p.NameAlias != p.Name) j.Val(p.NameAlias);
+            if (p.NameBeforeNickname != null && p.NameBeforeNickname != p.NameAlias)
+                j.Val(p.NameBeforeNickname);
+            j.EndArr();
+        }
         j.Prop("age", p.Age);
         if (p.BirthYear > 0) { j.Prop("dob", $"{p.BirthYear:D4}"); j.Prop("birthYear", p.BirthYear); j.Prop("birthDoy", p.BirthDoy); }
         j.Key("nat"); j.BeginArr(); foreach (var n in p.Nat) j.Val(n); j.EndArr();
         if (p.NatId != 0) j.Prop("natId", p.NatId);
         j.Prop("club", p.Club);
+        if (p.ClubShort != null) j.Prop("clubShort", p.ClubShort);
+        if (p.ClubAliases is { Length: > 0 })
+        {
+            j.Key("clubAliases"); j.BeginArr(); foreach (string alias in p.ClubAliases) j.Val(alias); j.EndArr();
+        }
+        if (p.ClubStatus != null) j.Prop("clubStatus", p.ClubStatus);
         // Moederclub alleen emitten als die afwijkt van de huidige club (= huurrelatie); scheelt ruis.
         if (isPlayer && p.OwnerClub != null && p.OwnerClub != p.Club)
         {
@@ -1324,6 +1539,11 @@ internal static class Dumper
             if (p.OwnerTeamType >= 0) j.Prop("ownerTeamType", p.OwnerTeamType);   // elftal bij de moederclub
         }
         j.Prop("div", p.Div);
+        if (p.DivisionShort != null) j.Prop("divisionShort", p.DivisionShort);
+        if (p.DivisionAliases is { Length: > 0 })
+        {
+            j.Key("divisionAliases"); j.BeginArr(); foreach (string alias in p.DivisionAliases) j.Val(alias); j.EndArr();
+        }
         // Gender alleen emitten als vrouw (bij "vrouwenvoetbal meenemen"); mannen blijven veld-loos.
         if (p.Gender == 1) j.Prop("gender", 1);
         j.Prop("ca", p.Ca);
@@ -1349,7 +1569,12 @@ internal static class Dumper
             j.Null4("wageDemand");
             j.Prop("listed", p.Listed);
             j.Prop("loanListed", p.LoanListed);
-            if (p.TransferTo != null) { j.Prop("transferTo", p.TransferTo); if (p.TransferDate != null) j.Prop("transferDate", p.TransferDate); }
+            if (p.TransferTo != null)
+            {
+                j.Prop("transferTo", p.TransferTo);
+                if (p.TransferFrom != null) j.Prop("transferFrom", p.TransferFrom);
+                if (p.TransferDate != null) j.Prop("transferDate", p.TransferDate);
+            }
             j.Prop("notForSale", p.NotForSale);
             j.Prop("setForRelease", p.SetForRelease);
             j.Prop("clubRep", p.ClubRep);
@@ -1502,6 +1727,8 @@ internal sealed class Person
 {
     public uint Uid;
     public string Name;
+    public string NameAlias;
+    public string NameBeforeNickname;
     public int Age;
     public int BirthYear;
     public int BirthDoy;
@@ -1509,8 +1736,13 @@ internal sealed class Person
     public uint NatId;          // DB-UID van het (eerste) land — taalonafhankelijk (issue #15)
     public int JobId;           // functie-byte uit het contract — taalonafhankelijk
     public string Club;
+    public string ClubShort;
+    public string[] ClubAliases;
+    public string ClubStatus;
     public string OwnerClub;    // moederclub (volledig contract); ≠ Club bij huur
     public string Div;
+    public string DivisionShort;
+    public string[] DivisionAliases;
     public int Gender;          // 0 = man, 1 = vrouw
     public int TeamType = -1;   // 0 = 1e elftal, ~3 = reserves, ≥10 = jeugd; -1 = onbekend
     public int OwnerTeamType = -1;   // elftal bij de moederclub (squad-walk); alleen relevant bij huur

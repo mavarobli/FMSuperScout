@@ -41,6 +41,8 @@
 
   <ItemGroup>
     <Compile Include="..\core\*.cs" Exclude="..\core\*.Mac.cs" />
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
+    <None Update="THIRD-PARTY-NOTICES.txt" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

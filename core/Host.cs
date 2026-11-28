@@ -14,4 +14,7 @@ internal static class Host
     /// <summary>"plugin" of "scanner" — gaat mee in dump-meta en diagnostics.</summary>
     public static string Kind = "plugin";
     public static string Version = "?";
+
+    public static readonly string DataDirectory = Environment.GetEnvironmentVariable("FMSS_DATA_DIR") ??
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FMSuperScout");
 }

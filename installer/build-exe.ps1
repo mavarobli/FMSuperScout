@@ -43,6 +43,7 @@ $node = (Get-Command node).Source
 Copy-Item $node -Destination (Join-Path $viewer 'node.exe') -Force
 # Scanner naast node.exe: server.js zoekt hem op ..\FMSuperScout.Scanner.exe
 Copy-Item $scanner -Destination $viewer -Force
+Copy-Item (Join-Path (Split-Path $scanner) 'THIRD-PARTY-NOTICES.txt') -Destination $viewer -Force
 
 $mb = [math]::Round((Get-ChildItem $stage -File -Recurse | Measure-Object Length -Sum).Sum / 1MB, 1)
 Write-Host "Stage klaar: $mb MB ongecomprimeerd"

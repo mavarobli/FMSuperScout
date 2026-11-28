@@ -30,7 +30,8 @@
   --side-line: #23284a;
   --side-sunk: #111329;   /* actieve-filterblok, iets dieper dan het paneel */
   --link: #b9adf0;        /* tekstlinks op donker: lichtviolet, contrast > 7:1 */
-  --font-display: Bahnschrift, 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Segoe UI', 'Microsoft YaHei', 'Noto Sans CJK SC', system-ui, sans-serif;
+  --font-display: Bahnschrift, var(--font-ui);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -55,7 +56,7 @@
 ::-webkit-scrollbar-corner { background: transparent; }
 html, body { height: 100%; }
 body {
-  font: 13px/1.45 "Segoe UI", system-ui, sans-serif;
+  font: 13px/1.45 var(--font-ui);
   background:
     radial-gradient(1100px 650px at 88% -12%, rgba(91, 70, 184, .09), transparent 62%),
     radial-gradient(900px 600px at -8% 112%, rgba(50, 70, 200, .07), transparent 60%),
@@ -328,6 +329,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .frow input[type=text] { width: 96px; text-align: right; }
 /* bedreven (niet-natuurlijke) positie in de positiekolom: zelfde letter, gedempt */
 .pos-acc, #grid td .pos-acc { color: var(--dim); vertical-align: baseline; }
+.pos-term { white-space: nowrap; }
 .chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text); margin-bottom: 6px; cursor: pointer; }
 .chk input { accent-color: var(--accent); }
 #btn-clear { background: none; border: 0; padding: 4px 0; color: var(--link); font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -701,7 +703,7 @@ td.exp-year { color: #d8c88a; }
 .es-steps { text-align: left; font-size: 13px; line-height: 2; color: var(--muted); margin: 4px 0 0; padding-left: 22px; }
 .es-steps kbd {
   background: var(--bg3); border: 1px solid var(--border); border-bottom-width: 2px;
-  border-radius: 4px; padding: 1px 6px; font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text);
+  border-radius: 4px; padding: 1px 6px; font: 600 11px/1.4 var(--font-ui); color: var(--text);
 }
 .es-steps b { color: var(--text); font-weight: 600; }
 

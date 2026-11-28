@@ -75,7 +75,14 @@ internal sealed partial class MemScan
 
     // Getypeerde reads naar een lokale variabele: niets van FM's geheugen blijft op onze heap
     // achter (op de Mac scant de scan ook onze eigen heap, zie MemScan.Mac.cs).
-    public unsafe ulong Ptr(ulong a) { ulong v; return ReadRaw(a, &v, 8) ? v : 0UL; }
+    public ulong Ptr(ulong a) => TryPtr(a, out ulong v) ? v : 0UL;
+    public unsafe bool TryPtr(ulong a, out ulong value)
+    {
+        ulong v;
+        bool read = ReadRaw(a, &v, 8);
+        value = read ? v : 0UL;
+        return read;
+    }
     public unsafe long I64(ulong a) { long v; return ReadRaw(a, &v, 8) ? v : 0L; }
     public unsafe uint U32(ulong a) { uint v; return ReadRaw(a, &v, 4) ? v : 0U; }
     public unsafe int I32(ulong a) { int v; return ReadRaw(a, &v, 4) ? v : 0; }
@@ -104,11 +111,11 @@ internal sealed partial class MemScan
     {
         maxLen = System.Math.Clamp(maxLen, 32, 256);
         byte* buf = stackalloc byte[maxLen];
-        if (!ReadRaw(addr, buf, maxLen))
+        while (!ReadRaw(addr, buf, maxLen))
         {
-            // Fallback: lees korter (adres kan vlak bij regio-einde liggen).
-            maxLen = 32;
-            if (!ReadRaw(addr, buf, maxLen)) return null;
+            // Probeer een kortere read als de naam vlak bij een regio-einde ligt.
+            if (maxLen == 32) return null;
+            maxLen = System.Math.Max(32, maxLen / 2);
         }
         int n = 0;
         while (n < maxLen && buf[n] != 0) n++;
